@@ -1,13 +1,21 @@
 
+'use client'; // Make this a client component for state and effects
+
+import { useEffect, useState } from 'react';
 import { getLoggedMatchSuggestions, type LoggedMatchSuggestion } from '@/services/match-report-service';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getAIMatchingMode, setAIMatchingMode as setAIMatchingModeService, type AIMatchingMode } from '@/services/ai-config-service';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon, BrainCircuit, Zap, RefreshCw, Settings2 } from 'lucide-react';
 import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { useToast } from "@/hooks/use-toast";
+import { Separator } from '@/components/ui/separator';
 
-export const dynamic = 'force-dynamic'; // Ensure fresh data on each request
 
 function getMatchScoreColor(score?: string) {
   switch (score?.toLowerCase()) {
@@ -27,35 +35,157 @@ function getMatchScoreIcon(score?: string) {
   }
 }
 
+export default function MatchReportsPage() {
+  const [reports, setReports] = useState<LoggedMatchSuggestion[]>([]);
+  const [isLoadingReports, setIsLoadingReports] = useState(true);
+  const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
+  const [isUpdatingMode, setIsUpdatingMode] = useState(false);
+  const { toast } = useToast();
 
-export default async function MatchReportsPage() {
-  const reports = await getLoggedMatchSuggestions();
+  const fetchReports = async () => {
+    setIsLoadingReports(true);
+    try {
+      const fetchedReports = await getLoggedMatchSuggestions();
+      setReports(fetchedReports);
+    } catch (error) {
+      console.error("Failed to fetch match reports:", error);
+      toast({ title: "Error", description: "Could not load match reports.", variant: "destructive" });
+    } finally {
+      setIsLoadingReports(false);
+    }
+  };
+
+  const fetchMode = async () => {
+    try {
+      const mode = await getAIMatchingMode();
+      setCurrentMatchingMode(mode);
+    } catch (error) {
+      console.error("Failed to fetch AI matching mode:", error);
+      // Keep default or last known, toast is optional here
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+    fetchMode();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleModeToggle = async (newModeChecked: boolean) => {
+    const newMode: AIMatchingMode = newModeChecked ? 'advanced' : 'simple';
+    if (newMode === currentMatchingMode) return;
+
+    setIsUpdatingMode(true);
+    try {
+      const result = await setAIMatchingModeService(newMode);
+      if (result.success) {
+        setCurrentMatchingMode(newMode);
+        toast({
+          title: "AI Mode Updated",
+          description: `Matching mode set to ${newMode}. New suggestions will use this mode.`,
+        });
+      } else {
+        throw new Error(result.message || "Failed to update mode server-side");
+      }
+    } catch (error: any) {
+      console.error("Failed to set AI matching mode:", error);
+      toast({
+        title: "Update Failed",
+        description: error.message || "Could not update AI matching mode.",
+        variant: "destructive",
+      });
+      // Revert UI switch if backend update fails by re-fetching the actual mode
+      fetchMode(); 
+    } finally {
+      setIsUpdatingMode(false);
+    }
+  };
+
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 py-8">
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl flex items-center gap-3">
-            <ServerCrash className="h-8 w-8 text-primary" />
-            AI Match Suggestion Admin Report
+            <Settings2 className="h-8 w-8 text-primary" />
+            AI Configuration
           </CardTitle>
           <CardDescription className="font-body">
-            This report shows AI-generated item match suggestions.
-            <br />
-            <span className="font-semibold text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-sm inline-block my-1">Important Note:</span> Due to React Strict Mode, you may see duplicate entries in development for each suggestion event; this does not occur in production.
+            Control AI behavior for item matching. Changes will apply to new suggestions.
           </CardDescription>
         </CardHeader>
+        <CardContent className="space-y-4">
+            <div className="flex items-center space-x-3 p-4 border rounded-lg bg-muted/30">
+                <Switch
+                id="ai-matching-mode"
+                checked={currentMatchingMode === 'advanced'}
+                onCheckedChange={handleModeToggle}
+                disabled={isUpdatingMode}
+                />
+                <Label htmlFor="ai-matching-mode" className="flex-grow font-headline text-lg">
+                Use Advanced AI Matching
+                </Label>
+                {isUpdatingMode && <RefreshCw className="h-5 w-5 animate-spin text-primary" />}
+            </div>
+            <div className="flex items-start gap-4 text-sm text-muted-foreground p-4 border-l-4 border-primary/50 bg-primary/5 rounded-md">
+                <BrainCircuit className="h-6 w-6 text-primary mt-0.5 shrink-0" />
+                <div>
+                    <strong className="text-foreground">Advanced Mode:</strong> Considers 'offer' vs. 'want' types, aims for direct fulfillment and complementary trades. More nuanced but potentially more complex/costly.
+                </div>
+            </div>
+            <div className="flex items-start gap-4 text-sm text-muted-foreground p-4 border-l-4 border-secondary/50 bg-secondary/5 rounded-md">
+                <Zap className="h-6 w-6 text-secondary-foreground mt-0.5 shrink-0" />
+                 <div>
+                    <strong className="text-foreground">Simple Mode:</strong> Focuses on general relevance, category similarity, and keyword matches. Less nuanced, potentially faster/cheaper.
+                </div>
+            </div>
+        </CardContent>
+        <CardFooter>
+            <p className="text-xs text-muted-foreground font-body">
+                Current active mode: <Badge variant={currentMatchingMode === 'advanced' ? "default" : "secondary"} className="capitalize">{currentMatchingMode}</Badge>.
+                Refresh suggestion logs below to see mode used for past suggestions.
+            </p>
+        </CardFooter>
+      </Card>
+
+      <Separator />
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div>
+                <CardTitle className="font-headline text-3xl flex items-center gap-3">
+                    <ServerCrash className="h-8 w-8 text-accent" />
+                    AI Match Suggestion Logs
+                </CardTitle>
+                <CardDescription className="font-body mt-1">
+                    This report shows AI-generated item match suggestions.
+                    <br />
+                    <span className="font-semibold text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-sm inline-block my-1 text-xs">Important Dev Note:</span> Due to React Strict Mode, you may see duplicate entries in development for each suggestion event; this does not occur in production.
+                </CardDescription>
+            </div>
+            <Button onClick={fetchReports} disabled={isLoadingReports} variant="outline" size="sm">
+              <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingReports ? 'animate-spin' : ''}`} />
+              Refresh Logs
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent>
-          {reports.length === 0 ? (
+          {isLoadingReports ? (
+             <div className="text-center py-12 text-muted-foreground font-body flex items-center justify-center gap-2">
+                <RefreshCw className="h-5 w-5 animate-spin" /> Loading suggestion logs...
+             </div>
+          ) : reports.length === 0 ? (
             <p className="text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</p>
           ) : (
-            <ScrollArea className="h-[calc(100vh-22rem)] w-full border rounded-md">
+            <ScrollArea className="h-[calc(100vh-30rem)] w-full border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="w-[180px]">Timestamp</TableHead>
                     <TableHead>For User ID</TableHead>
                     <TableHead>Current Item</TableHead>
+                    <TableHead>Matching Mode</TableHead>
                     <TableHead>Suggested Items (ID, Owner, Score)</TableHead>
                     <TableHead className="min-w-[300px]">Reasoning</TableHead>
                   </TableRow>
@@ -74,6 +204,15 @@ export default async function MatchReportsPage() {
                                 View Item <LinkIcon className="h-3 w-3" />
                             </Link>
                           </div>
+                      </TableCell>
+                      <TableCell className="text-xs capitalize">
+                        {report.usedMatchingMode ? (
+                            <Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>
+                                {report.usedMatchingMode}
+                            </Badge>
+                        ): (
+                            <Badge variant="outline">N/A</Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         {report.suggestedMatches && report.suggestedMatches.length > 0 ? (

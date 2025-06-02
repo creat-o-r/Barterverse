@@ -1,7 +1,8 @@
 
 'use server';
 /**
- * @fileOverview Suggests matching items for a given item based on LLM analysis, considering item listing types (offer/want).
+ * @fileOverview Suggests matching items for a given item based on LLM analysis,
+ * considering item listing types (offer/want) and a configurable matching mode (simple/advanced).
  *
  * - suggestMatchingItems - A function that suggests trade matches.
  * - ItemMatchInput - The input type for the suggestMatchingItems function.
@@ -11,6 +12,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { logMatchSuggestion } from '@/services/match-report-service';
+import { getAIMatchingMode, type AIMatchingMode } from '@/services/ai-config-service';
 
 const ItemBriefSchema = z.object({
   id: z.string(),
@@ -34,6 +36,7 @@ const SuggestedItemWithScoreSchema = z.object({
   ownerId: z.string().describe("The ID of the owner of the suggested item."),
 });
 
+// This schema is used by both prompts for their direct AI output.
 const PromptSuggestedItemSchema = z.object({
   itemId: z.string().describe("The ID of the suggested matching item."),
   matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low).")
@@ -42,12 +45,15 @@ const PromptSuggestedItemSchema = z.object({
 const ItemMatchOutputSchema = z.object({
   suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores and ownerIds. Can be empty if no good matches are found."),
   reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
+  usedMatchingMode: z.custom<AIMatchingMode>().optional().describe("The matching mode that was used (simple or advanced)."),
 });
 export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 
-const prompt = ai.definePrompt({
-  name: 'itemMatchPrompt',
-  input: {schema: ItemMatchInputSchema},
+
+// ADVANCED PROMPT
+const advancedItemMatchPrompt = ai.definePrompt({
+  name: 'advancedItemMatchPrompt',
+  input: {schema: ItemMatchInputSchema}, // Input is the full ItemMatchInputSchema
   output: {schema: z.object({
     suggestedMatches: z.array(PromptSuggestedItemSchema),
     reasoning: z.string().optional(),
@@ -90,6 +96,48 @@ Optionally, provide a brief (1-2 sentences) overall reasoning for your suggestio
   `,
 });
 
+
+// SIMPLE PROMPT
+const simpleItemMatchPrompt = ai.definePrompt({
+  name: 'simpleItemMatchPrompt',
+  input: {schema: ItemMatchInputSchema}, // Input is the full ItemMatchInputSchema
+  output: {schema: z.object({
+    suggestedMatches: z.array(PromptSuggestedItemSchema),
+    reasoning: z.string().optional(),
+  })},
+  prompt: `You are an AI assistant helping users find items to trade on a barter platform.
+Given a "Current Item" and a list of "Available Items" from other users, identify items from the "Available Items" list that could be a good trade. Focus on general relevance, category similarity, and keyword matches in descriptions.
+
+Current Item:
+ID: {{{currentItem.id}}}
+Name: {{{currentItem.name}}}
+Description: {{{currentItem.description}}}
+Category: {{{currentItem.category}}}
+Owner ID: {{{currentItem.ownerId}}}
+Listing Type: {{{currentItem.listingType}}} (Note: for simple matching, you can largely ignore this, just provide generally relevant items)
+
+
+Available Items (format: ID :: Name :: Category :: Description):
+{{#each availableItems}}
+- {{id}} :: {{name}} :: {{category}} :: {{description}}
+{{/each}}
+
+For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
+"High" indicates a strong potential match based on similarity.
+"Medium" indicates a good potential match.
+"Low" indicates a possible, but less compelling, match.
+
+Do not suggest:
+- The current item itself (ID: {{{currentItem.id}}}).
+- Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}).
+
+Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
+If no good matches are found, return an empty list for 'suggestedMatches'.
+Optionally, provide a brief (1-2 sentences) overall reasoning for your suggestions.
+  `,
+});
+
+
 const itemMatchFlow = ai.defineFlow(
   {
     name: 'itemMatchFlow',
@@ -98,38 +146,42 @@ const itemMatchFlow = ai.defineFlow(
   },
   async (input: ItemMatchInput): Promise<ItemMatchOutput> => {
     const flowName = 'itemMatchFlow';
+    const matchingMode = await getAIMatchingMode();
     
-    // Filter out the current item itself and items from the same owner from the availableItems list before sending to AI.
-    // The AI prompt also reinforces this, but pre-filtering is good practice.
     const filteredAvailableItems = input.availableItems.filter(item => 
         item.id !== input.currentItem.id && item.ownerId !== input.currentItem.ownerId
     );
 
     if (filteredAvailableItems.length === 0) {
         const reasoning = `No other relevant items available from other users to suggest matches for your ${input.currentItem.listingType} "${input.currentItem.name}".`;
-        const output: ItemMatchOutput = { suggestedMatches: [], reasoning: reasoning };
+        const output: ItemMatchOutput = { suggestedMatches: [], reasoning: reasoning, usedMatchingMode: matchingMode };
         await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
             suggestedMatches: output.suggestedMatches,
             reasoning: output.reasoning,
+            usedMatchingMode: matchingMode,
         });
         return output;
     }
 
     try {
-      const {output: promptOutput} = await prompt({
-          triggeringUserId: input.triggeringUserId, // This field is for the prompt, not used by AI directly
-          currentItem: input.currentItem,
-          availableItems: filteredAvailableItems // Pass the pre-filtered list
-      });
+      let promptOutput;
+      if (matchingMode === 'advanced') {
+        const { output } = await advancedItemMatchPrompt({ ...input, availableItems: filteredAvailableItems });
+        promptOutput = output;
+      } else { // 'simple' mode
+        const { output } = await simpleItemMatchPrompt({ ...input, availableItems: filteredAvailableItems });
+        promptOutput = output;
+      }
 
       if (!promptOutput) {
-          console.warn(`${flowName}: Prompt returned null output`);
+          console.warn(`${flowName} (${matchingMode} mode): Prompt returned null output`);
           const errorOutput: ItemMatchOutput = {
               suggestedMatches: [],
-              reasoning: "The AI assistant could not generate suggestions at this time."
+              reasoning: `The AI assistant (${matchingMode} mode) could not generate suggestions at this time.`,
+              usedMatchingMode: matchingMode,
           };
           await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
@@ -137,10 +189,12 @@ const itemMatchFlow = ai.defineFlow(
             currentItemName: input.currentItem.name,
             suggestedMatches: errorOutput.suggestedMatches,
             reasoning: errorOutput.reasoning,
+            usedMatchingMode: matchingMode,
           });
           return errorOutput;
       }
 
+      // Augment AI suggestions with ownerId from the filteredAvailableItems list
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = filteredAvailableItems.find(item => item.id === aiSuggestion.itemId);
         return {
@@ -151,7 +205,8 @@ const itemMatchFlow = ai.defineFlow(
       
       const validatedOutput: ItemMatchOutput = {
         suggestedMatches: augmentedMatches,
-        reasoning: promptOutput.reasoning
+        reasoning: promptOutput.reasoning,
+        usedMatchingMode: matchingMode,
       };
       
       await logMatchSuggestion({
@@ -160,34 +215,36 @@ const itemMatchFlow = ai.defineFlow(
         currentItemName: input.currentItem.name,
         suggestedMatches: validatedOutput.suggestedMatches,
         reasoning: validatedOutput.reasoning,
+        usedMatchingMode: matchingMode,
       });
       return validatedOutput;
 
     } catch (error: any) {
-      console.error(`Error in ${flowName} calling prompt:`, error);
+      console.error(`Error in ${flowName} (${matchingMode} mode) calling prompt:`, error);
       try {
-        console.error(`Detailed error object in ${flowName}:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.error(`Detailed error object in ${flowName} (${matchingMode} mode):`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
-        console.error(`Could not stringify detailed error object in ${flowName}:`, e);
+        console.error(`Could not stringify detailed error object in ${flowName} (${matchingMode} mode):`, e);
       }
 
-      let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
+      let userMessage = `An unexpected error occurred while trying to get AI suggestions (${matchingMode} mode).`;
       const lowerErrorMessage = error.message?.toLowerCase() || "";
 
       if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-        userMessage = "The AI matching service has reached its current usage limit. Please try again later.";
+        userMessage = `The AI matching service (${matchingMode} mode) has reached its current usage limit. Please try again later.`;
       } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
-        userMessage = "The AI matching service is temporarily overloaded. Please try again in a few moments.";
+        userMessage = `The AI matching service (${matchingMode} mode) is temporarily overloaded. Please try again in a few moments.`;
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
-        userMessage = "The AI matching service could not process the request due to content restrictions or safety settings.";
+        userMessage = `The AI matching service (${matchingMode} mode) could not process the request due to content restrictions or safety settings.`;
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
-        userMessage = "The AI's response was not in the expected format. Please try again. If the problem persists, item data might be causing an issue.";
-        console.error(`${flowName}: AI response format error. Issues/Message:`, error.issues || error.message);
+        userMessage = `The AI's response (${matchingMode} mode) was not in the expected format. Please try again. If the problem persists, item data might be causing an issue.`;
+        console.error(`${flowName} (${matchingMode} mode): AI response format error. Issues/Message:`, error.issues || error.message);
       }
 
       const errorOutput: ItemMatchOutput = {
         suggestedMatches: [],
-        reasoning: userMessage
+        reasoning: userMessage,
+        usedMatchingMode: matchingMode,
       };
       await logMatchSuggestion({
         triggeringUserId: input.triggeringUserId,
@@ -195,6 +252,7 @@ const itemMatchFlow = ai.defineFlow(
         currentItemName: input.currentItem.name,
         suggestedMatches: errorOutput.suggestedMatches,
         reasoning: errorOutput.reasoning,
+        usedMatchingMode: matchingMode,
       });
       return errorOutput;
     }

@@ -7,15 +7,9 @@
 .pnp.js
 .yarn/install-state.gz
 
-# testing
-/coverage
-
 # next.js
 /.next/
 /out/
-
-# production
-/build
 
 # misc
 .DS_Store
@@ -25,33 +19,36 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-# TODO: Remove next-env.d.ts once https://github.com/vercel/next.js/issues/52434 is fixed
-next-env.d.ts
 
 # vercel
 .vercel
 
-# env files
+# turbo
+.turbo
+
+# intellij
+.idea
+
+# Production Build Artifacts (Next.js)
+.next
+build
+dist
+
+# Environment variables
 .env
 .env*.local
-
-# Firebase
-.firebase/
-firebase-debug.log
-database-debug.log
+*.env
 
 # Log files
 *.log
 *.log.*
-.match-suggestions.log.json
 
-# VSCode
-.vscode/*
+# User-specific VSCode settings
+.vscode/*.user.*
 !.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
 
-# IDX
-.idx
+# Match suggestions log file
+*.log.json
+
+# AI Settings file
+.ai-settings.json
