@@ -1,11 +1,13 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Repeat, CheckCircle, XCircle, Hourglass } from 'lucide-react';
-import type { TradeOffer } from '@/types'; // Assuming types are in @/types
+import { MessageSquare, Repeat, CheckCircle, XCircle, Hourglass, Bot } from 'lucide-react';
+import type { TradeOffer } from '@/types'; 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { dummyItems } from '@/lib/dummy-data'; // To get item names
+import { dummyItems } from '@/lib/dummy-data'; 
+import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
+import { Separator } from '@/components/ui/separator';
 
 // Reusing dummyTrades for now, ideally this comes from a service
 const dummyTrades: TradeOffer[] = [
@@ -68,7 +70,6 @@ const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
   switch (status) {
     case 'pending': return <Hourglass className="h-5 w-5 text-yellow-500" />;
     case 'accepted': return <CheckCircle className="h-5 w-5 text-green-500" />;
-    // Other statuses might not be relevant for "active chats" page
     default: return <MessageSquare className="h-5 w-5 text-gray-500" />;
   }
 };
@@ -83,7 +84,7 @@ export default function ChatsPage() {
   );
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto space-y-8">
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl flex items-center gap-3">
@@ -140,6 +141,23 @@ export default function ChatsPage() {
               })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-3xl flex items-center gap-3">
+            <Bot className="h-8 w-8 text-accent" />
+            Direct Assistant Chat
+          </CardTitle>
+          <CardDescription className="font-body">
+            Have a question or need help? Chat directly with our AI assistant.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <GeneralChatWindow />
         </CardContent>
       </Card>
     </div>
