@@ -3,7 +3,7 @@ import type { Item } from '@/types';
 import ItemCard from './ItemCard';
 
 interface ItemListProps {
-  items: (Item & { matchScore?: string; isThirdPartyFulfillment?: boolean })[]; // Updated to include isThirdPartyFulfillment
+  items: (Item & { matchScore?: string; isThirdPartyFulfillment?: boolean })[];
 }
 
 export default function ItemList({ items }: ItemListProps) {
@@ -12,11 +12,12 @@ export default function ItemList({ items }: ItemListProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="flex flex-row items-stretch overflow-x-auto space-x-3 py-3 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-5 md:space-x-0 md:py-0">
       {items.map((item) => (
-        <ItemCard key={item.id} item={item} />
+        <div key={item.id} className="min-w-[150px] w-[150px] md:min-w-0 md:w-full h-full">
+          <ItemCard item={item} />
+        </div>
       ))}
     </div>
   );
 }
-
