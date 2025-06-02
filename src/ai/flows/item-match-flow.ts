@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Suggests matching items for a given item based on LLM analysis.
@@ -87,14 +88,31 @@ const itemMatchFlow = ai.defineFlow(
       return output;
     } catch (error: any) {
       console.error("Error in itemMatchFlow calling prompt:", error);
+      // Log more details if possible, useful for server-side debugging
+      if (error && typeof error === 'object') {
+        try {
+          console.error("Detailed error object in itemMatchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        } catch (e) {
+          console.error("Could not stringify detailed error object:", e);
+        }
+      }
+
       let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
+
       if (error.message && typeof error.message === 'string') {
         if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
           userMessage = "The AI matching service is temporarily overloaded. Please try again in a few moments.";
         } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
             userMessage = "The AI matching service could not process the request due to content restrictions or safety settings.";
+        } else if (error.name === 'ZodError' || (error.message && (error.message.includes('invalid_type') || error.message.includes('Expected')) )) {
+            userMessage = "The AI's response was not in the expected format. Please try again. If the problem persists, the item data might be causing an issue.";
+            console.error("AI response format error (ZodError or similar). Issues/Message:", error.issues || error.message);
         }
+      } else if (error.name === 'ZodError' && error.issues) { // Catch ZodError even if message isn't standard
+        userMessage = "The AI's response had an unexpected data structure. Please try again.";
+        console.error("AI response format error (ZodError issues):", error.issues);
       }
+      
       return {
         suggestedItemIds: [],
         reasoning: userMessage
