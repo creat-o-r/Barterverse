@@ -16,7 +16,8 @@ export interface LoggedMatchSuggestion {
     ownerId: string;
   }>;
   reasoning?: string;
-  usedMatchingMode?: AIMatchingMode; // Added to log which mode was used
+  usedMatchingMode?: AIMatchingMode; 
+  preferencesConsidered?: boolean; // Added to log if preferences were used
 }
 
 const LOG_FILE_PATH = path.join(process.cwd(), '.match-suggestions.log.json');
@@ -28,7 +29,12 @@ async function readLogs(): Promise<LoggedMatchSuggestion[]> {
     if (fileContent.trim() === '') {
       return []; 
     }
-    return JSON.parse(fileContent) as LoggedMatchSuggestion[];
+    // Make sure to handle new fields gracefully if old logs exist
+    const logs = JSON.parse(fileContent) as LoggedMatchSuggestion[];
+    return logs.map(log => ({
+        ...log,
+        preferencesConsidered: log.preferencesConsidered === undefined ? false : log.preferencesConsidered, // default old logs
+    }));
   } catch (error: any) {
     if (error.code === 'ENOENT') {
       await fs.writeFile(LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8'); 
@@ -50,6 +56,7 @@ async function writeLogs(logs: LoggedMatchSuggestion[]): Promise<void> {
 export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'timestamp'>): Promise<void> {
   const newLog: LoggedMatchSuggestion = {
     ...data,
+    preferencesConsidered: data.preferencesConsidered === undefined ? false : data.preferencesConsidered,
     timestamp: new Date().toISOString(),
   };
 

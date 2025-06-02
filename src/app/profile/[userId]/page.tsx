@@ -7,21 +7,18 @@ import type { User, Item, UserMotivation, TradeTimingPreference } from '@/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Brain, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { use, useState, useEffect } from 'react'; // Updated import
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { use, useState, useEffect } from 'react';
 
 // Helper function to find user (simulates data fetching)
 async function getUserProfile(userId: string): Promise<User | null> {
-  // For "me", we can pick the first user or implement logic later
   const actualUserId = userId === 'me' ? dummyUsers[0].id : userId;
   const user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
-  // Filter items owned by this user
   user.items = dummyItems.filter(item => item.ownerId === user.id);
   return user;
 }
@@ -55,55 +52,23 @@ const tradeTimingTextMap: Record<TradeTimingPreference, string> = {
   'flexible': 'Flexible Timing',
 };
 
-// Helper function inside UserProfilePage component to generate mock activity summary
-const generateMockActivitySummary = (user: User): string => {
-    let summary = "Recent Activity Analysis Target:\n";
-    const offers = user.items.filter(i => i.listingType === 'offer' && (i.status === 'available' || i.status === 'pending')).slice(0, 2);
-    const wants = user.items.filter(i => i.listingType === 'want' && (i.status === 'available' || i.status === 'pending')).slice(0, 1);
-
-    if (offers.length > 0) {
-      summary += "\nOffers Listed by User:\n";
-      offers.forEach(item => {
-        summary += `- "${item.name}" (Category: ${item.category}, Description: "...${item.description.substring(0,30)}...")\n`;
-      });
-    }
-    if (wants.length > 0) {
-      summary += "\nWants Listed by User:\n";
-      wants.forEach(item => {
-        summary += `- "${item.name}" (Seeking in ${item.category}, Description: "...${item.description.substring(0,30)}...")\n`;
-      });
-    }
-
-    // Add some mock chat snippets based on user ID for variety
-    if (user.id === 'user1') { // Alice
-      summary += "\nSample Chat Snippets:\n- \"Happy to ship smaller items if needed! Let's build a friendly trading community.\"\n- \"Mainly looking for unique vintage pieces, not so worried about value maximization.\"";
-    } else if (user.id === 'user2') { // Bob
-      summary += "\nSample Chat Snippets:\n- \"Prefer local pickup for electronics to ensure everything is as described.\"\n- \"Only interested in direct trades for now. What's the best offer you have?\"";
-    } else if (user.id === 'user3') { // Charlie
-        summary += "\nSample Chat Snippets:\n- \"Quick and easy trades are best for me, happy to help others out!\"\n- \"Open to different kinds of offers, especially for my sustainable goods.\"";
-    } else { // Diana, Ethan
-      summary += "\nSample Chat Snippets:\n- \"Let's make a fair deal that works for both of us.\"\n- \"Open to discussing details to make the trade smooth.\"";
-    }
-    return summary.trim();
-};
-
 
 export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
-  const resolvedParams = use(paramsProp); // Use React.use to unwrap params
+  const params = use(paramsProp); 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadUserProfile() {
       setLoading(true);
-      const profile = await getUserProfile(resolvedParams.userId); // Use resolvedParams.userId
+      const profile = await getUserProfile(params.userId);
       setUser(profile);
       setLoading(false);
     }
-    if (resolvedParams.userId) {
+    if (params.userId) {
         loadUserProfile();
     }
-  }, [resolvedParams.userId]); // Depend on resolvedParams.userId
+  }, [params.userId]); 
 
   if (loading) {
     return <div className="text-center py-10 font-body">Loading profile...</div>;
@@ -113,55 +78,11 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     return <div className="text-center py-10 font-body">User not found.</div>;
   }
 
-  const isCurrentUser = resolvedParams.userId === 'me' || resolvedParams.userId === dummyUsers[0].id;
+  const isCurrentUser = params.userId === 'me' || params.userId === dummyUsers[0].id;
 
   const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
   const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
   const tradedOrFulfilledItems = user.items.filter(item => item.status === 'traded');
-
-  const getMockAISuggestions = (currentUser: User) => {
-    let suggestions: any = {
-        motivations: ['convenience-focused'] as UserMotivation[],
-        locationPreference: { isSensitive: false },
-        tradeTimingPreference: 'flexible' as TradeTimingPreference,
-        interestedInThirdPartyFulfillment: true,
-        confidence: 'Medium',
-        reasoning: "General activity suggests a flexible approach to trading."
-    };
-    if (currentUser.id === 'user1') {
-        suggestions = {
-            motivations: ['unique-finds', 'community-building'] as UserMotivation[],
-            locationPreference: { isSensitive: false, notes: "Appears flexible with shipping." },
-            tradeTimingPreference: 'flexible' as TradeTimingPreference,
-            interestedInThirdPartyFulfillment: true,
-            confidence: 'High',
-            reasoning: "Activity suggests a focus on unique items and positive community interactions. Mentions shipping."
-        };
-    } else if (currentUser.id === 'user2') {
-        suggestions = {
-            motivations: ['maximize-trades'] as UserMotivation[],
-            locationPreference: { isSensitive: true, notes: 'Strong preference for local pickup for electronics.' },
-            tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
-            interestedInThirdPartyFulfillment: false,
-            confidence: 'High',
-            reasoning: "User seems focused on item value, direct exchanges, and mentions local pickup preferences."
-        };
-    } else if (currentUser.id === 'user3') {
-        suggestions = {
-            motivations: ['help-others', 'convenience-focused'] as UserMotivation[],
-            locationPreference: { isSensitive: false },
-            tradeTimingPreference: 'staged' as TradeTimingPreference,
-            interestedInThirdPartyFulfillment: true,
-            confidence: 'Medium',
-            reasoning: "Seems motivated by helping and convenience, likely open to staged trades."
-        };
-    }
-    return suggestions;
-  };
-  
-  const mockAISuggestions = getMockAISuggestions(user);
-  const mockActivitySummary = generateMockActivitySummary(user);
-
 
   return (
     <div className="space-y-8">
@@ -262,10 +183,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
 
       <Separator />
 
-      <UserProfileAIInsights user={user} mockAISuggestions={mockAISuggestions} mockActivitySummary={mockActivitySummary} />
-
-      <Separator />
-
       <section>
         <h2 className="text-2xl font-headline mb-4 flex items-center gap-2">
             <Gift className="h-6 w-6 text-green-600" />
@@ -302,97 +219,5 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
         </Card>
       </section>
     </div>
-  );
-}
-
-function UserProfileAIInsights({ user, mockAISuggestions, mockActivitySummary }: { user: User, mockAISuggestions: any, mockActivitySummary: string }) {
-  const [showSampleActivity, setShowSampleActivity] = useState(false);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-headline text-xl flex items-center gap-3">
-          <Brain className="h-6 w-6 text-accent" />
-          AI Preference Insights (Experimental)
-        </CardTitle>
-        <CardDescription className="font-body">
-          Understanding how AI might learn and suggest trading preferences for {user.name}.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <Collapsible open={showSampleActivity} onOpenChange={setShowSampleActivity}>
-          <div className="space-y-2">
-            <p className="text-sm font-body text-muted-foreground">
-              Our AI can learn preferences by analyzing activity like item listings and chat interactions.
-            </p>
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" size="sm" className="w-full flex justify-between items-center text-left">
-                <span className="flex-grow">{showSampleActivity ? 'Hide' : 'Show'} Sample Activity Data AI Might Use</span>
-                {showSampleActivity ? <ChevronUp className="h-4 w-4 ml-2 shrink-0" /> : <ChevronDown className="h-4 w-4 ml-2 shrink-0" />}
-              </Button>
-            </CollapsibleTrigger>
-          </div>
-          <CollapsibleContent className="mt-4 space-y-2">
-            <div className="p-3 bg-muted/30 rounded-md border">
-              <h4 className="font-headline text-[0.9rem] mb-1.5 flex items-center gap-1.5">
-                <FileText className="h-4 w-4 text-muted-foreground"/>
-                Sample Activity Data for {user.name}
-              </h4>
-              <pre className="text-xs font-code whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
-                {mockActivitySummary}
-              </pre>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        <Separator/>
-
-        <div>
-          <h4 className="font-headline text-md mb-2">Simulated AI Preference Suggestions:</h4>
-          <p className="text-sm font-body text-muted-foreground mb-3">
-            Based on data like the sample above, AI might make these suggestions for {user.name}&apos;s preferences:
-          </p>
-          <div className="p-4 border rounded-md bg-background space-y-3">
-            {mockAISuggestions.motivations && mockAISuggestions.motivations.length > 0 && (
-              <div>
-                <h5 className="text-xs font-semibold text-muted-foreground mb-0.5">Motivations:</h5>
-                <div className="flex flex-wrap gap-1.5">
-                  {mockAISuggestions.motivations.map((m: UserMotivation) => <Badge key={m} variant="secondary" className="text-xs">{motivationTextMap[m] || m}</Badge>)}
-                </div>
-              </div>
-            )}
-            {mockAISuggestions.locationPreference && (
-              <div>
-                <h5 className="text-xs font-semibold text-muted-foreground mb-0.5">Location:</h5>
-                <Badge variant="secondary" className="text-xs">
-                  {mockAISuggestions.locationPreference.isSensitive ? `Sensitive (${mockAISuggestions.locationPreference.notes || 'Notes unavailable'})` : 'Flexible'}
-                </Badge>
-              </div>
-            )}
-            {mockAISuggestions.tradeTimingPreference && (
-              <div>
-                <h5 className="text-xs font-semibold text-muted-foreground mb-0.5">Trade Timing:</h5>
-                <Badge variant="secondary" className="text-xs">{tradeTimingTextMap[mockAISuggestions.tradeTimingPreference] || mockAISuggestions.tradeTimingPreference}</Badge>
-              </div>
-            )}
-            {mockAISuggestions.interestedInThirdPartyFulfillment !== undefined && (
-              <div>
-                <h5 className="text-xs font-semibold text-muted-foreground mb-0.5">3rd Party Fulfillment:</h5>
-                <Badge variant="secondary" className="text-xs">{mockAISuggestions.interestedInThirdPartyFulfillment ? 'Likely Open' : 'Likely Prefers Direct'}</Badge>
-              </div>
-            )}
-            {mockAISuggestions.confidence && (
-              <div className="pt-2">
-                <h5 className="text-xs font-semibold text-muted-foreground mb-0.5">AI Confidence: <Badge variant="outline" className="ml-1 py-0 px-1.5 text-[0.65rem]">{mockAISuggestions.confidence}</Badge></h5>
-                {mockAISuggestions.reasoning && <p className="text-xs italic text-muted-foreground">{mockAISuggestions.reasoning}</p>}
-              </div>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground font-body italic mt-3">
-            These are illustrative examples. Actual AI-driven preference setting would involve ongoing learning and user confirmation (e.g., in &quot;Edit Profile&quot;).
-          </p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

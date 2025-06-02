@@ -1,5 +1,5 @@
 
-'use client'; // Make this a client component for state and effects
+'use client'; 
 
 import { useEffect, useState } from 'react';
 import { getLoggedMatchSuggestions, type LoggedMatchSuggestion } from '@/services/match-report-service';
@@ -13,14 +13,14 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon, BrainCircuit, Zap, RefreshCw, Settings2, UserCog } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain } from 'lucide-react'; // Added Brain
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
-
+import AdminAIPreferenceInsights from '@/components/admin/AdminAIPreferenceInsights'; // New import
 
 function getMatchScoreColor(score?: string) {
   switch (score?.toLowerCase()) {
@@ -250,6 +250,7 @@ export default function MatchReportsPage() {
                     <TableHead>For User ID</TableHead>
                     <TableHead>Current Item</TableHead>
                     <TableHead>Matching Mode</TableHead>
+                     <TableHead>Prefs Used</TableHead>
                     <TableHead>Suggested Items (ID, (Owner ID), Score)</TableHead>
                     <TableHead className="min-w-[300px]">Reasoning</TableHead>
                   </TableRow>
@@ -278,6 +279,15 @@ export default function MatchReportsPage() {
                             <Badge variant="outline">N/A</Badge>
                         )}
                       </TableCell>
+                       <TableCell>
+                        {(report as any).preferencesConsidered !== undefined ? (
+                          <Badge variant={(report as any).preferencesConsidered ? 'default' : 'outline'} className="text-[10px] py-0.5 px-1.5">
+                            {(report as any).preferencesConsidered ? 'Yes' : 'No'}
+                          </Badge>
+                        ) : (
+                           <Badge variant="outline" className="text-[10px] py-0.5 px-1.5">N/A</Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
                           <div className="flex flex-col gap-1.5">
@@ -293,7 +303,7 @@ export default function MatchReportsPage() {
                                   {match.itemId} <LinkIcon className="h-3 w-3" />
                                 </Link>
                                 <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">
-                                  ({match.ownerId} <UserIcon className="h-3 w-3" />)
+                                  ({match.ownerId} <UserIconLucide className="h-3 w-3" />)
                                 </Link>
                               </div>
                             ))}
@@ -313,6 +323,10 @@ export default function MatchReportsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Separator />
+      <AdminAIPreferenceInsights />
+
     </div>
   );
 }
