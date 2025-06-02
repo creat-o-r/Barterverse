@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { logMatchSuggestion } from '@/services/match-report-service';
 
 const ItemBriefSchema = z.object({
   id: z.string(),
@@ -19,6 +20,7 @@ const ItemBriefSchema = z.object({
 });
 
 const ItemMatchInputSchema = z.object({
+  triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
   currentItem: ItemBriefSchema.describe("The item for which to find matches."),
   availableItems: z.array(ItemBriefSchema).describe("A list of other items available for trade."),
 });
@@ -67,56 +69,87 @@ const itemMatchFlow = ai.defineFlow(
     outputSchema: ItemMatchOutputSchema,
   },
   async (input: ItemMatchInput): Promise<ItemMatchOutput> => {
+    const flowName = 'itemMatchFlow';
     const filteredAvailableItems = input.availableItems.filter(item => item.id !== input.currentItem.id);
 
     if (filteredAvailableItems.length === 0) {
-        return { suggestedItemIds: [], reasoning: "No other items available to suggest matches for." };
+        const output: ItemMatchOutput = { suggestedItemIds: [], reasoning: "No other items available to suggest matches for." };
+        await logMatchSuggestion({
+            triggeringUserId: input.triggeringUserId,
+            currentItemId: input.currentItem.id,
+            currentItemName: input.currentItem.name,
+            suggestedItemIds: output.suggestedItemIds,
+            reasoning: output.reasoning,
+        });
+        return output;
     }
 
     try {
       const {output} = await prompt({
+          triggeringUserId: input.triggeringUserId, 
           currentItem: input.currentItem,
           availableItems: filteredAvailableItems
       });
+
       if (!output) {
-          console.warn("itemMatchFlow: Prompt returned null output");
-          return {
+          console.warn(`${flowName}: Prompt returned null output`);
+          const errorOutput: ItemMatchOutput = {
               suggestedItemIds: [],
               reasoning: "The AI assistant could not generate suggestions at this time."
           };
+          await logMatchSuggestion({
+            triggeringUserId: input.triggeringUserId,
+            currentItemId: input.currentItem.id,
+            currentItemName: input.currentItem.name,
+            suggestedItemIds: errorOutput.suggestedItemIds,
+            reasoning: errorOutput.reasoning,
+          });
+          return errorOutput;
       }
+
+      await logMatchSuggestion({
+        triggeringUserId: input.triggeringUserId,
+        currentItemId: input.currentItem.id,
+        currentItemName: input.currentItem.name,
+        suggestedItemIds: output.suggestedItemIds,
+        reasoning: output.reasoning,
+      });
       return output;
+
     } catch (error: any) {
-      console.error("Error in itemMatchFlow calling prompt:", error);
+      console.error(`Error in ${flowName} calling prompt:`, error);
       try {
-        console.error("Detailed error object in itemMatchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.error(`Detailed error object in ${flowName}:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
-        console.error("Could not stringify detailed error object in itemMatchFlow:", e);
-      }
-
-      let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
-
-      if (error.message && typeof error.message === 'string') {
-        const lowerErrorMessage = error.message.toLowerCase();
-        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-          userMessage = "The AI matching service has reached its current usage limit. Please try again later.";
-        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
-          userMessage = "The AI matching service is temporarily overloaded. Please try again in a few moments.";
-        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
-            userMessage = "The AI matching service could not process the request due to content restrictions or safety settings.";
-        } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
-            userMessage = "The AI's response was not in the expected format. Please try again. If the problem persists, item data might be causing an issue.";
-            console.error("itemMatchFlow: AI response format error. Issues/Message:", error.issues || error.message);
-        }
-      } else if (error.name === 'ZodError' && error.issues) {
-        userMessage = "The AI's response had an unexpected data structure. Please try again.";
-        console.error("itemMatchFlow: AI response format error (ZodError issues):", error.issues);
+        console.error(`Could not stringify detailed error object in ${flowName}:`, e);
       }
       
-      return {
+      let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
+      const lowerErrorMessage = error.message?.toLowerCase() || "";
+
+      if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
+        userMessage = "The AI matching service has reached its current usage limit. Please try again later.";
+      } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
+        userMessage = "The AI matching service is temporarily overloaded. Please try again in a few moments.";
+      } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
+        userMessage = "The AI matching service could not process the request due to content restrictions or safety settings.";
+      } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
+        userMessage = "The AI's response was not in the expected format. Please try again. If the problem persists, item data might be causing an issue.";
+        console.error(`${flowName}: AI response format error. Issues/Message:`, error.issues || error.message);
+      }
+      
+      const errorOutput: ItemMatchOutput = {
         suggestedItemIds: [],
         reasoning: userMessage
       };
+      await logMatchSuggestion({
+        triggeringUserId: input.triggeringUserId,
+        currentItemId: input.currentItem.id,
+        currentItemName: input.currentItem.name,
+        suggestedItemIds: errorOutput.suggestedItemIds,
+        reasoning: errorOutput.reasoning, 
+      });
+      return errorOutput;
     }
   }
 );

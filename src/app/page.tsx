@@ -40,7 +40,7 @@ export default function HomePage() {
 
       const otherAvailableItemsForMatching = dummyItems.filter(
         (item) => item.id !== userFirstAvailableItem.id && (item.status === 'available' || item.status === 'pending')
-      ).map(item => ({ // Ensure we map to the schema expected by the flow
+      ).map(item => ({ 
         id: item.id,
         name: item.name,
         description: item.description,
@@ -55,6 +55,7 @@ export default function HomePage() {
 
       try {
         const result: ItemMatchOutput = await suggestMatchingItems({
+          triggeringUserId: currentUser.id, // Pass the current user's ID
           currentItem: {
             id: userFirstAvailableItem.id,
             name: userFirstAvailableItem.name,
@@ -66,9 +67,22 @@ export default function HomePage() {
 
         const matchedItemsFromDummy = dummyItems.filter(item => result.suggestedItemIds.includes(item.id));
         setTopMatchedItems(matchedItemsFromDummy);
+
+        const reasoningIsErrorOrSystemMessage = result.reasoning && (
+            result.reasoning.toLowerCase().includes('error') || 
+            result.reasoning.toLowerCase().includes('overloaded') ||
+            result.reasoning.toLowerCase().includes('could not process') ||
+            result.reasoning.toLowerCase().includes('usage limit') ||
+            result.reasoning.toLowerCase().includes('no other items available') || // from flow itself
+            result.reasoning.toLowerCase().includes('ai assistant could not generate suggestions') // from flow itself
+        );
+
         setTopMatchedReasoning(result.reasoning || (matchedItemsFromDummy.length === 0 ? `We couldn't find specific AI matches for your "${userFirstAvailableItem.name}" right now.` : null));
+        
+        // Do not show toast here as it's page load, reasoning is shown in card.
+
       } catch (error) {
-        console.error("Error fetching top matches:", error);
+        console.error("Error fetching top matches (client-side catch):", error);
         setTopMatchedReasoning(`Could not load matches for your "${userFirstAvailableItem.name}" due to a system issue.`);
       } finally {
         setLoadingTopMatches(false);
@@ -76,7 +90,8 @@ export default function HomePage() {
     }
 
     fetchTopMatches();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Fetch on initial load
 
 
   return (
@@ -88,7 +103,6 @@ export default function HomePage() {
         </p>
       </section>
 
-      {/* Top Matching Listings Section */}
       {loadingTopMatches && (
         <section>
           <Card>
@@ -133,7 +147,7 @@ export default function HomePage() {
                   </span>
                 )}
               </CardTitle>
-              {topMatchedReasoning && topMatchedItems.length > 0 && !topMatchedReasoning.toLowerCase().includes('error') && !topMatchedReasoning.toLowerCase().includes('overloaded') && (
+              {topMatchedReasoning && (
                 <p className="text-sm text-muted-foreground mt-1 font-body">{topMatchedReasoning}</p>
               )}
             </CardHeader>
@@ -141,7 +155,7 @@ export default function HomePage() {
               {topMatchedItems.length > 0 ? (
                 <ItemList items={topMatchedItems} />
               ) : (
-                <p className="text-muted-foreground font-body">{topMatchedReasoning}</p>
+                <p className="text-muted-foreground font-body">{topMatchedReasoning || "No suggestions available at the moment."}</p>
               )}
             </CardContent>
           </Card>
@@ -161,4 +175,3 @@ export default function HomePage() {
     </div>
   );
 }
-

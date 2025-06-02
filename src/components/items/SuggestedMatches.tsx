@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -25,6 +26,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setLoading(true);
       setFetchError(null);
       setAiReasoning(null);
+      setSuggestedItems([]); // Clear previous suggestions
+
       try {
         const otherAvailableItems = dummyItems.filter(
           (item) => item.id !== currentItem.id && (item.status === 'available' || item.status === 'pending')
@@ -36,13 +39,15 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         }));
 
         if (otherAvailableItems.length === 0) {
-            setAiReasoning("No other items available in the system to suggest matches for.");
+            const noItemsReasoning = "No other items available in the system to suggest matches for.";
+            setAiReasoning(noItemsReasoning);
             setSuggestedItems([]);
             setLoading(false);
             return;
         }
 
         const inputForFlow = {
+          triggeringUserId: currentItem.ownerId, // Pass the owner of the current item
           currentItem: {
             id: currentItem.id,
             name: currentItem.name,
@@ -57,27 +62,39 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         const matchedItems = dummyItems.filter(item => result.suggestedItemIds.includes(item.id));
         setSuggestedItems(matchedItems);
 
+        // Always set AI reasoning if provided, it might contain error messages from the flow
         if (result.reasoning) {
             setAiReasoning(result.reasoning);
-            // Only show a success/analysis toast if items were actually suggested AND reasoning doesn't indicate an error
-            const reasoningIsError = result.reasoning.toLowerCase().includes('error') || 
-                                     result.reasoning.toLowerCase().includes('overloaded') ||
-                                     result.reasoning.toLowerCase().includes('could not process');
-            if (matchedItems.length > 0 && !reasoningIsError) {
-                toast({
-                    title: "Trade Suggestions Analyzed",
-                    description: result.reasoning,
-                    duration: 7000, 
-                });
-            } else if (reasoningIsError && matchedItems.length === 0) {
-              // If reasoning indicates an error and no items, it's an AI-side issue
-              // This message will be displayed in the card content by aiReasoning state
-            }
+        }
+        
+        // Determine if reasoning indicates an error or system issue
+        const reasoningIsErrorOrSystemMessage = result.reasoning && (
+            result.reasoning.toLowerCase().includes('error') || 
+            result.reasoning.toLowerCase().includes('overloaded') ||
+            result.reasoning.toLowerCase().includes('could not process') ||
+            result.reasoning.toLowerCase().includes('usage limit') ||
+            result.reasoning.toLowerCase().includes('no other items available') ||
+            result.reasoning.toLowerCase().includes('ai assistant could not generate suggestions')
+        );
+
+        if (matchedItems.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
+            // Only show a success/analysis toast if items were suggested AND reasoning is positive/analytical
+            toast({
+                title: "Trade Suggestions Analyzed",
+                description: result.reasoning,
+                duration: 7000, 
+            });
+        } else if (reasoningIsErrorOrSystemMessage) {
+            // If reasoning indicates an error/issue, it's already set in aiReasoning to be displayed in the card.
+            // No separate toast needed here as the card content will show the message.
         }
 
+
       } catch (err: any) {
-        console.error("Failed to fetch item matches from flow:", err);
-        setFetchError("Could not load suggestions due to a system error. Please try again later.");
+        console.error("Failed to fetch item matches from flow (client-side catch):", err);
+        const clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
+        setFetchError(clientErrorMsg);
+        setAiReasoning(clientErrorMsg); // Show this in the card as well
         toast({
             title: "Suggestion System Error",
             description: "Failed to connect to the AI suggestion service.",
@@ -88,8 +105,14 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       }
     }
 
-    fetchSuggestions();
-  }, [currentItem, toast]);
+    if (currentItem?.id) {
+        fetchSuggestions();
+    } else {
+        setLoading(false);
+        setAiReasoning("Cannot fetch suggestions without a current item.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentItem.id, currentItem.name, currentItem.description, currentItem.category, currentItem.ownerId, toast]); // Ensure all dependent properties of currentItem are listed
 
   if (loading) {
     return (
@@ -106,31 +129,19 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       </Card>
     );
   }
-
-  if (fetchError) {
+  
+  // Display reasoning or error message if no items or if fetchError occurred
+  if ((suggestedItems.length === 0 && aiReasoning) || fetchError) {
     return (
-      <Card>
+      <Card className={fetchError ? "border-destructive" : ""}>
         <CardHeader>
-          <CardTitle className="font-headline text-xl text-destructive">Suggestion Error</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-destructive font-body">{fetchError}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (suggestedItems.length === 0 && !loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline text-xl flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" />
-            Potential Matches
+          <CardTitle className={`font-headline text-xl flex items-center gap-2 ${fetchError ? 'text-destructive' : ''}`}>
+            <Sparkles className={`h-6 w-6 ${fetchError ? 'text-destructive': 'text-primary'}`} />
+            {fetchError ? "Suggestion Error" : "Potential Matches"}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground font-body">
+          <p className={`font-body ${fetchError ? 'text-destructive' : 'text-muted-foreground'}`}>
             {aiReasoning || "No specific AI-powered matches found at this moment. Happy browsing!"}
           </p>
         </CardContent>
@@ -138,6 +149,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
   
+  // Display suggested items
   if (suggestedItems.length > 0 && !fetchError && !loading) {
     return (
         <Card>
@@ -146,7 +158,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             <Sparkles className="h-6 w-6 text-primary" />
             AI-Suggested Matches for {currentItem.name}
             </CardTitle>
-             {aiReasoning && !aiReasoning.toLowerCase().includes('error') && !aiReasoning.toLowerCase().includes('overloaded') && (
+             {aiReasoning && (
                 <p className="text-sm text-muted-foreground mt-1 font-body">{aiReasoning}</p>
              )}
         </CardHeader>
@@ -157,5 +169,5 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
 
-  return null;
+  return null; // Should not be reached if logic is correct
 }

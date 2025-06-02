@@ -1,7 +1,8 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, Repeat, UserCircle, Menu } from 'lucide-react';
+import { Package, PlusCircle, Repeat, UserCircle, Menu, ServerCrash } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,10 +18,15 @@ const navLinks = [
   { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
   { href: '/trades', label: 'My Trades', icon: <Repeat className="h-4 w-4" /> },
   { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> },
+  { href: '/admin/match-reports', label: 'Admin Reports', icon: <ServerCrash className="h-4 w-4" />, adminOnly: true }, // Added admin link
 ];
 
 export default function Navbar() {
   const isLoggedIn = true; // Placeholder for auth state
+  // In a real app, you'd also have an isAdmin check
+  const isAdmin = true; // Placeholder for admin state
+
+  const visibleNavLinks = navLinks.filter(link => !link.adminOnly || (link.adminOnly && isAdmin));
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
@@ -31,10 +37,10 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-4">
-          {navLinks.map((link) => (
+        <nav className="hidden md:flex items-center gap-1">
+          {visibleNavLinks.map((link) => (
             <Button key={link.href} variant="ghost" asChild>
-              <Link href={link.href} className="flex items-center gap-2 text-sm">
+              <Link href={link.href} className="flex items-center gap-2 text-sm px-3 py-2">
                 {link.icon}
                 {link.label}
               </Link>
@@ -43,7 +49,7 @@ export default function Navbar() {
           {isLoggedIn ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full ml-2">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src="https://placehold.co/100x100.png?text=U" alt="User" data-ai-hint="profile avatar" />
                     <AvatarFallback>U</AvatarFallback>
@@ -60,9 +66,11 @@ export default function Navbar() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <UserCircle className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/profile/me">
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   {/* Placeholder for logout */}
@@ -71,7 +79,7 @@ export default function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild>
+            <Button asChild className="ml-2">
               <Link href="/auth/signin">Login</Link>
             </Button>
           )}
@@ -87,7 +95,7 @@ export default function Navbar() {
             </SheetTrigger>
             <SheetContent side="right">
               <nav className="flex flex-col gap-4 mt-8">
-                {navLinks.map((link) => (
+                {visibleNavLinks.map((link) => (
                   <Button key={link.href} variant="ghost" asChild className="justify-start">
                     <Link href={link.href} className="flex items-center gap-3 text-base py-2">
                       {link.icon}
