@@ -4,7 +4,7 @@ import type { User, Item } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Award, Edit3 } from 'lucide-react';
+import { Star, Package, MessageSquare, Award, Edit3, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
