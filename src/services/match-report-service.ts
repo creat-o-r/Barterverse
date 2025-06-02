@@ -1,4 +1,6 @@
 
+'use server';
+
 import fs from 'fs/promises';
 import path from 'path';
 import type { AIMatchingMode } from './ai-config-service'; // Import the type
