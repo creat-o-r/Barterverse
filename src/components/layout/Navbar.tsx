@@ -17,10 +17,15 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const primaryNavLinks = [
   { href: '/', label: 'Match', icon: <Package className="h-4 w-4" /> },
   { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
-  { href: '/chats', label: 'Chats', icon: <MessageSquare className="h-4 w-4" /> },
+  { 
+    href: '/chats', 
+    label: 'Chats', 
+    icon: <MessageSquare className="h-4 w-4" />,
+    hasNotification: true // Add a flag for notification
+  },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
-const adminLinkConfig = { href: '/admin/match-reports', label: 'Admin', icon: <ServerCrash className="h-4 w-4" /> };
+const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" /> }; // Removed label
 
 export default function Navbar() {
   const isLoggedIn = true; // Placeholder for auth state
@@ -34,9 +39,15 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-1">
           {primaryNavLinks.map((link) => (
             <Button key={link.href} variant="ghost" asChild>
-              <Link href={link.href} className="flex items-center gap-2 text-sm px-3 py-2">
+              <Link href={link.href} className="relative flex items-center gap-2 text-sm px-3 py-2">
                 {link.icon}
                 {link.label}
+                {link.hasNotification && (
+                  <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                  </span>
+                )}
               </Link>
             </Button>
           ))}
@@ -89,12 +100,12 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Admin Report Button - Desktop */}
+          {/* Admin Report Button - Desktop (Icon only, far right) */}
           {isLoggedIn && isAdmin && (
-            <Button variant="ghost" asChild className="hidden md:flex items-center text-sm px-3 py-2">
-              <Link href={adminLinkConfig.href} className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" asChild className="hidden md:flex text-muted-foreground hover:text-foreground">
+              <Link href={adminLinkConfig.href} title="Admin Reports">
                 {adminLinkConfig.icon}
-                {adminLinkConfig.label}
+                <span className="sr-only">Admin Reports</span>
               </Link>
             </Button>
           )}
@@ -111,9 +122,14 @@ export default function Navbar() {
                 <nav className="flex flex-col gap-4 mt-8">
                   {primaryNavLinks.map((link) => (
                     <Button key={link.href} variant="ghost" asChild className="justify-start">
-                      <Link href={link.href} className="flex items-center gap-3 text-base py-2">
+                      <Link href={link.href} className="relative flex items-center gap-3 text-base py-2">
                         {link.icon}
                         {link.label}
+                        {link.hasNotification && (
+                          <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
+                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                          </span>
+                        )}
                       </Link>
                     </Button>
                   ))}
@@ -126,12 +142,12 @@ export default function Navbar() {
                       </Link>
                     </Button>
                   )}
-                  {/* Mobile Admin Report Link */}
+                  {/* Mobile Admin Report Link (Icon only) */}
                   {isLoggedIn && isAdmin && (
                      <Button variant="ghost" asChild className="justify-start">
-                      <Link href={adminLinkConfig.href} className="flex items-center gap-3 text-base py-2">
+                      <Link href={adminLinkConfig.href} className="flex items-center gap-3 text-base py-2" title="Admin Reports">
                         {adminLinkConfig.icon}
-                        {adminLinkConfig.label}
+                        <span className="sr-only">Admin Reports</span> {/* Keep label for accessibility, but could be removed if space is tight */}
                       </Link>
                     </Button>
                   )}
