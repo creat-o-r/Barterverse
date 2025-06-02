@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, Menu, ServerCrash, LogOut } from 'lucide-react';
+import { Package, PlusCircle, UserCircle, Menu, ServerCrash, LogOut, MessageSquare } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const primaryNavLinks = [
   { href: '/', label: 'Match', icon: <Package className="h-4 w-4" /> },
   { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
+  { href: '/chats', label: 'Chats', icon: <MessageSquare className="h-4 w-4" /> },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
 const adminLinkConfig = { href: '/admin/match-reports', label: 'Admin', icon: <ServerCrash className="h-4 w-4" /> };
@@ -28,8 +29,7 @@ export default function Navbar() {
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center">
-        {/* BarterVerse text link removed */}
-
+        
         {/* Desktop Navigation - Main Links (left-aligned) */}
         <nav className="hidden md:flex items-center gap-1">
           {primaryNavLinks.map((link) => (
@@ -45,7 +45,7 @@ export default function Navbar() {
         {/* Right-aligned items: Profile, Admin Button, Mobile Menu Trigger */}
         <div className="ml-auto flex items-center gap-2">
           {/* Profile Dropdown / Login Button - Desktop */}
-          <div className="hidden md:block"> {/* md:block ensures this section is for desktop */}
+          <div className="hidden md:block"> 
             {isLoggedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
