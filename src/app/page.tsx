@@ -12,7 +12,7 @@ import { Sparkles, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 export default function HomePage() {
-  const [topMatchedItems, setTopMatchedItems] = useState<Item[]>([]);
+  const [topMatchedItemsWithScores, setTopMatchedItemsWithScores] = useState<(Item & { matchScore: string })[]>([]);
   const [topMatchedReasoning, setTopMatchedReasoning] = useState<string | null>(null);
   const [loadingTopMatches, setLoadingTopMatches] = useState(true);
   const [userFirstItemNameForTitle, setUserFirstItemNameForTitle] = useState<string | null>(null);
@@ -22,24 +22,24 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchTopMatches() {
       setLoadingTopMatches(true);
-      setTopMatchedItems([]);
+      setTopMatchedItemsWithScores([]);
       setTopMatchedReasoning(null);
       setUserFirstItemNameForTitle(null);
 
       const currentUser = dummyUsers[0]; // Simulate current user
       const userFirstAvailableItem = dummyItems.find(
-        (item) => item.ownerId === currentUser.id && (item.status === 'available' || item.status === 'pending')
+        (item) => item.ownerId === currentUser.id && (item.status === 'available' || item.status === 'pending') && item.listingType === 'offer'
       );
 
       if (!userFirstAvailableItem) {
-        setTopMatchedReasoning("List an item you own to see personalized matches here!");
+        setTopMatchedReasoning("List an 'offer' item to see personalized matches here!");
         setLoadingTopMatches(false);
         return;
       }
       setUserFirstItemNameForTitle(userFirstAvailableItem.name);
 
       const otherAvailableItemsForMatching = dummyItems.filter(
-        (item) => item.id !== userFirstAvailableItem.id && (item.status === 'available' || item.status === 'pending')
+        (item) => item.id !== userFirstAvailableItem.id && (item.status === 'available' || item.status === 'pending') && item.listingType === 'offer'
       ).map(item => ({ 
         id: item.id,
         name: item.name,
@@ -48,14 +48,14 @@ export default function HomePage() {
       }));
 
       if (otherAvailableItemsForMatching.length === 0) {
-        setTopMatchedReasoning(`No other items currently available to suggest matches for your "${userFirstAvailableItem.name}".`);
+        setTopMatchedReasoning(`No other 'offer' items currently available to suggest matches for your "${userFirstAvailableItem.name}".`);
         setLoadingTopMatches(false);
         return;
       }
 
       try {
         const result: ItemMatchOutput = await suggestMatchingItems({
-          triggeringUserId: currentUser.id, // Pass the current user's ID
+          triggeringUserId: currentUser.id,
           currentItem: {
             id: userFirstAvailableItem.id,
             name: userFirstAvailableItem.name,
@@ -65,22 +65,14 @@ export default function HomePage() {
           availableItems: otherAvailableItemsForMatching,
         });
 
-        const matchedItemsFromDummy = dummyItems.filter(item => result.suggestedItemIds.includes(item.id));
-        setTopMatchedItems(matchedItemsFromDummy);
-
-        const reasoningIsErrorOrSystemMessage = result.reasoning && (
-            result.reasoning.toLowerCase().includes('error') || 
-            result.reasoning.toLowerCase().includes('overloaded') ||
-            result.reasoning.toLowerCase().includes('could not process') ||
-            result.reasoning.toLowerCase().includes('usage limit') ||
-            result.reasoning.toLowerCase().includes('no other items available') || // from flow itself
-            result.reasoning.toLowerCase().includes('ai assistant could not generate suggestions') // from flow itself
-        );
-
-        setTopMatchedReasoning(result.reasoning || (matchedItemsFromDummy.length === 0 ? `We couldn't find specific AI matches for your "${userFirstAvailableItem.name}" right now.` : null));
+        const matchedItems = result.suggestedMatches.map(match => {
+          const item = dummyItems.find(dItem => dItem.id === match.itemId);
+          return item ? { ...item, matchScore: match.matchScore } : null;
+        }).filter(Boolean) as (Item & { matchScore: string })[];
         
-        // Do not show toast here as it's page load, reasoning is shown in card.
-
+        setTopMatchedItemsWithScores(matchedItems);
+        setTopMatchedReasoning(result.reasoning || (matchedItems.length === 0 ? `We couldn't find specific AI matches for your "${userFirstAvailableItem.name}" right now.` : null));
+        
       } catch (error) {
         console.error("Error fetching top matches (client-side catch):", error);
         setTopMatchedReasoning(`Could not load matches for your "${userFirstAvailableItem.name}" due to a system issue.`);
@@ -91,7 +83,7 @@ export default function HomePage() {
 
     fetchTopMatches();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Fetch on initial load
+  }, []); 
 
 
   return (
@@ -134,14 +126,14 @@ export default function HomePage() {
         </section>
       )}
 
-      {!loadingTopMatches && (topMatchedItems.length > 0 || topMatchedReasoning) && (
+      {!loadingTopMatches && (topMatchedItemsWithScores.length > 0 || topMatchedReasoning) && (
          <section>
-          <Card className={topMatchedItems.length === 0 ? "border-border border-dashed" : "border-border"}>
+          <Card className={topMatchedItemsWithScores.length === 0 ? "border-border border-dashed" : "border-border"}>
             <CardHeader>
               <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                <Sparkles className={`h-6 w-6 ${topMatchedItems.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-                {topMatchedItems.length > 0 ? "Suggested For You" : "Trade Ideas"}
-                {userFirstItemNameForTitle && topMatchedItems.length > 0 && (
+                <Sparkles className={`h-6 w-6 ${topMatchedItemsWithScores.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
+                {topMatchedItemsWithScores.length > 0 ? "Suggested For You" : "Trade Ideas"}
+                {userFirstItemNameForTitle && topMatchedItemsWithScores.length > 0 && (
                   <span className="text-base font-body text-muted-foreground ml-2">
                     (for your {userFirstItemNameForTitle})
                   </span>
@@ -152,8 +144,8 @@ export default function HomePage() {
               )}
             </CardHeader>
             <CardContent>
-              {topMatchedItems.length > 0 ? (
-                <ItemList items={topMatchedItems} />
+              {topMatchedItemsWithScores.length > 0 ? (
+                <ItemList items={topMatchedItemsWithScores} />
               ) : (
                 <p className="text-muted-foreground font-body">{topMatchedReasoning || "No suggestions available at the moment."}</p>
               )}

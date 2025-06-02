@@ -15,7 +15,7 @@ interface SuggestedMatchesProps {
 }
 
 export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps) {
-  const [suggestedItems, setSuggestedItems] = useState<Item[]>([]);
+  const [suggestedItemsWithScores, setSuggestedItemsWithScores] = useState<(Item & { matchScore: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setLoading(true);
       setFetchError(null);
       setAiReasoning(null);
-      setSuggestedItems([]); // Clear previous suggestions
+      setSuggestedItemsWithScores([]); // Clear previous suggestions
 
       try {
         const otherAvailableItems = dummyItems.filter(
@@ -41,13 +41,13 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         if (otherAvailableItems.length === 0) {
             const noItemsReasoning = "No other items available in the system to suggest matches for.";
             setAiReasoning(noItemsReasoning);
-            setSuggestedItems([]);
+            setSuggestedItemsWithScores([]);
             setLoading(false);
             return;
         }
 
         const inputForFlow = {
-          triggeringUserId: currentItem.ownerId, // Pass the owner of the current item
+          triggeringUserId: currentItem.ownerId, 
           currentItem: {
             id: currentItem.id,
             name: currentItem.name,
@@ -59,15 +59,17 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
         const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
         
-        const matchedItems = dummyItems.filter(item => result.suggestedItemIds.includes(item.id));
-        setSuggestedItems(matchedItems);
+        const matchedItems = result.suggestedMatches.map(match => {
+          const item = dummyItems.find(dItem => dItem.id === match.itemId);
+          return item ? { ...item, matchScore: match.matchScore } : null;
+        }).filter(Boolean) as (Item & { matchScore: string })[]; // Type assertion
 
-        // Always set AI reasoning if provided, it might contain error messages from the flow
+        setSuggestedItemsWithScores(matchedItems);
+
         if (result.reasoning) {
             setAiReasoning(result.reasoning);
         }
         
-        // Determine if reasoning indicates an error or system issue
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
             result.reasoning.toLowerCase().includes('error') || 
             result.reasoning.toLowerCase().includes('overloaded') ||
@@ -78,23 +80,18 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         );
 
         if (matchedItems.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
-            // Only show a success/analysis toast if items were suggested AND reasoning is positive/analytical
             toast({
                 title: "Trade Suggestions Analyzed",
                 description: result.reasoning,
                 duration: 7000, 
             });
-        } else if (reasoningIsErrorOrSystemMessage) {
-            // If reasoning indicates an error/issue, it's already set in aiReasoning to be displayed in the card.
-            // No separate toast needed here as the card content will show the message.
         }
-
 
       } catch (err: any) {
         console.error("Failed to fetch item matches from flow (client-side catch):", err);
         const clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
         setFetchError(clientErrorMsg);
-        setAiReasoning(clientErrorMsg); // Show this in the card as well
+        setAiReasoning(clientErrorMsg); 
         toast({
             title: "Suggestion System Error",
             description: "Failed to connect to the AI suggestion service.",
@@ -112,7 +109,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         setAiReasoning("Cannot fetch suggestions without a current item.");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem.id, currentItem.name, currentItem.description, currentItem.category, currentItem.ownerId, toast]); // Ensure all dependent properties of currentItem are listed
+  }, [currentItem.id]); // Simplified dependencies, ensure currentItem itself triggers refetch if its properties change.
 
   if (loading) {
     return (
@@ -130,8 +127,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
   
-  // Display reasoning or error message if no items or if fetchError occurred
-  if ((suggestedItems.length === 0 && aiReasoning) || fetchError) {
+  if ((suggestedItemsWithScores.length === 0 && aiReasoning) || fetchError) {
     return (
       <Card className={fetchError ? "border-destructive" : ""}>
         <CardHeader>
@@ -149,8 +145,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
   
-  // Display suggested items
-  if (suggestedItems.length > 0 && !fetchError && !loading) {
+  if (suggestedItemsWithScores.length > 0 && !fetchError && !loading) {
     return (
         <Card>
         <CardHeader>
@@ -163,11 +158,11 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
              )}
         </CardHeader>
         <CardContent>
-            <ItemList items={suggestedItems} />
+            <ItemList items={suggestedItemsWithScores} />
         </CardContent>
         </Card>
     );
   }
 
-  return null; // Should not be reached if logic is correct
+  return null; 
 }

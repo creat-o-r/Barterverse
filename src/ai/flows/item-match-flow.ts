@@ -26,9 +26,14 @@ const ItemMatchInputSchema = z.object({
 });
 export type ItemMatchInput = z.infer<typeof ItemMatchInputSchema>;
 
+const SuggestedItemWithScoreSchema = z.object({
+  itemId: z.string().describe("The ID of the suggested matching item."),
+  matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low).")
+});
+
 const ItemMatchOutputSchema = z.object({
-  suggestedItemIds: z.array(z.string()).describe("A list of IDs of suggested matching items. Should be at most 3 items."),
-  reasoning: z.string().optional().describe("The reasoning behind the overall suggestions."),
+  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores. Can be empty if no good matches are found."),
+  reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
 });
 export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 
@@ -37,7 +42,12 @@ const prompt = ai.definePrompt({
   input: {schema: ItemMatchInputSchema},
   output: {schema: ItemMatchOutputSchema},
   prompt: `You are an expert at finding complementary items for trade.
-  Given a "Current Item" and a list of "Available Items", identify up to 3 items from the "Available Items" list that would be a good trade match for the "Current Item".
+  Given a "Current Item" and a list of "Available Items", identify items from the "Available Items" list that would be a good trade match for the "Current Item".
+
+  For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
+  "High" indicates a very strong potential trade.
+  "Medium" indicates a decent potential trade.
+  "Low" indicates a possible, but less compelling, trade.
 
   Consider the following factors for a good match:
   - Category similarity or complementarity.
@@ -56,9 +66,9 @@ const prompt = ai.definePrompt({
   - {{id}} :: {{name}} :: {{category}} :: {{description}}
   {{/each}}
 
-  Provide a list of IDs for the suggested items. The list should contain at most 3 item IDs.
-  Optionally, provide a brief (1-2 sentences) reasoning for your overall suggestions.
-  Focus on suggesting items that are genuinely good potential trades. If no good matches are found, return an empty list of suggestedItemIds.
+  Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
+  If no good matches are found, return an empty list for 'suggestedMatches'.
+  Optionally, provide a brief (1-2 sentences) overall reasoning for your suggestions.
   `,
 });
 
@@ -73,12 +83,13 @@ const itemMatchFlow = ai.defineFlow(
     const filteredAvailableItems = input.availableItems.filter(item => item.id !== input.currentItem.id);
 
     if (filteredAvailableItems.length === 0) {
-        const output: ItemMatchOutput = { suggestedItemIds: [], reasoning: "No other items available to suggest matches for." };
+        const output: ItemMatchOutput = { suggestedMatches: [], reasoning: "No other items available to suggest matches for." };
+        // Log even if no suggestions are made due to no available items
         await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
-            suggestedItemIds: output.suggestedItemIds,
+            suggestedMatches: output.suggestedMatches,
             reasoning: output.reasoning,
         });
         return output;
@@ -86,7 +97,7 @@ const itemMatchFlow = ai.defineFlow(
 
     try {
       const {output} = await prompt({
-          triggeringUserId: input.triggeringUserId, 
+          triggeringUserId: input.triggeringUserId,
           currentItem: input.currentItem,
           availableItems: filteredAvailableItems
       });
@@ -94,27 +105,33 @@ const itemMatchFlow = ai.defineFlow(
       if (!output) {
           console.warn(`${flowName}: Prompt returned null output`);
           const errorOutput: ItemMatchOutput = {
-              suggestedItemIds: [],
+              suggestedMatches: [],
               reasoning: "The AI assistant could not generate suggestions at this time."
           };
           await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
-            suggestedItemIds: errorOutput.suggestedItemIds,
+            suggestedMatches: errorOutput.suggestedMatches,
             reasoning: errorOutput.reasoning,
           });
           return errorOutput;
       }
 
+      // Ensure suggestedMatches is always an array, even if the LLM misbehaves slightly
+      const validatedOutput: ItemMatchOutput = {
+        suggestedMatches: Array.isArray(output.suggestedMatches) ? output.suggestedMatches : [],
+        reasoning: output.reasoning
+      };
+      
       await logMatchSuggestion({
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
-        suggestedItemIds: output.suggestedItemIds,
-        reasoning: output.reasoning,
+        suggestedMatches: validatedOutput.suggestedMatches,
+        reasoning: validatedOutput.reasoning,
       });
-      return output;
+      return validatedOutput;
 
     } catch (error: any) {
       console.error(`Error in ${flowName} calling prompt:`, error);
@@ -123,7 +140,7 @@ const itemMatchFlow = ai.defineFlow(
       } catch (e) {
         console.error(`Could not stringify detailed error object in ${flowName}:`, e);
       }
-      
+
       let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
       const lowerErrorMessage = error.message?.toLowerCase() || "";
 
@@ -137,17 +154,17 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = "The AI's response was not in the expected format. Please try again. If the problem persists, item data might be causing an issue.";
         console.error(`${flowName}: AI response format error. Issues/Message:`, error.issues || error.message);
       }
-      
+
       const errorOutput: ItemMatchOutput = {
-        suggestedItemIds: [],
+        suggestedMatches: [],
         reasoning: userMessage
       };
       await logMatchSuggestion({
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
-        suggestedItemIds: errorOutput.suggestedItemIds,
-        reasoning: errorOutput.reasoning, 
+        suggestedMatches: errorOutput.suggestedMatches,
+        reasoning: errorOutput.reasoning,
       });
       return errorOutput;
     }

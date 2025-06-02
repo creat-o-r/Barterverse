@@ -1,8 +1,9 @@
+
 import type { Item } from '@/types';
 import ItemCard from './ItemCard';
 
 interface ItemListProps {
-  items: Item[];
+  items: (Item & { matchScore?: string })[];
 }
 
 export default function ItemList({ items }: ItemListProps) {

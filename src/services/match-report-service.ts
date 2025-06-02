@@ -7,7 +7,7 @@ export interface LoggedMatchSuggestion {
   triggeringUserId: string;
   currentItemId: string;
   currentItemName: string;
-  suggestedItemIds: string[];
+  suggestedMatches: Array<{ itemId: string; matchScore: string }>; // Updated
   reasoning?: string;
 }
 
@@ -24,6 +24,7 @@ async function readLogs(): Promise<LoggedMatchSuggestion[]> {
   } catch (error: any) {
     // If file doesn't exist or other read errors, assume no logs yet
     if (error.code === 'ENOENT') {
+      await fs.writeFile(LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8'); // Create the file if it doesn't exist
       return [];
     }
     console.error('[Match Report Service] Error reading log file:', error);
@@ -45,7 +46,7 @@ export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'time
     timestamp: new Date().toISOString(),
   };
 
-  const currentLogs = await readLogs();
+  let currentLogs = await readLogs();
   currentLogs.unshift(newLog); // Add to the beginning for recent first
 
   // Optional: Limit the size of the log, e.g., to 500 entries

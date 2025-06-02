@@ -5,17 +5,36 @@ import type { Item } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Gift, Search } from 'lucide-react';
+import { Eye, Gift, Search, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface ItemCardProps {
-  item: Item;
+  item: Item & { matchScore?: string };
 }
+
+function getMatchScoreColor(score?: string) {
+  switch (score?.toLowerCase()) {
+    case 'high': return 'bg-green-600 hover:bg-green-700 text-white';
+    case 'medium': return 'bg-yellow-500 hover:bg-yellow-600 text-black';
+    case 'low': return 'bg-red-500 hover:bg-red-600 text-white';
+    default: return 'bg-gray-400 hover:bg-gray-500 text-white';
+  }
+}
+
+function getMatchScoreIcon(score?: string) {
+  switch (score?.toLowerCase()) {
+    case 'high': return <TrendingUp className="h-3 w-3 mr-1" />;
+    case 'medium': return <Minus className="h-3 w-3 mr-1" />;
+    case 'low': return <TrendingDown className="h-3 w-3 mr-1" />;
+    default: return null;
+  }
+}
+
 
 export default function ItemCard({ item }: ItemCardProps) {
   return (
-    <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl">
+    <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl group">
       <CardHeader className="p-0 relative">
-        <div className="aspect-[4/3] relative w-full">
+        <div className="aspect-[4/3] relative w-full overflow-hidden">
           <Image
             src={item.imageUrl || `https://placehold.co/600x400.png?text=${item.listingType}`}
             alt={item.name}
@@ -27,15 +46,23 @@ export default function ItemCard({ item }: ItemCardProps) {
            {item.status !== 'available' && (
             <Badge
               variant={item.status === 'traded' ? 'destructive' : 'secondary'}
-              className="absolute top-2 right-2 capitalize z-10"
+              className="absolute top-2 right-2 capitalize z-10 text-xs"
             >
               {item.status}
+            </Badge>
+          )}
+           {item.matchScore && (
+            <Badge
+              className={`absolute top-2 left-2 capitalize z-10 text-xs flex items-center ${getMatchScoreColor(item.matchScore)}`}
+            >
+              {getMatchScoreIcon(item.matchScore)}
+              Match: {item.matchScore}
             </Badge>
           )}
         </div>
         <Badge
             variant={item.listingType === 'offer' ? 'default' : 'secondary'}
-            className={`absolute bottom-2 left-2 capitalize z-10 ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            className={`absolute bottom-2 left-2 capitalize z-10 text-xs ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
         >
             {item.listingType === 'offer' ? <Gift className="h-3 w-3 mr-1" /> : <Search className="h-3 w-3 mr-1" />}
             {item.listingType}
