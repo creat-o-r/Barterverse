@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageSquare, Star, UserCircle, Tag, Info, Repeat } from 'lucide-react';
-import ChatWindow from '@/components/chat/ChatWindow'; // We will create this next
 import { Badge } from '@/components/ui/badge';
+import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 
 // Helper function to find item and owner (simulates data fetching)
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
@@ -41,8 +41,8 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                 data-ai-hint={item.dataAiHint || "item image detail"}
               />
                {item.status !== 'available' && (
-                <Badge 
-                  variant={item.status === 'traded' ? 'destructive' : 'secondary'} 
+                <Badge
+                  variant={item.status === 'traded' ? 'destructive' : 'secondary'}
                   className="absolute top-4 right-4 text-lg p-2 capitalize"
                 >
                   {item.status}
@@ -105,21 +105,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-sm font-body text-muted-foreground mb-4">
-                    Start a conversation with {owner.name} to negotiate a trade.
-                </p>
-                 {/* ChatWindow will be integrated here. For now, a button placeholder */}
-                <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" size="lg" disabled>
-                  <MessageSquare className="mr-2 h-5 w-5" />
-                  Start Trade Negotiation (Chat UI Coming Soon)
-                </Button>
-                {/* 
-                <ChatWindow 
-                    currentItem={item} 
-                    otherUserId={owner.id} 
-                    otherUserName={owner.name} 
-                /> 
-                */}
+                <ItemTradeInitiationContent item={item} ownerName={owner.name} ownerId={owner.id} />
             </CardContent>
            </Card>
         )}
