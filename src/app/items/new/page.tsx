@@ -17,9 +17,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search, HelpCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
+import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
 import { useState, useCallback } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -36,6 +37,7 @@ type ItemFormValues = z.infer<typeof itemFormSchema>;
 export default function NewItemPage() {
   const { toast } = useToast();
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
+  const [isInferringListingType, setIsInferringListingType] = useState(false);
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
@@ -44,60 +46,94 @@ export default function NewItemPage() {
       description: '',
       category: '',
       imageUrl: '',
-      listingType: 'offer', // Default to 'offer'
+      listingType: 'offer', // Default to 'offer', AI might override
     },
   });
 
-  const handleSuggestCategory = useCallback(async () => {
+  const handleAiSuggestions = useCallback(async () => {
     const name = form.getValues('name');
     const description = form.getValues('description');
 
-    if (name.length >= 3 && description.length >= 10) {
-      setIsSuggestingCategory(true);
-      form.setValue('category', '');
-      try {
-        const result: SuggestCategoryOutput = await suggestCategory({ name, description });
-        if (result.errorMessage) {
-          toast({
-            title: "Category Suggestion Error",
-            description: result.errorMessage,
-            variant: "destructive",
-          });
-        } else if (result.suggestedCategory) {
-          form.setValue('category', result.suggestedCategory, { shouldValidate: true });
-          toast({
-            title: "Category Suggested!",
-            description: `We've suggested "${result.suggestedCategory}" as the category.`,
-          });
-        } else {
-          toast({
-            title: "Hmm...",
-            description: "Couldn't automatically suggest a category. Please enter one manually if needed, or try rephrasing your description.",
-            variant: "default"
-          });
-        }
-      } catch (error) {
-        console.error("Error calling suggestCategory flow:", error);
+    if (name.length < 3 || description.length < 10) {
+      return;
+    }
+
+    // Suggest Category
+    setIsSuggestingCategory(true);
+    // form.setValue('category', ''); // Don't clear if user already typed something they want to keep
+    try {
+      const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
+      if (categoryResult.errorMessage) {
         toast({
-          title: "AI System Error",
-          description: "Could not connect to the category suggestion service.",
+          title: "Category Suggestion Error",
+          description: categoryResult.errorMessage,
           variant: "destructive",
         });
-      } finally {
-        setIsSuggestingCategory(false);
+      } else if (categoryResult.suggestedCategory) {
+        form.setValue('category', categoryResult.suggestedCategory, { shouldValidate: true });
+        toast({
+          title: "Category Suggested!",
+          description: `We've suggested "${categoryResult.suggestedCategory}" as the category.`,
+        });
+      } else {
+         toast({
+            title: "Category Suggestion",
+            description: "Could not automatically suggest a category. Please enter one if needed.",
+            variant: "default"
+          });
       }
+    } catch (error) {
+      console.error("Error calling suggestCategory flow:", error);
+      toast({
+        title: "AI System Error",
+        description: "Could not connect to the category suggestion service.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSuggestingCategory(false);
+    }
+
+    // Infer Listing Type
+    setIsInferringListingType(true);
+    try {
+      const listingTypeResult: InferListingTypeOutput = await inferListingType({ name, description });
+      if (listingTypeResult.errorMessage) {
+        toast({
+          title: "Listing Type Inference Error",
+          description: listingTypeResult.errorMessage,
+          variant: "destructive",
+        });
+        // Keep current or default listingType if AI errors out
+      } else if (listingTypeResult.inferredListingType) {
+        form.setValue('listingType', listingTypeResult.inferredListingType, { shouldValidate: true });
+        toast({
+          title: "Listing Type Inferred!",
+          description: `We've inferred this is an "${listingTypeResult.inferredListingType}" listing. You can change it if needed.`,
+        });
+      }
+    } catch (error) {
+      console.error("Error calling inferListingType flow:", error);
+      toast({
+        title: "AI System Error",
+        description: "Could not connect to the listing type inference service. Please select manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsInferringListingType(false);
     }
   }, [form, toast]);
 
 
   function onSubmit(data: ItemFormValues) {
-    console.log(data); // Includes listingType
+    console.log(data);
     toast({
       title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
       description: `${data.name} has been successfully posted.`,
     });
     form.reset();
   }
+
+  const isLoadingAi = isSuggestingCategory || isInferringListingType;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -108,48 +144,12 @@ export default function NewItemPage() {
             List an Item
           </CardTitle>
           <CardDescription className="font-body">
-            Tell us if you're offering an item you have, or listing an item you want.
-            Good descriptions and images attract more attention! Our AI can help suggest a category.
+            Tell us about your item. Our AI can help suggest a category and whether you're offering or wanting an item.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="listingType"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel className="font-headline">What kind of listing is this?</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4"
-                      >
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="offer" id="offer" />
-                          </FormControl>
-                          <FormLabel htmlFor="offer" className="font-normal flex items-center gap-2">
-                             <Gift className="h-5 w-5 text-green-600" /> I'm offering an item I have
-                          </FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="want" id="want" />
-                          </FormControl>
-                          <FormLabel htmlFor="want" className="font-normal flex items-center gap-2">
-                            <Search className="h-5 w-5 text-blue-600" /> I'm looking for an item I want
-                          </FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <FormField
                 control={form.control}
                 name="name"
@@ -177,7 +177,7 @@ export default function NewItemPage() {
                         {...field}
                         onBlur={() => {
                             field.onBlur();
-                            handleSuggestCategory();
+                            handleAiSuggestions();
                         }}
                       />
                     </FormControl>
@@ -185,6 +185,49 @@ export default function NewItemPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="listingType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel className="font-headline flex items-center gap-2">
+                      Listing Type
+                      {isInferringListingType && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                      {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}
+                    </FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value} // Ensure value is controlled
+                        className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4"
+                      >
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="offer" id="offer" />
+                          </FormControl>
+                          <FormLabel htmlFor="offer" className="font-normal flex items-center gap-2">
+                             <Gift className="h-5 w-5 text-green-600" /> I'm offering an item I have
+                          </FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="want" id="want" />
+                          </FormControl>
+                          <FormLabel htmlFor="want" className="font-normal flex items-center gap-2">
+                            <Search className="h-5 w-5 text-blue-600" /> I'm looking for an item I want
+                          </FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                     <FormDescription className="font-body">
+                      AI will suggest this based on your description. You can change it.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="category"
@@ -193,17 +236,17 @@ export default function NewItemPage() {
                     <FormLabel className="font-headline flex items-center gap-2">
                       Category
                       {isSuggestingCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                      {!isSuggestingCategory && form.getValues('category') && <Sparkles className="h-4 w-4 text-accent" />}
+                       {!isSuggestingCategory && form.formState.dirtyFields.category && <Sparkles className="h-4 w-4 text-accent" />}
                     </FormLabel>
                     <FormControl>
                       <Input
                         placeholder={isSuggestingCategory ? "AI is suggesting a category..." : "e.g., Books & Stationery"}
                         {...field}
-                        readOnly
+                        readOnly // Keep readOnly if AI is the primary source, or allow manual edit. For now, keeping as suggested.
                       />
                     </FormControl>
                     <FormDescription className="font-body">
-                      Category will be suggested by AI based on name and description. You can manually update it if needed.
+                      Category will be suggested by AI. Click description again to re-trigger if needed.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -225,11 +268,11 @@ export default function NewItemPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSuggestingCategory}>
-                {isSuggestingCategory ? (
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingAi}>
+                {isLoadingAi ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Suggesting Category...
+                    AI is working...
                   </>
                 ) : (
                   `Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`
