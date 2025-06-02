@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic'; // Ensure fresh data on each request
@@ -21,7 +21,7 @@ function getMatchScoreColor(score?: string) {
 function getMatchScoreIcon(score?: string) {
   switch (score?.toLowerCase()) {
     case 'high': return <TrendingUp className="h-3 w-3 mr-1" />;
-    case 'medium': return <Minus className="h-3 w-3 mr-1" />; // Or another appropriate icon
+    case 'medium': return <Minus className="h-3 w-3 mr-1" />; 
     case 'low': return <TrendingDown className="h-3 w-3 mr-1" />;
     default: return null;
   }
@@ -55,8 +55,8 @@ export default async function MatchReportsPage() {
                   <TableRow>
                     <TableHead className="w-[180px]">Timestamp</TableHead>
                     <TableHead>For User ID</TableHead>
-                    <TableHead>Current Item (Name & Link)</TableHead>
-                    <TableHead>Suggested Items (ID & Score)</TableHead>
+                    <TableHead>Current Item</TableHead>
+                    <TableHead>Suggested Items (ID, Owner, Score)</TableHead>
                     <TableHead className="min-w-[300px]">Reasoning</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -79,16 +79,21 @@ export default async function MatchReportsPage() {
                         {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
                           <div className="flex flex-col gap-1.5">
                             {report.suggestedMatches.map(match => (
-                              <div key={match.itemId} className="flex items-center gap-2">
+                              <div key={match.itemId} className="flex items-center gap-2 text-xs">
                                 <Badge
-                                  className={`text-xs py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
+                                  className={`py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
                                 >
                                   {getMatchScoreIcon(match.matchScore)}
                                   {match.matchScore || 'N/A'}
                                 </Badge>
-                                <Link href={`/items/${match.itemId}`} className="text-xs hover:text-primary hover:underline inline-flex items-center gap-1">
+                                <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
                                   {match.itemId} <LinkIcon className="h-3 w-3" />
                                 </Link>
+                                <span className="text-muted-foreground">(Owner: 
+                                  <Link href={`/profile/${match.ownerId}`} className="hover:text-primary hover:underline inline-flex items-center gap-0.5 ml-0.5">
+                                    {match.ownerId} <UserIcon className="h-3 w-3" />
+                                  </Link>
+                                )</span>
                               </div>
                             ))}
                           </div>
@@ -110,4 +115,3 @@ export default async function MatchReportsPage() {
     </div>
   );
 }
-

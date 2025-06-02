@@ -7,7 +7,11 @@ export interface LoggedMatchSuggestion {
   triggeringUserId: string;
   currentItemId: string;
   currentItemName: string;
-  suggestedMatches: Array<{ itemId: string; matchScore: string }>; // Updated
+  suggestedMatches: Array<{ 
+    itemId: string; 
+    matchScore: string;
+    ownerId: string; // Added ownerId
+  }>;
   reasoning?: string;
 }
 

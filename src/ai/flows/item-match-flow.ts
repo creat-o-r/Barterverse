@@ -17,22 +17,30 @@ const ItemBriefSchema = z.object({
   name: z.string(),
   description: z.string(),
   category: z.string(),
+  ownerId: z.string(), // Added ownerId
 });
 
 const ItemMatchInputSchema = z.object({
   triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
   currentItem: ItemBriefSchema.describe("The item for which to find matches."),
-  availableItems: z.array(ItemBriefSchema).describe("A list of other items available for trade."),
+  availableItems: z.array(ItemBriefSchema).describe("A list of other items available for trade, including their ownerIds."),
 });
 export type ItemMatchInput = z.infer<typeof ItemMatchInputSchema>;
 
 const SuggestedItemWithScoreSchema = z.object({
   itemId: z.string().describe("The ID of the suggested matching item."),
+  matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low)."),
+  ownerId: z.string().describe("The ID of the owner of the suggested item."), // Added ownerId
+});
+
+// This is the schema for the prompt's direct output for suggestedMatches
+const PromptSuggestedItemSchema = z.object({
+  itemId: z.string().describe("The ID of the suggested matching item."),
   matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low).")
 });
 
 const ItemMatchOutputSchema = z.object({
-  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores. Can be empty if no good matches are found."),
+  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores and ownerIds. Can be empty if no good matches are found."),
   reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
 });
 export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
@@ -40,7 +48,11 @@ export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 const prompt = ai.definePrompt({
   name: 'itemMatchPrompt',
   input: {schema: ItemMatchInputSchema},
-  output: {schema: ItemMatchOutputSchema},
+  // The prompt itself only needs to output itemId and matchScore. ownerId is added by the flow.
+  output: {schema: z.object({
+    suggestedMatches: z.array(PromptSuggestedItemSchema),
+    reasoning: z.string().optional(),
+  })},
   prompt: `You are an expert at finding complementary items for trade.
   Given a "Current Item" and a list of "Available Items", identify items from the "Available Items" list that would be a good trade match for the "Current Item".
 
@@ -60,10 +72,11 @@ const prompt = ai.definePrompt({
   Name: {{{currentItem.name}}}
   Description: {{{currentItem.description}}}
   Category: {{{currentItem.category}}}
+  Owner ID: {{{currentItem.ownerId}}}
 
-  Available Items (format: ID :: Name :: Category :: Description):
+  Available Items (format: ID :: Name :: Category :: OwnerID :: Description):
   {{#each availableItems}}
-  - {{id}} :: {{name}} :: {{category}} :: {{description}}
+  - {{id}} :: {{name}} :: {{category}} :: {{ownerId}} :: {{description}}
   {{/each}}
 
   Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
@@ -84,7 +97,6 @@ const itemMatchFlow = ai.defineFlow(
 
     if (filteredAvailableItems.length === 0) {
         const output: ItemMatchOutput = { suggestedMatches: [], reasoning: "No other items available to suggest matches for." };
-        // Log even if no suggestions are made due to no available items
         await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
@@ -96,13 +108,13 @@ const itemMatchFlow = ai.defineFlow(
     }
 
     try {
-      const {output} = await prompt({
+      const {output: promptOutput} = await prompt({
           triggeringUserId: input.triggeringUserId,
           currentItem: input.currentItem,
           availableItems: filteredAvailableItems
       });
 
-      if (!output) {
+      if (!promptOutput) {
           console.warn(`${flowName}: Prompt returned null output`);
           const errorOutput: ItemMatchOutput = {
               suggestedMatches: [],
@@ -112,16 +124,24 @@ const itemMatchFlow = ai.defineFlow(
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
-            suggestedMatches: errorOutput.suggestedMatches,
+            suggestedMatches: errorOutput.suggestedMatches, // This expects the augmented schema
             reasoning: errorOutput.reasoning,
           });
           return errorOutput;
       }
 
-      // Ensure suggestedMatches is always an array, even if the LLM misbehaves slightly
+      // Augment AI suggestions with ownerId
+      const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
+        const originalItem = filteredAvailableItems.find(item => item.id === aiSuggestion.itemId);
+        return {
+          ...aiSuggestion,
+          ownerId: originalItem?.ownerId || 'unknown', // Fallback if ownerId not found
+        };
+      });
+      
       const validatedOutput: ItemMatchOutput = {
-        suggestedMatches: Array.isArray(output.suggestedMatches) ? output.suggestedMatches : [],
-        reasoning: output.reasoning
+        suggestedMatches: augmentedMatches,
+        reasoning: promptOutput.reasoning
       };
       
       await logMatchSuggestion({

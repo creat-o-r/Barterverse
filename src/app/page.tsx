@@ -45,6 +45,7 @@ export default function HomePage() {
         name: item.name,
         description: item.description,
         category: item.category,
+        ownerId: item.ownerId, // Ensure ownerId is passed
       }));
 
       if (otherAvailableItemsForMatching.length === 0) {
@@ -61,6 +62,7 @@ export default function HomePage() {
             name: userFirstAvailableItem.name,
             description: userFirstAvailableItem.description,
             category: userFirstAvailableItem.category,
+            ownerId: userFirstAvailableItem.ownerId, // Ensure ownerId is passed
           },
           availableItems: otherAvailableItemsForMatching,
         });

@@ -35,7 +35,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             id: item.id,
             name: item.name,
             description: item.description,
-            category: item.category
+            category: item.category,
+            ownerId: item.ownerId, // Ensure ownerId is passed
         }));
 
         if (otherAvailableItems.length === 0) {
@@ -53,6 +54,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             name: currentItem.name,
             description: currentItem.description,
             category: currentItem.category,
+            ownerId: currentItem.ownerId, // Ensure ownerId is passed
           },
           availableItems: otherAvailableItems,
         };
@@ -61,6 +63,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         
         const matchedItems = result.suggestedMatches.map(match => {
           const item = dummyItems.find(dItem => dItem.id === match.itemId);
+          // We already have match.ownerId from the flow, so no need to pull it from dItem again.
           return item ? { ...item, matchScore: match.matchScore } : null;
         }).filter(Boolean) as (Item & { matchScore: string })[]; // Type assertion
 
@@ -109,7 +112,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         setAiReasoning("Cannot fetch suggestions without a current item.");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem.id]); // Simplified dependencies, ensure currentItem itself triggers refetch if its properties change.
+  }, [currentItem.id, currentItem.name]); // Added currentItem.name to dep array for re-fetch if item changes significantly
 
   if (loading) {
     return (
