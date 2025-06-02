@@ -5,7 +5,7 @@ import type { User, Item } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, SearchHeart } from 'lucide-react';
+import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -79,7 +79,7 @@ export default async function UserProfilePage({ params }: { params: { userId: st
                 <p className="text-sm text-muted-foreground font-body">Items Offered</p>
             </div>
              <div className="p-4 bg-background rounded-lg">
-                <SearchHeart className="h-8 w-8 text-blue-600 mx-auto mb-2"/>
+                <Search className="h-8 w-8 text-blue-600 mx-auto mb-2"/>
                 <p className="text-2xl font-headline">{user.items.filter(i => i.listingType === 'want').length}</p>
                 <p className="text-sm text-muted-foreground font-body">Items Wanted</p>
             </div>
@@ -105,7 +105,7 @@ export default async function UserProfilePage({ params }: { params: { userId: st
 
        <section>
         <h2 className="text-2xl font-headline mb-4 flex items-center gap-2">
-            <SearchHeart className="h-6 w-6 text-blue-600" />
+            <Search className="h-6 w-6 text-blue-600" />
             Items Wanted ({wantedItems.length})
         </h2>
         {wantedItems.length > 0 ? <ItemList items={wantedItems} /> : <p className="text-muted-foreground font-body">This user is not currently looking for any specific items.</p>}
