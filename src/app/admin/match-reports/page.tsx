@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic'; // Ensure fresh data on each request
 
-function getMatchScoreColor(score: string) {
+function getMatchScoreColor(score?: string) {
   switch (score?.toLowerCase()) {
     case 'high': return 'bg-green-600 hover:bg-green-700 text-white';
     case 'medium': return 'bg-yellow-500 hover:bg-yellow-600 text-black';
@@ -18,7 +18,7 @@ function getMatchScoreColor(score: string) {
   }
 }
 
-function getMatchScoreIcon(score: string) {
+function getMatchScoreIcon(score?: string) {
   switch (score?.toLowerCase()) {
     case 'high': return <TrendingUp className="h-3 w-3 mr-1" />;
     case 'medium': return <Minus className="h-3 w-3 mr-1" />; // Or another appropriate icon
@@ -55,14 +55,14 @@ export default async function MatchReportsPage() {
                   <TableRow>
                     <TableHead className="w-[180px]">Timestamp</TableHead>
                     <TableHead>For User ID</TableHead>
-                    <TableHead>Current Item (Name & ID Link)</TableHead>
+                    <TableHead>Current Item (Name & Link)</TableHead>
                     <TableHead>Suggested Items (ID & Score)</TableHead>
                     <TableHead className="min-w-[300px]">Reasoning</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {reports.map((report, index) => (
-                    <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
+                    <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${report.suggestedMatches.map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
                       <TableCell className="font-mono text-xs">
                         {new Date(report.timestamp).toLocaleString()}
                       </TableCell>
@@ -70,9 +70,8 @@ export default async function MatchReportsPage() {
                       <TableCell>
                           <div className="font-semibold">{report.currentItemName}</div>
                           <div className="text-xs text-muted-foreground">
-                            ID: {' '}
                             <Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
-                                {report.currentItemId} <LinkIcon className="h-3 w-3" />
+                                View Item <LinkIcon className="h-3 w-3" />
                             </Link>
                           </div>
                       </TableCell>
@@ -85,9 +84,11 @@ export default async function MatchReportsPage() {
                                   className={`text-xs py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
                                 >
                                   {getMatchScoreIcon(match.matchScore)}
-                                  {match.matchScore}
+                                  {match.matchScore || 'N/A'}
                                 </Badge>
-                                <span className="text-xs">{match.itemId}</span>
+                                <Link href={`/items/${match.itemId}`} className="text-xs hover:text-primary hover:underline inline-flex items-center gap-1">
+                                  {match.itemId} <LinkIcon className="h-3 w-3" />
+                                </Link>
                               </div>
                             ))}
                           </div>
