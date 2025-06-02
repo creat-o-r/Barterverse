@@ -228,11 +228,9 @@ export default function MatchReportsPage() {
                                 <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
                                   {match.itemId} <LinkIcon className="h-3 w-3" />
                                 </Link>
-                                <span className="text-muted-foreground">(Owner: 
-                                  <Link href={`/profile/${match.ownerId}`} className="hover:text-primary hover:underline inline-flex items-center gap-0.5 ml-0.5">
-                                    {match.ownerId} <UserIcon className="h-3 w-3" />
-                                  </Link>
-                                )</span>
+                                <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">
+                                  ({match.ownerId} <UserIcon className="h-3 w-3" />)
+                                </Link>
                               </div>
                             ))}
                           </div>
