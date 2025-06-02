@@ -42,7 +42,7 @@ export default async function MatchReportsPage() {
           <CardDescription className="font-body">
             This report shows AI-generated item match suggestions.
             <br />
-            <span className="font-semibold text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-sm inline-block my-1">Important Note:</span> This data is stored in a local JSON file. Due to React Strict Mode, you may see duplicate entries in development for each suggestion event; this does not occur in production.
+            <span className="font-semibold text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-sm inline-block my-1">Important Note:</span> Due to React Strict Mode, you may see duplicate entries in development for each suggestion event; this does not occur in production.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -62,7 +62,7 @@ export default async function MatchReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {reports.map((report, index) => (
-                    <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${report.suggestedMatches.map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
+                    <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
                       <TableCell className="font-mono text-xs">
                         {new Date(report.timestamp).toLocaleString()}
                       </TableCell>
@@ -80,7 +80,7 @@ export default async function MatchReportsPage() {
                           <div className="flex flex-col gap-1.5">
                             {report.suggestedMatches.map(match => (
                               <div key={match.itemId} className="flex items-center gap-2">
-                                <Badge 
+                                <Badge
                                   className={`text-xs py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
                                 >
                                   {getMatchScoreIcon(match.matchScore)}
@@ -110,3 +110,4 @@ export default async function MatchReportsPage() {
     </div>
   );
 }
+
