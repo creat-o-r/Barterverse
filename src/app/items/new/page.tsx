@@ -17,12 +17,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search, HelpCircle } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
 import { useState, useCallback } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { addNewItemToDummyData } from '@/lib/dummy-data'; // Import the new function
+import { dummyUsers } from '@/lib/dummy-data'; // To get current user ID
+import { useRouter } from 'next/navigation'; // For redirecting
 
 const itemFormSchema = z.object({
   name: z.string().min(3, { message: 'Item name must be at least 3 characters.' }),
@@ -36,8 +39,14 @@ type ItemFormValues = z.infer<typeof itemFormSchema>;
 
 export default function NewItemPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Simulate current user - in a real app, this would come from auth context
+  const currentUserId = dummyUsers[0]?.id;
+
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
@@ -46,7 +55,7 @@ export default function NewItemPage() {
       description: '',
       category: '',
       imageUrl: '',
-      listingType: 'offer', // Default to 'offer', AI might override
+      listingType: 'offer',
     },
   });
 
@@ -58,9 +67,7 @@ export default function NewItemPage() {
       return;
     }
 
-    // Suggest Category
     setIsSuggestingCategory(true);
-    // form.setValue('category', ''); // Don't clear if user already typed something they want to keep
     try {
       const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
       if (categoryResult.errorMessage) {
@@ -93,7 +100,6 @@ export default function NewItemPage() {
       setIsSuggestingCategory(false);
     }
 
-    // Infer Listing Type
     setIsInferringListingType(true);
     try {
       const listingTypeResult: InferListingTypeOutput = await inferListingType({ name, description });
@@ -103,7 +109,6 @@ export default function NewItemPage() {
           description: listingTypeResult.errorMessage,
           variant: "destructive",
         });
-        // Keep current or default listingType if AI errors out
       } else if (listingTypeResult.inferredListingType) {
         form.setValue('listingType', listingTypeResult.inferredListingType, { shouldValidate: true });
         toast({
@@ -124,16 +129,48 @@ export default function NewItemPage() {
   }, [form, toast]);
 
 
-  function onSubmit(data: ItemFormValues) {
-    console.log(data);
-    toast({
-      title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
-      description: `${data.name} has been successfully posted.`,
-    });
-    form.reset();
+  async function onSubmit(data: ItemFormValues) {
+    if (!currentUserId) {
+      toast({
+        title: "Error",
+        description: "Could not identify current user. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const newItemData = {
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        listingType: data.listingType,
+        imageUrl: data.imageUrl || '', // Ensure imageUrl is always a string
+        ownerId: currentUserId,
+      };
+      const addedItem = addNewItemToDummyData(newItemData);
+      
+      toast({
+        title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
+        description: `${data.name} has been successfully posted.`,
+      });
+      form.reset();
+      // Redirect to the new item's page or user's profile to see the item
+      router.push(`/items/${addedItem.id}`); 
+    } catch (error: any) {
+        console.error("Error submitting new item:", error);
+        toast({
+            title: "Submission Error",
+            description: error.message || "Could not post your item. Please try again.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   const isLoadingAi = isSuggestingCategory || isInferringListingType;
+  const isLoadingOverall = isLoadingAi || isSubmitting;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -157,7 +194,7 @@ export default function NewItemPage() {
                   <FormItem>
                     <FormLabel className="font-headline">Item Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Vintage Leather Journal or (Want) Fujifilm Camera" {...field} />
+                      <Input placeholder="e.g., Vintage Leather Journal or (Want) Fujifilm Camera" {...field} disabled={isLoadingOverall} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -175,9 +212,12 @@ export default function NewItemPage() {
                         className="resize-none"
                         rows={5}
                         {...field}
+                        disabled={isLoadingOverall}
                         onBlur={() => {
                             field.onBlur();
-                            handleAiSuggestions();
+                            if (!form.formState.dirtyFields.category || !form.formState.dirtyFields.listingType) {
+                                handleAiSuggestions();
+                            }
                         }}
                       />
                     </FormControl>
@@ -194,17 +234,18 @@ export default function NewItemPage() {
                     <FormLabel className="font-headline flex items-center gap-2">
                       Listing Type
                       {isInferringListingType && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-                      {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}
+                       {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}
                     </FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
-                        value={field.value} // Ensure value is controlled
+                        value={field.value}
                         className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4"
+                        disabled={isLoadingOverall}
                       >
                         <FormItem className="flex items-center space-x-3 space-y-0">
                           <FormControl>
-                            <RadioGroupItem value="offer" id="offer" />
+                            <RadioGroupItem value="offer" id="offer" disabled={isLoadingOverall} />
                           </FormControl>
                           <FormLabel htmlFor="offer" className="font-normal flex items-center gap-2">
                              <Gift className="h-5 w-5 text-green-600" /> I'm offering an item I have
@@ -212,7 +253,7 @@ export default function NewItemPage() {
                         </FormItem>
                         <FormItem className="flex items-center space-x-3 space-y-0">
                           <FormControl>
-                            <RadioGroupItem value="want" id="want" />
+                            <RadioGroupItem value="want" id="want" disabled={isLoadingOverall} />
                           </FormControl>
                           <FormLabel htmlFor="want" className="font-normal flex items-center gap-2">
                             <Search className="h-5 w-5 text-blue-600" /> I'm looking for an item I want
@@ -242,11 +283,11 @@ export default function NewItemPage() {
                       <Input
                         placeholder={isSuggestingCategory ? "AI is suggesting a category..." : "e.g., Books & Stationery"}
                         {...field}
-                        readOnly // Keep readOnly if AI is the primary source, or allow manual edit. For now, keeping as suggested.
+                        disabled={isLoadingOverall} 
                       />
                     </FormControl>
                     <FormDescription className="font-body">
-                      Category will be suggested by AI. Click description again to re-trigger if needed.
+                      Category will be suggested by AI. Type to override.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -259,7 +300,7 @@ export default function NewItemPage() {
                   <FormItem>
                     <FormLabel className="font-headline">Image URL (Optional)</FormLabel>
                     <FormControl>
-                      <Input type="url" placeholder="https://example.com/image.png" {...field} />
+                      <Input type="url" placeholder="https://example.com/image.png" {...field} disabled={isLoadingOverall}/>
                     </FormControl>
                     <FormDescription className="font-body">
                       A direct link to an image of your item. Use placeholder e.g. https://placehold.co/600x400.png. For 'want' items, this could be an image of the desired item.
@@ -268,11 +309,11 @@ export default function NewItemPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingAi}>
-                {isLoadingAi ? (
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
+                {isLoadingOverall ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    AI is working...
+                    {isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting Category...' : 'Inferring Type...')}
                   </>
                 ) : (
                   `Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`
@@ -285,3 +326,4 @@ export default function NewItemPage() {
     </div>
   );
 }
+

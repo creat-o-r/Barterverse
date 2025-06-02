@@ -75,7 +75,7 @@ export const dummyUsers: User[] = [
   },
 ];
 
-export const dummyItems: Item[] = [
+export let dummyItems: Item[] = [ // Changed to let for modification
   {
     id: 'item1',
     name: 'Vintage Leather Journal',
@@ -247,11 +247,9 @@ export const dummyItems: Item[] = [
 ];
 
 // Assign items to users for profile pages
-dummyUsers[0].items = [dummyItems[0], dummyItems[2], dummyItems[6], dummyItems[12]]; 
-dummyUsers[1].items = [dummyItems[1], dummyItems[3], dummyItems[7]]; 
-dummyUsers[2].items = [dummyItems[4], dummyItems[5], dummyItems[13]]; 
-dummyUsers[3].items = [dummyItems[8], dummyItems[9]]; 
-dummyUsers[4].items = [dummyItems[10], dummyItems[11]]; 
+dummyUsers.forEach(user => {
+  user.items = dummyItems.filter(item => item.ownerId === user.id);
+});
 
 dummyItems.forEach(item => {
   const owner = dummyUsers.find(user => user.id === item.ownerId);
@@ -288,6 +286,40 @@ export function updateUserPreferencesInDummyData(
   }
   
   dummyUsers[userIndex] = userToUpdate;
-  console.log(`[DummyData] Updated preferences for user ${userId}:`, newPreferences);
+  // console.log(`[DummyData] Updated preferences for user ${userId}:`, newPreferences);
   return true;
+}
+
+// Function to add a new item to the dummyItems array (in-memory)
+export function addNewItemToDummyData(
+  itemData: Omit<Item, 'id' | 'ownerName' | 'status' | 'dataAiHint'> & { ownerId: string }
+): Item {
+  const owner = dummyUsers.find(user => user.id === itemData.ownerId);
+  if (!owner) {
+    console.error(`[DummyData] Owner with ID ${itemData.ownerId} not found. Cannot add item.`);
+    // In a real app, you might throw an error or handle this differently
+    throw new Error(`Owner not found for ID: ${itemData.ownerId}`);
+  }
+
+  const newItem: Item = {
+    ...itemData,
+    id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    ownerName: owner.name,
+    status: 'available', // Default status for new items
+    // Basic dataAiHint generation from name
+    dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
+    imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`
+  };
+
+  dummyItems.push(newItem);
+  
+  // Also add to the owner's item list
+  const userIndex = dummyUsers.findIndex(u => u.id === itemData.ownerId);
+  if (userIndex !== -1) {
+    dummyUsers[userIndex].items.push(newItem);
+  }
+
+  console.log('[DummyData] Added new item:', newItem);
+  console.log('[DummyData] Total items now:', dummyItems.length);
+  return newItem;
 }
