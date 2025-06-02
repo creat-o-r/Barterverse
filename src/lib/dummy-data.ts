@@ -32,6 +32,26 @@ export const dummyUsers: User[] = [
     bio: 'Into sustainable fashion and upcycled goods. Let\'s make a deal!',
     items: [],
   },
+  {
+    id: 'user4',
+    name: 'Diana Doodad',
+    avatarUrl: 'https://placehold.co/100x100.png?text=D',
+    dataAiHint: 'profile avatar',
+    rating: 4.6,
+    tradesCompleted: 15,
+    bio: 'Collector of quirky antiques and vintage clothing. Always on the lookout for unique pieces.',
+    items: [],
+  },
+  {
+    id: 'user5',
+    name: 'Ethan Exchange',
+    avatarUrl: 'https://placehold.co/100x100.png?text=E',
+    dataAiHint: 'profile avatar',
+    rating: 4.9,
+    tradesCompleted: 30,
+    bio: 'Sports gear and outdoor equipment fanatic. Ready to trade for my next adventure!',
+    items: [],
+  },
 ];
 
 export const dummyItems: Item[] = [
@@ -111,29 +131,111 @@ export const dummyItems: Item[] = [
     id: 'item7',
     name: 'Looking for: First Edition Sci-Fi Novel',
     description: 'Seeking a first edition copy of "Dune" by Frank Herbert. Must be in good or very good condition. Willing to trade valuable collectibles.',
-    imageUrl: 'https://placehold.co/600x400.png', // Generic placeholder for "want"
+    imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'book search',
     category: 'Books & Stationery',
     ownerId: 'user1',
     ownerName: 'Alice Trader',
-    status: 'available', // 'available' means the want is active
+    status: 'available',
     listingType: 'want',
   },
   {
     id: 'item8',
     name: 'Wanted: Specific Model Digital Camera',
     description: 'I am looking for a Fujifilm X100V digital camera, any color, in good working condition. Open to discussing trades for my electronics.',
-    imageUrl: 'https://placehold.co/600x400.png', // Generic placeholder for "want"
+    imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'camera search',
     category: 'Electronics',
     ownerId: 'user2',
     ownerName: 'Bob Barterer',
     status: 'available',
     listingType: 'want',
+  },
+  {
+    id: 'item9',
+    name: 'Vintage Fedora Hat',
+    description: 'A stylish vintage fedora hat from the 1950s. Wool felt, in excellent condition for its age. Size medium.',
+    imageUrl: 'https://placehold.co/600x400.png',
+    dataAiHint: 'vintage hat',
+    category: 'Fashion & Accessories',
+    ownerId: 'user4',
+    ownerName: 'Diana Doodad',
+    status: 'available',
+    listingType: 'offer',
+  },
+  {
+    id: 'item10',
+    name: 'Wanted: Rare 1980s Comic Book',
+    description: 'Looking for a specific issue of "The Uncanny X-Men" from the mid-1980s to complete my collection. Must be graded 8.0 or higher.',
+    imageUrl: 'https://placehold.co/600x400.png',
+    dataAiHint: 'comic book',
+    category: 'Collectibles',
+    ownerId: 'user4',
+    ownerName: 'Diana Doodad',
+    status: 'available',
+    listingType: 'want',
+  },
+  {
+    id: 'item11',
+    name: '4-Person Camping Tent',
+    description: 'Spacious 4-person dome tent. Used twice, in great condition. Includes rainfly and carrying bag. Perfect for family camping trips.',
+    imageUrl: 'https://placehold.co/600x400.png',
+    dataAiHint: 'camping tent',
+    category: 'Sporting Goods',
+    ownerId: 'user5',
+    ownerName: 'Ethan Exchange',
+    status: 'available',
+    listingType: 'offer',
+  },
+  {
+    id: 'item12',
+    name: 'Adjustable Dumbbell Set (5-50 lbs)',
+    description: 'Set of adjustable dumbbells, replaces multiple individual weights. Goes from 5 to 50 lbs. Excellent for home workouts.',
+    imageUrl: 'https://placehold.co/600x400.png',
+    dataAiHint: 'dumbbell set',
+    category: 'Sporting Goods',
+    ownerId: 'user5',
+    ownerName: 'Ethan Exchange',
+    status: 'pending',
+    listingType: 'offer',
+  },
+  {
+    id: 'item13',
+    name: 'Collection of Classic Rock Vinyl Records',
+    description: 'About 50 vinyl records from classic rock bands of the 70s and 80s. Mixed condition, some rare finds.',
+    imageUrl: 'https://placehold.co/600x400.png',
+    dataAiHint: 'vinyl records',
+    category: 'Collectibles',
+    ownerId: 'user1',
+    ownerName: 'Alice Trader',
+    status: 'available',
+    listingType: 'offer',
+  },
+  {
+    id: 'item14',
+    name: 'Wanted: Beginner Skateboard',
+    description: 'Looking for a complete beginner-friendly skateboard for an adult. Good condition, nothing too fancy. Willing to trade handmade items.',
+    imageUrl: 'https://placehold.co/600x400.png',
+    dataAiHint: 'skateboard search',
+    category: 'Sporting Goods',
+    ownerId: 'user3',
+    ownerName: 'Charlie Swapper',
+    status: 'available',
+    listingType: 'want',
   }
 ];
 
 // Assign items to users for profile pages
-dummyUsers[0].items = [dummyItems[0], dummyItems[2], dummyItems[6]];
-dummyUsers[1].items = [dummyItems[1], dummyItems[3], dummyItems[7]];
-dummyUsers[2].items = [dummyItems[4], dummyItems[5]];
+dummyUsers[0].items = [dummyItems[0], dummyItems[2], dummyItems[6], dummyItems[12]]; // Alice: Journal, Scarf, Want Sci-Fi Novel, Vinyl Records
+dummyUsers[1].items = [dummyItems[1], dummyItems[3], dummyItems[7]]; // Bob: Console, Speaker, Want Camera
+dummyUsers[2].items = [dummyItems[4], dummyItems[5], dummyItems[13]]; // Charlie: Succulents, Tote Bag, Want Skateboard
+dummyUsers[3].items = [dummyItems[8], dummyItems[9]]; // Diana: Fedora Hat, Want Comic Book
+dummyUsers[4].items = [dummyItems[10], dummyItems[11]]; // Ethan: Tent, Dumbbells
+
+// Make sure all items have an ownerName consistent with their ownerId
+dummyItems.forEach(item => {
+  const owner = dummyUsers.find(user => user.id === item.ownerId);
+  if (owner) {
+    item.ownerName = owner.name;
+  }
+});
