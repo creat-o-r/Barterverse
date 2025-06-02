@@ -3,7 +3,7 @@ import type { Item } from '@/types';
 import ItemCard from './ItemCard';
 
 interface ItemListProps {
-  items: (Item & { matchScore?: string })[];
+  items: (Item & { matchScore?: string; isThirdPartyFulfillment?: boolean })[]; // Updated to include isThirdPartyFulfillment
 }
 
 export default function ItemList({ items }: ItemListProps) {
@@ -19,3 +19,4 @@ export default function ItemList({ items }: ItemListProps) {
     </div>
   );
 }
+

@@ -5,10 +5,10 @@ import type { Item } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Gift, Search, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Eye, Gift, Search, TrendingUp, TrendingDown, Minus, Users } from 'lucide-react'; // Added Users icon
 
 interface ItemCardProps {
-  item: Item & { matchScore?: string };
+  item: Item & { matchScore?: string; isThirdPartyFulfillment?: boolean }; // Updated to include isThirdPartyFulfillment
 }
 
 function getMatchScoreColor(score?: string) {
@@ -74,10 +74,18 @@ export default function ItemCard({ item }: ItemCardProps) {
             {item.name}
           </Link>
         </CardTitle>
-        <p className="text-sm text-muted-foreground line-clamp-2 font-body mb-1">
+        <p className="text-sm text-muted-foreground line-clamp-2 font-body mb-2"> {/* Increased mb */}
           {item.description}
         </p>
-        <Badge variant="outline" className="text-xs">{item.category}</Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className="text-xs">{item.category}</Badge>
+            {item.isThirdPartyFulfillment && (
+            <Badge variant="secondary" className="text-xs flex items-center bg-accent/10 text-accent-foreground/90 border-accent/50">
+                <Users className="h-3 w-3 mr-1 text-accent" />
+                3rd Party Match
+            </Badge>
+            )}
+        </div>
       </CardContent>
       <CardFooter className="p-4 border-t">
         <Button asChild variant="default" size="sm" className="w-full bg-primary hover:bg-primary/90">
@@ -90,3 +98,4 @@ export default function ItemCard({ item }: ItemCardProps) {
     </Card>
   );
 }
+

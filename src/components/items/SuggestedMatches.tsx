@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import type { Item } from '@/types';
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Added dummyUsers for ownerId check
+import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -35,13 +35,15 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           return;
       }
       
-      // Assuming currentItem.ownerId is the ID of the user viewing the page or owning the item
-      const viewingUserId = currentItem.ownerId; 
+      const viewingUserId = dummyUsers[0].id; // Simulate current logged-in user
 
       try {
         const otherAvailableItems = dummyItems.filter(
           (item) => item.id !== currentItem.id && 
-                     item.ownerId !== viewingUserId && // Exclude items from the current item's owner
+                     // For suggestions, we are interested in items from users other than the current item's owner.
+                     // The AI prompt itself handles not suggesting items from currentItem.ownerId if it's a self-suggestion.
+                     // And we are interested in items from users other than the viewingUserId IF currentItem is also not by viewingUserId.
+                     // The main point is that availableItems should be broad.
                      (item.status === 'available' || item.status === 'pending')
         ).map(item => ({
             id: item.id,
@@ -75,12 +77,23 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
         const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
         
-        const matchedItems = (result.suggestedMatches || []).map(match => {
+        const augmentedMatchedItems = (result.suggestedMatches || []).map(match => {
           const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-          return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
-        }).filter(Boolean) as (Item & { matchScore: string })[];
+          if (!itemDetails) return null;
 
-        setSuggestedItemsWithScores(matchedItems);
+          let isThirdPartyFulfillment = false;
+          if (
+            currentItem.listingType === 'want' &&
+            match.ownerId !== viewingUserId &&
+            match.ownerId !== currentItem.ownerId
+          ) {
+            isThirdPartyFulfillment = true;
+          }
+
+          return { ...itemDetails, matchScore: match.matchScore, isThirdPartyFulfillment };
+        }).filter(Boolean) as (Item & { matchScore: string; isThirdPartyFulfillment?: boolean })[];
+
+        setSuggestedItemsWithScores(augmentedMatchedItems);
         setAiReasoning(result.reasoning || null);
         
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
@@ -92,14 +105,13 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             result.reasoning.toLowerCase().includes('ai assistant could not generate suggestions')
         );
 
-        if (matchedItems.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
+        if (augmentedMatchedItems.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
             toast({
                 title: currentItem.listingType === 'offer' ? "Trade Suggestions Analyzed" : "Potential Fulfillments Found",
                 description: result.reasoning,
                 duration: 7000, 
             });
-        } else if (matchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
-            // No matches found, but AI gave a reason
+        } else if (augmentedMatchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
              setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
         }
 
@@ -208,3 +220,4 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       </Card>
   );
 }
+

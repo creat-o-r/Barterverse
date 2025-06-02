@@ -10,6 +10,7 @@ export type Item = {
   ownerName: string;
   status: 'available' | 'traded' | 'pending';
   listingType: 'offer' | 'want'; // New field
+  isThirdPartyFulfillment?: boolean; // Flag for UI hint
 };
 
 export type User = {
@@ -51,3 +52,4 @@ export type ChatMessage = {
   timestamp: Date;
   isAIMessage?: boolean;
 };
+
