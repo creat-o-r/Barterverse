@@ -11,6 +11,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge'; // Added missing import
 
 interface UserItemSuggestion {
   userItem: Item;
