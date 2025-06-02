@@ -1,4 +1,6 @@
 
+"use client";
+
 import Image from 'next/image';
 import { dummyUsers, dummyItems } from '@/lib/dummy-data';
 import type { User, Item, UserMotivation, TradeTimingPreference } from '@/types';
@@ -86,13 +88,35 @@ const generateMockActivitySummary = (user: User): string => {
 };
 
 
-export default async function UserProfilePage({ params }: { params: { userId: string } }) {
-  const user = await getUserProfile(params.userId);
-  const isCurrentUser = params.userId === 'me' || params.userId === dummyUsers[0].id; // Basic check
+export default function UserProfilePage({ params }: { params: { userId: string } }) {
+  // This page is now a Client Component because of "use client" at the top.
+  // However, data fetching like getUserProfile should ideally be done in a Server Component
+  // and passed down, or fetched via useEffect/SWR if it must be a Client Component.
+  // For this iteration, we'll keep the direct async call, but acknowledge this pattern.
+  
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    async function loadUserProfile() {
+      setLoading(true);
+      const profile = await getUserProfile(params.userId);
+      setUser(profile);
+      setLoading(false);
+    }
+    loadUserProfile();
+  }, [params.userId]);
+
+  if (loading) {
+    // Basic loading state
+    return <div className="text-center py-10 font-body">Loading profile...</div>;
+  }
 
   if (!user) {
     return <div className="text-center py-10 font-body">User not found.</div>;
   }
+
+  const isCurrentUser = params.userId === 'me' || params.userId === dummyUsers[0].id; // Basic check
 
   const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
   const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
@@ -379,3 +403,4 @@ function UserProfileAIInsights({ user, mockAISuggestions, mockActivitySummary }:
   );
 }
 
+    
