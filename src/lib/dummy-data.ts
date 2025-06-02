@@ -1,5 +1,6 @@
 
 import type { Item, User, UserMotivation, TradeTimingPreference } from '@/types';
+import type { InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow'; // Import the type for clarity
 
 export const dummyUsers: User[] = [
   {
@@ -10,11 +11,11 @@ export const dummyUsers: User[] = [
     rating: 4.5,
     tradesCompleted: 12,
     bio: 'Loves vintage books and handmade crafts. Always open for a fair trade!',
-    items: [],
+    items: [], // Will be populated later
     interestedInThirdPartyFulfillment: true,
-    motivations: ['unique-finds', 'community-building'],
+    motivations: ['unique-finds', 'community-building'] as UserMotivation[],
     locationPreference: { isSensitive: false },
-    tradeTimingPreference: 'flexible',
+    tradeTimingPreference: 'flexible' as TradeTimingPreference,
   },
   {
     id: 'user2',
@@ -26,9 +27,9 @@ export const dummyUsers: User[] = [
     bio: 'Electronics enthusiast and collector of rare video games.',
     items: [],
     interestedInThirdPartyFulfillment: false,
-    motivations: ['maximize-trades'],
+    motivations: ['maximize-trades'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Prefers trades within the city for larger items.' },
-    tradeTimingPreference: 'simultaneous',
+    tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
   },
   {
     id: 'user3',
@@ -40,9 +41,9 @@ export const dummyUsers: User[] = [
     bio: 'Into sustainable fashion and upcycled goods. Let\'s make a deal!',
     items: [],
     interestedInThirdPartyFulfillment: true,
-    motivations: ['help-others', 'convenience-focused'],
+    motivations: ['help-others', 'convenience-focused'] as UserMotivation[],
     locationPreference: { isSensitive: false },
-    tradeTimingPreference: 'staged',
+    tradeTimingPreference: 'staged' as TradeTimingPreference,
   },
   {
     id: 'user4',
@@ -54,9 +55,9 @@ export const dummyUsers: User[] = [
     bio: 'Collector of quirky antiques and vintage clothing. Always on the lookout for unique pieces.',
     items: [],
     interestedInThirdPartyFulfillment: false,
-    motivations: ['unique-finds'],
+    motivations: ['unique-finds'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Willing to ship smaller items.' },
-    tradeTimingPreference: 'flexible',
+    tradeTimingPreference: 'flexible' as TradeTimingPreference,
   },
   {
     id: 'user5',
@@ -68,9 +69,9 @@ export const dummyUsers: User[] = [
     bio: 'Sports gear and outdoor equipment fanatic. Ready to trade for my next adventure!',
     items: [],
     interestedInThirdPartyFulfillment: true,
-    motivations: ['maximize-trades', 'convenience-focused'],
+    motivations: ['maximize-trades', 'convenience-focused'] as UserMotivation[],
     locationPreference: { isSensitive: false },
-    tradeTimingPreference: 'simultaneous',
+    tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
   },
 ];
 
@@ -246,16 +247,47 @@ export const dummyItems: Item[] = [
 ];
 
 // Assign items to users for profile pages
-dummyUsers[0].items = [dummyItems[0], dummyItems[2], dummyItems[6], dummyItems[12]]; // Alice: Journal, Scarf, Want Sci-Fi Novel, Vinyl Records
-dummyUsers[1].items = [dummyItems[1], dummyItems[3], dummyItems[7]]; // Bob: Console, Speaker, Want Camera
-dummyUsers[2].items = [dummyItems[4], dummyItems[5], dummyItems[13]]; // Charlie: Succulents, Tote Bag, Want Skateboard
-dummyUsers[3].items = [dummyItems[8], dummyItems[9]]; // Diana: Fedora Hat, Want Comic Book
-dummyUsers[4].items = [dummyItems[10], dummyItems[11]]; // Ethan: Tent, Dumbbells
+dummyUsers[0].items = [dummyItems[0], dummyItems[2], dummyItems[6], dummyItems[12]]; 
+dummyUsers[1].items = [dummyItems[1], dummyItems[3], dummyItems[7]]; 
+dummyUsers[2].items = [dummyItems[4], dummyItems[5], dummyItems[13]]; 
+dummyUsers[3].items = [dummyItems[8], dummyItems[9]]; 
+dummyUsers[4].items = [dummyItems[10], dummyItems[11]]; 
 
-// Make sure all items have an ownerName consistent with their ownerId
 dummyItems.forEach(item => {
   const owner = dummyUsers.find(user => user.id === item.ownerId);
   if (owner) {
     item.ownerName = owner.name;
   }
 });
+
+// Function to update user preferences in the dummyUsers array (in-memory)
+export function updateUserPreferencesInDummyData(
+  userId: string,
+  newPreferences: InferUserPreferencesOutput['suggestedPreferences']
+): boolean {
+  const userIndex = dummyUsers.findIndex(u => u.id === userId);
+  if (userIndex === -1) {
+    console.warn(`[DummyData] User with ID ${userId} not found for preference update.`);
+    return false;
+  }
+
+  const userToUpdate = dummyUsers[userIndex];
+
+  // Update fields if they exist in newPreferences
+  if (newPreferences.motivations !== undefined) {
+    userToUpdate.motivations = newPreferences.motivations;
+  }
+  if (newPreferences.locationPreference !== undefined) {
+    userToUpdate.locationPreference = newPreferences.locationPreference;
+  }
+  if (newPreferences.tradeTimingPreference !== undefined) {
+    userToUpdate.tradeTimingPreference = newPreferences.tradeTimingPreference;
+  }
+  if (newPreferences.interestedInThirdPartyFulfillment !== undefined) {
+    userToUpdate.interestedInThirdPartyFulfillment = newPreferences.interestedInThirdPartyFulfillment;
+  }
+  
+  dummyUsers[userIndex] = userToUpdate;
+  console.log(`[DummyData] Updated preferences for user ${userId}:`, newPreferences);
+  return true;
+}

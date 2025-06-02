@@ -10,13 +10,15 @@ const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 
 interface AISettings {
   matchingMode: AIMatchingMode;
-  useUserProfilePreferencesInMatching: boolean; // New setting
+  useUserProfilePreferencesInMatching: boolean;
+  enableAutomaticPreferenceInference: boolean; // New setting
 }
 
 // Default settings
 const defaultSettings: AISettings = {
   matchingMode: 'advanced',
-  useUserProfilePreferencesInMatching: true, // Default to true
+  useUserProfilePreferencesInMatching: true,
+  enableAutomaticPreferenceInference: false, // Default to false
 };
 
 async function readSettings(): Promise<AISettings> {
@@ -27,7 +29,6 @@ async function readSettings(): Promise<AISettings> {
       await writeSettings(defaultSettings);
       return defaultSettings;
     }
-    // Merge with defaults to ensure new settings are present
     const parsedSettings = JSON.parse(fileContent);
     return { ...defaultSettings, ...parsedSettings };
   } catch (error: any) {
@@ -36,7 +37,7 @@ async function readSettings(): Promise<AISettings> {
       return defaultSettings;
     }
     console.error('[AI Config Service] Error reading settings file:', error);
-    return defaultSettings; // Fallback to default on other errors
+    return defaultSettings; 
   }
 }
 
@@ -81,5 +82,23 @@ export async function setUseUserProfilePreferencesInMatching(usePrefs: boolean):
   } catch (error: any) {
     console.error('[AI Config Service] Error in setUseUserProfilePreferencesInMatching:', error);
     return { success: false, message: 'Failed to update user preference setting for matching.' };
+  }
+}
+
+export async function getEnableAutomaticPreferenceInference(): Promise<boolean> {
+  const settings = await readSettings();
+  return settings.enableAutomaticPreferenceInference;
+}
+
+export async function setEnableAutomaticPreferenceInference(enable: boolean): Promise<{success: boolean; message?: string}> {
+  try {
+    const currentSettings = await readSettings();
+    currentSettings.enableAutomaticPreferenceInference = enable;
+    await writeSettings(currentSettings);
+    console.log(`[AI Config Service] Automatic Preference Inference set to: ${enable}`);
+    return { success: true, message: `Automatic AI preference inference ${enable ? 'enabled' : 'disabled'}.` };
+  } catch (error: any) {
+    console.error('[AI Config Service] Error in setEnableAutomaticPreferenceInference:', error);
+    return { success: false, message: 'Failed to update automatic preference inference setting.' };
   }
 }
