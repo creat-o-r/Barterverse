@@ -80,26 +80,25 @@ Your goal is to find relevant matches based on the "Current Item"'s type:
 1. If the "Current Item" is an 'offer' (listed by User_CurrentItem_Owner):
    - Scenario 1.1 (High Priority): Find 'want' items from "Available Items" (owned by other users, not User_CurrentItem_Owner) that the "Current Item" could directly fulfill.
    - Scenario 1.2 (Medium Priority): Find other 'offer' items from "Available Items" (owned by other users, not User_CurrentItem_Owner) that would be a good complementary trade for someone who has the "Current Item".
-   - Reasoning should explain why the suggested items are good matches (e.g., direct fulfillment of a want, or good value exchange for an offer).
 
 2. If the "Current Item" is a 'want' (listed by User_CurrentItem_Owner):
    - Your main task is to find 'offer' items from "Available Items" that could fulfill this 'want'.
    - Scenario 2.1 (High Priority - Fulfillment with Reciprocity Hint):
      If an 'offer' item (let's call it Fulfilling_Offer, owned by User_Fulfilling_Offer) from "Available Items" directly fulfills the "Current Item" (the 'want'),
      AND User_CurrentItem_Owner (who listed the 'want') ALSO has 'offer' items listed in "Available Items" that User_Fulfilling_Offer might find appealing for a trade,
-     then this is a strong match. Suggest Fulfilling_Offer. Your reasoning should mention that User_CurrentItem_Owner also has items they are offering, potentially facilitating a trade.
+     then this is a strong match. Suggest Fulfilling_Offer.
    - Scenario 2.2 (Medium Priority - Fulfillment by Viewer):
      If Fulfilling_Offer is owned by the '{{{triggeringUserId}}}' (the viewer), and it fulfills the "Current Item",
      but User_CurrentItem_Owner does NOT have obvious 'offer' items for clear reciprocation visible in "Available Items",
-     still suggest Fulfilling_Offer. The reasoning should state that the viewer ({{{triggeringUserId}}}) has an item that matches the want, and they can initiate a negotiation to discuss a fair trade.
+     still suggest Fulfilling_Offer. The reasoning should indicate that the viewer ({{{triggeringUserId}}}) has an item that matches the want and can initiate a negotiation.
    - Scenario 2.3 (Low Priority - Fulfillment by Third Party):
      If Fulfilling_Offer (owned by a User_Fulfilling_Offer who is NOT '{{{triggeringUserId}}}' and NOT User_CurrentItem_Owner) fulfills the "Current Item", suggest this.
      The reasoning can indicate that another user has a suitable item, which the '{{{triggeringUserId}}}' might be able to help broker or be aware of.
 
 For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low" based on the scenarios.
-"High" indicates a very strong potential match (e.g., direct fulfillment with reciprocity hint, or a highly sought-after complementary offer).
-"Medium" indicates a good potential match (e.g., direct fulfillment by viewer even if reciprocation isn't immediately obvious).
-"Low" indicates a possible, but less compelling, match (e.g., fulfillment by a third party).
+"High" indicates a very strong potential match.
+"Medium" indicates a good potential match.
+"Low" indicates a possible, but less compelling, match.
 
 Do not suggest:
 - The current item itself if it appears in the available items list (ID: {{{currentItem.id}}}).
@@ -107,7 +106,7 @@ Do not suggest:
 
 Respond with a list of suggested matches, each including the 'itemId' (of the suggested 'offer' or 'want' from "Available Items") and its 'matchScore'.
 If no good matches are found, return an empty list for 'suggestedMatches'.
-Provide a brief (1-2 sentences) overall reasoning for your suggestions, considering the listing types and scenarios.
+Provide a very concise (ideally 1 sentence, maximum 2 short sentences) overall reasoning for your suggestions. If multiple factors apply, focus on the most impactful one.
   `,
 });
 
@@ -281,3 +280,5 @@ export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemM
   return itemMatchFlow(input);
 }
 
+
+    

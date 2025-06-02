@@ -220,7 +220,7 @@ export default function HomePage() {
                    itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` : 
                    `AI Matches for your ${itemSuggestion.userItem.name}`}
                 </CardTitle>
-                {!itemSuggestion.isLoading && itemSuggestion.reasoning && !itemSuggestion.error && (
+                {!itemSuggestion.isLoading && itemSuggestion.reasoning && !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 && (
                   <p className="text-sm text-muted-foreground mt-1 font-body">{itemSuggestion.reasoning}</p>
                 )}
                  {!itemSuggestion.isLoading && itemSuggestion.error && (
@@ -268,3 +268,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
