@@ -6,7 +6,6 @@ import { getLoggedMatchSuggestions, type LoggedMatchSuggestion } from '@/service
 import { getAIMatchingMode, setAIMatchingMode as setAIMatchingModeService, type AIMatchingMode } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-// Removed ScrollArea import as it's no longer used for the main table
 import { Badge } from '@/components/ui/badge';
 import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon, BrainCircuit, Zap, RefreshCw, Settings2 } from 'lucide-react';
 import Link from 'next/link';
@@ -141,10 +140,10 @@ export default function MatchReportsPage() {
             </div>
         </CardContent>
         <CardFooter>
-            <p className="text-xs text-muted-foreground font-body">
+            <div className="text-xs text-muted-foreground font-body">
                 Current active mode: <Badge variant={currentMatchingMode === 'advanced' ? "default" : "secondary"} className="capitalize">{currentMatchingMode}</Badge>.
                 Refresh suggestion logs below to see mode used for past suggestions.
-            </p>
+            </div>
         </CardFooter>
       </Card>
 
@@ -178,7 +177,6 @@ export default function MatchReportsPage() {
           ) : reports.length === 0 ? (
             <p className="text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</p>
           ) : (
-            // Removed ScrollArea, Table component itself handles overflow
             <Table>
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
