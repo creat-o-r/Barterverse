@@ -1,5 +1,5 @@
 
-import type { Item, User } from '@/types';
+import type { Item, User, UserMotivation, TradeTimingPreference } from '@/types';
 
 export const dummyUsers: User[] = [
   {
@@ -12,6 +12,9 @@ export const dummyUsers: User[] = [
     bio: 'Loves vintage books and handmade crafts. Always open for a fair trade!',
     items: [],
     interestedInThirdPartyFulfillment: true,
+    motivations: ['unique-finds', 'community-building'],
+    locationPreference: { isSensitive: false },
+    tradeTimingPreference: 'flexible',
   },
   {
     id: 'user2',
@@ -23,6 +26,9 @@ export const dummyUsers: User[] = [
     bio: 'Electronics enthusiast and collector of rare video games.',
     items: [],
     interestedInThirdPartyFulfillment: false,
+    motivations: ['maximize-trades'],
+    locationPreference: { isSensitive: true, notes: 'Prefers trades within the city for larger items.' },
+    tradeTimingPreference: 'simultaneous',
   },
   {
     id: 'user3',
@@ -34,6 +40,9 @@ export const dummyUsers: User[] = [
     bio: 'Into sustainable fashion and upcycled goods. Let\'s make a deal!',
     items: [],
     interestedInThirdPartyFulfillment: true,
+    motivations: ['help-others', 'convenience-focused'],
+    locationPreference: { isSensitive: false },
+    tradeTimingPreference: 'staged',
   },
   {
     id: 'user4',
@@ -45,6 +54,9 @@ export const dummyUsers: User[] = [
     bio: 'Collector of quirky antiques and vintage clothing. Always on the lookout for unique pieces.',
     items: [],
     interestedInThirdPartyFulfillment: false,
+    motivations: ['unique-finds'],
+    locationPreference: { isSensitive: true, notes: 'Willing to ship smaller items.' },
+    tradeTimingPreference: 'flexible',
   },
   {
     id: 'user5',
@@ -56,6 +68,9 @@ export const dummyUsers: User[] = [
     bio: 'Sports gear and outdoor equipment fanatic. Ready to trade for my next adventure!',
     items: [],
     interestedInThirdPartyFulfillment: true,
+    motivations: ['maximize-trades', 'convenience-focused'],
+    locationPreference: { isSensitive: false },
+    tradeTimingPreference: 'simultaneous',
   },
 ];
 
@@ -244,4 +259,3 @@ dummyItems.forEach(item => {
     item.ownerName = owner.name;
   }
 });
-

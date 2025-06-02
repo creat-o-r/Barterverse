@@ -13,6 +13,9 @@ export type Item = {
   isThirdPartyFulfillment?: boolean; // Flag for UI hint
 };
 
+export type UserMotivation = 'help-others' | 'maximize-trades' | 'convenience-focused' | 'community-building' | 'unique-finds';
+export type TradeTimingPreference = 'simultaneous' | 'staged' | 'flexible';
+
 export type User = {
   id: string;
   name: string;
@@ -22,11 +25,18 @@ export type User = {
   tradesCompleted: number;
   bio?: string;
   items: Item[]; // Items listed by the user
-  interestedInThirdPartyFulfillment?: boolean; // New setting for 3rd party trades
+  interestedInThirdPartyFulfillment?: boolean; 
+  // Experimental LLM-aware preferences
+  motivations?: UserMotivation[];
+  locationPreference?: {
+    isSensitive: boolean;
+    notes?: string; // e.g., "Prefers local pickup for large items"
+  };
+  tradeTimingPreference?: TradeTimingPreference;
 };
 
 export type TradeOffer = {
-  id: string;
+  id:string;
   offeringUserId: string;
   receivingUserId: string;
   offeredItemId: string;
@@ -53,4 +63,3 @@ export type ChatMessage = {
   timestamp: Date;
   isAIMessage?: boolean;
 };
-

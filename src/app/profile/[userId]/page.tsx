@@ -1,11 +1,11 @@
 
 import Image from 'next/image';
 import { dummyUsers, dummyItems } from '@/lib/dummy-data';
-import type { User, Item } from '@/types';
+import type { User, Item, UserMotivation, TradeTimingPreference } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, Search, Network } from 'lucide-react';
+import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -37,6 +37,19 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
   </div>
 );
 
+const motivationTextMap: Record<UserMotivation, string> = {
+  'help-others': 'Helping Others',
+  'maximize-trades': 'Maximizing Trades',
+  'convenience-focused': 'Convenience',
+  'community-building': 'Community Building',
+  'unique-finds': 'Finding Unique Items',
+};
+
+const tradeTimingTextMap: Record<TradeTimingPreference, string> = {
+  'simultaneous': 'Prefers Simultaneous',
+  'staged': 'Open to Staged Trades',
+  'flexible': 'Flexible Timing',
+};
 
 export default async function UserProfilePage({ params }: { params: { userId: string } }) {
   const user = await getUserProfile(params.userId);
@@ -96,21 +109,56 @@ export default async function UserProfilePage({ params }: { params: { userId: st
       
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-xl flex items-center gap-2">
-            <Network className="h-6 w-6 text-primary" />
-            Trading Preferences
+          <CardTitle className="font-headline text-xl flex items-center gap-3">
+            <Sparkles className="h-6 w-6 text-primary" />
+            Trading Style & Preferences
           </CardTitle>
+          <CardDescription className="font-body">
+            Insights into how {user.name} likes to trade. This can help AI find better matches.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-body text-sm text-muted-foreground">Interest in 3rd Party Fulfillments:</span>
-            <Badge variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"}>
-              {user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct"}
+        <CardContent className="space-y-4 pt-2">
+          <div>
+            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4>
+            <Badge variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"} className="text-xs">
+              {user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}
             </Badge>
           </div>
-          {/* Future: Add UI for editing this preference if isCurrentUser */}
+          
+          {user.motivations && user.motivations.length > 0 && (
+            <div>
+              <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {user.motivations.map(motivation => (
+                  <Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {user.locationPreference && (
+            <div>
+              <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Preference:</h4>
+              <Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">
+                {user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}
+              </Badge>
+              {user.locationPreference.isSensitive && user.locationPreference.notes && (
+                <p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>
+              )}
+            </div>
+          )}
+
+          {user.tradeTimingPreference && (
+            <div>
+              <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4>
+               <Badge variant="outline" className="text-xs">
+                {tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}
+              </Badge>
+            </div>
+          )}
+
            {isCurrentUser && (
-             <p className="text-xs text-muted-foreground font-body italic pt-2">
+             <p className="text-xs text-muted-foreground font-body italic pt-2 border-t border-dashed mt-4">
                 You can change your trading preferences in the &quot;Edit Profile&quot; section (coming soon).
             </p>
            )}
@@ -157,4 +205,3 @@ export default async function UserProfilePage({ params }: { params: { userId: st
     </div>
   );
 }
-
