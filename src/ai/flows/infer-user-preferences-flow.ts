@@ -63,8 +63,8 @@ Analyze the activity summary and infer the following preferences:
     -   'community-building': Mentions of meeting people, local community, friendly interactions.
     -   'unique-finds': Looking for rare, specific, or collectible items.
 2.  **Location Preference**:
-    -   `isSensitive` (boolean): Does the user mention location, shipping, pickup, or local trades? If yes, true. Otherwise, false.
-    -   `notes` (string, optional): If sensitive, capture any specific notes like "prefers local pickup" or "willing to ship small items".
+    -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades? If yes, true. Otherwise, false.
+    -   notes (string, optional): If sensitive, capture any specific notes like "prefers local pickup" or "willing to ship small items".
 3.  **Trade Timing Preference**: Choose from: 'simultaneous' (prefers to swap items at the same time), 'staged' (open to one person sending first, then the other), 'flexible' (seems open to either or doesn't specify).
     -   'simultaneous': May mention "in-person swap", "meet up".
     -   'staged': May mention "I can send mine first", or be open to shipping logistics.
@@ -88,7 +88,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
       const {output} = await prompt(input);
       if (!output || !output.suggestedPreferences) {
         console.warn(`${flowName}: Prompt returned null or incomplete output for suggestedPreferences.`);
-        return { 
+        return {
             userId: input.userId,
             suggestedPreferences: { // Provide minimal default if AI fails badly
                 locationPreference: { isSensitive: false},
@@ -97,10 +97,10 @@ const inferUserPreferencesFlow = ai.defineFlow(
             },
             confidence: 'Low',
             reasoning: "AI could not reliably infer preferences from the provided summary.",
-            errorMessage: "The AI assistant could not infer preferences at this time." 
+            errorMessage: "The AI assistant could not infer preferences at this time."
         };
       }
-      return { 
+      return {
         userId: input.userId,
         suggestedPreferences: output.suggestedPreferences,
         confidence: output.confidence,
@@ -126,7 +126,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
         userMessage = "The AI's response for preferences was not in the expected format.";
       }
 
-      return { 
+      return {
         userId: input.userId,
         suggestedPreferences: {
             locationPreference: { isSensitive: false},
