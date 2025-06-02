@@ -21,15 +21,16 @@ const primaryNavLinks = [
     href: '/chats', 
     label: 'Chats', 
     icon: <MessageSquare className="h-4 w-4" />,
-    hasNotification: true // Add a flag for notification
+    hasNotification: true 
   },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
-const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" /> }; // Removed label
+const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" /> };
 
 export default function Navbar() {
   const isLoggedIn = true; // Placeholder for auth state
   const isAdmin = true; // Placeholder for admin state
+  const unreadCount = 3; // Placeholder for unread chat count
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
@@ -42,10 +43,9 @@ export default function Navbar() {
               <Link href={link.href} className="relative flex items-center gap-2 text-sm px-3 py-2">
                 {link.icon}
                 {link.label}
-                {link.hasNotification && (
-                  <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                {link.hasNotification && unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 h-4 min-w-[1rem] rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center px-1">
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
               </Link>
@@ -125,10 +125,10 @@ export default function Navbar() {
                       <Link href={link.href} className="relative flex items-center gap-3 text-base py-2">
                         {link.icon}
                         {link.label}
-                        {link.hasNotification && (
-                          <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
-                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                          </span>
+                        {link.hasNotification && unreadCount > 0 && (
+                           <span className="absolute top-1 right-1 h-4 min-w-[1rem] rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center px-1">
+                             {unreadCount > 9 ? '9+' : unreadCount}
+                           </span>
                         )}
                       </Link>
                     </Button>
@@ -147,7 +147,7 @@ export default function Navbar() {
                      <Button variant="ghost" asChild className="justify-start">
                       <Link href={adminLinkConfig.href} className="flex items-center gap-3 text-base py-2" title="Admin Reports">
                         {adminLinkConfig.icon}
-                        <span className="sr-only">Admin Reports</span> {/* Keep label for accessibility, but could be removed if space is tight */}
+                        <span className="sr-only">Admin Reports</span>
                       </Link>
                     </Button>
                   )}
