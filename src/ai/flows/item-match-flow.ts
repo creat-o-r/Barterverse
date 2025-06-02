@@ -29,10 +29,6 @@ const ItemMatchOutputSchema = z.object({
 });
 export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 
-export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
-  return itemMatchFlow(input);
-}
-
 const prompt = ai.definePrompt({
   name: 'itemMatchPrompt',
   input: {schema: ItemMatchInputSchema},
@@ -69,18 +65,44 @@ const itemMatchFlow = ai.defineFlow(
     inputSchema: ItemMatchInputSchema,
     outputSchema: ItemMatchOutputSchema,
   },
-  async (input: ItemMatchInput) => {
-    // Filter out the current item from availableItems if it's present
+  async (input: ItemMatchInput): Promise<ItemMatchOutput> => {
     const filteredAvailableItems = input.availableItems.filter(item => item.id !== input.currentItem.id);
 
     if (filteredAvailableItems.length === 0) {
         return { suggestedItemIds: [], reasoning: "No other items available to suggest." };
     }
 
-    const {output} = await prompt({
-        currentItem: input.currentItem,
-        availableItems: filteredAvailableItems
-    });
-    return output!;
+    try {
+      const {output} = await prompt({
+          currentItem: input.currentItem,
+          availableItems: filteredAvailableItems
+      });
+      if (!output) {
+          console.warn("ItemMatchFlow: Prompt returned null output");
+          return {
+              suggestedItemIds: [],
+              reasoning: "AI could not generate suggestions at this time."
+          };
+      }
+      return output;
+    } catch (error: any) {
+      console.error("Error in itemMatchFlow calling prompt:", error);
+      let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
+      if (error.message && typeof error.message === 'string') {
+        if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+          userMessage = "The AI matching service is temporarily overloaded. Please try again in a few moments.";
+        } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
+            userMessage = "The AI matching service could not process the request due to content restrictions or safety settings.";
+        }
+      }
+      return {
+        suggestedItemIds: [],
+        reasoning: userMessage
+      };
+    }
   }
 );
+
+export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
+  return itemMatchFlow(input);
+}
