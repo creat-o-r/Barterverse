@@ -5,51 +5,51 @@ import type { TradeOffer } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { dummyItems } from '@/lib/dummy-data'; 
+import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
 import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
 import { Separator } from '@/components/ui/separator';
 
 // Reusing dummyTrades for now, ideally this comes from a service
 const dummyTrades: TradeOffer[] = [
   {
-    id: 'trade1',
-    offeringUserId: 'user1', // Assume current user is user1
-    receivingUserId: 'user2',
-    offeredItemId: 'item1',
-    requestedItemId: 'item2',
+    id: 'trade-user1-wants-item2-from-user2', // Alice wants Bob's Retro Gaming Console
+    offeringUserId: 'user2', // Bob is "offering" item2
+    receivingUserId: 'user1', // Alice is "receiving" item2 if trade succeeds
+    offeredItemId: 'item2', // The item Bob has
+    requestedItemId: 'item3', // What Alice might offer in return (Hand-knitted Scarf)
     status: 'pending',
     createdAt: new Date(Date.now() - 86400000 * 2),
     updatedAt: new Date(Date.now() - 86400000 * 1),
   },
   {
-    id: 'trade2',
-    offeringUserId: 'user3',
-    receivingUserId: 'user1', // Assume current user is user1
-    offeredItemId: 'item5',
-    requestedItemId: 'item3',
+    id: 'trade-user1-wants-item5-from-user3', // Alice wants Charlie's Succulents
+    offeringUserId: 'user3', // Charlie is "offering" item5
+    receivingUserId: 'user1', // Alice is "receiving" item5
+    offeredItemId: 'item5', // The item Charlie has
+    requestedItemId: 'item1', // What Alice might offer (Vintage Journal)
     status: 'accepted',
     createdAt: new Date(Date.now() - 86400000 * 5),
     updatedAt: new Date(Date.now() - 86400000 * 3),
   },
    {
-    id: 'trade3',
-    offeringUserId: 'user1',
-    receivingUserId: 'user3',
-    offeredItemId: 'item4',
-    requestedItemId: 'itemX',
+    id: 'trade-user1-wants-item9-from-user4', // Alice wants Diana's Fedora Hat
+    offeringUserId: 'user4', // Diana has item9
+    receivingUserId: 'user1', // Alice wants item9
+    offeredItemId: 'item9', // Diana's Fedora
+    requestedItemId: 'item13', // Alice offers Vinyl Records
     status: 'pending',
     createdAt: new Date(Date.now() - 86400000 * 1),
     updatedAt: new Date(),
   },
   {
-    id: 'trade4',
-    offeringUserId: 'user2',
-    receivingUserId: 'user1',
-    offeredItemId: 'itemY',
-    requestedItemId: 'itemZ',
-    status: 'completed', // Will be filtered out
-    createdAt: new Date(Date.now() - 86400000 * 4),
-    updatedAt: new Date(Date.now() - 86400000 * 4),
+    id: 'trade-user2-wants-item1-from-user1', // Bob wants Alice's Vintage Journal
+    offeringUserId: 'user1', // Alice has item1
+    receivingUserId: 'user2', // Bob wants item1
+    offeredItemId: 'item1',
+    requestedItemId: 'item4', // Bob offers Bluetooth speaker
+    status: 'pending',
+    createdAt: new Date(Date.now() - 86400000 * 0.5),
+    updatedAt: new Date(Date.now() - 86400000 * 0.2),
   },
 ];
 
@@ -59,11 +59,7 @@ const getItemName = (itemId: string) => dummyItems.find(item => item.id === item
 // Helper to get user name (simplified)
 const getUserName = (userId: string, currentUserId: string) => {
     if (userId === currentUserId) return "You";
-    // In a real app, fetch user names based on ID
-    if (userId === 'user1') return "Alice Trader";
-    if (userId === 'user2') return "Bob Barterer";
-    if (userId === 'user3') return "Charlie Swapper";
-    return `User (${userId.substring(0,4)})`;
+    return dummyUsers.find(user => user.id === userId)?.name || `User (${userId.substring(0,4)})`;
 }
 
 const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
@@ -101,9 +97,26 @@ export default function ChatsPage() {
           ) : (
             <div className="space-y-4">
               {activeChats.map((trade) => {
+                // Determine who the other party is
                 const otherPartyId = trade.offeringUserId === currentUserId ? trade.receivingUserId : trade.offeringUserId;
                 const otherPartyName = getUserName(otherPartyId, currentUserId);
-                const userIsOffering = trade.offeringUserId === currentUserId;
+                
+                // Determine what is being offered and requested from the current user's perspective
+                let itemCurrentUserOffersName = 'Something';
+                let itemOtherUserOffersName = 'Something';
+
+                if (trade.offeringUserId === currentUserId) {
+                  // Current user is OFFERING trade.offeredItemId
+                  // and REQUESTING trade.requestedItemId from the other user
+                  itemCurrentUserOffersName = getItemName(trade.offeredItemId);
+                  itemOtherUserOffersName = getItemName(trade.requestedItemId);
+                } else { // trade.receivingUserId === currentUserId
+                  // Current user is RECEIVING trade.offeredItemId from the other user
+                  // and the other user is REQUESTING trade.requestedItemId (which is current user's)
+                  itemCurrentUserOffersName = getItemName(trade.requestedItemId);
+                  itemOtherUserOffersName = getItemName(trade.offeredItemId);
+                }
+
 
                 return (
                   <Card key={trade.id} className="hover:shadow-md transition-shadow">
@@ -122,11 +135,8 @@ export default function ChatsPage() {
                                 {trade.status}
                             </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground font-body line-clamp-1">
-                          {userIsOffering ? 
-                            `Your offer: ${getItemName(trade.offeredItemId)} for Their: ${getItemName(trade.requestedItemId)}` :
-                            `Their offer: ${getItemName(trade.offeredItemId)} for Your: ${getItemName(trade.requestedItemId)}`
-                          }
+                        <p className="text-sm text-muted-foreground font-body line-clamp-2">
+                           {`Your offer: ${itemCurrentUserOffersName} for Their: ${itemOtherUserOffersName}`}
                         </p>
                         <p className="text-xs text-muted-foreground font-body">
                           Last activity: {new Date(trade.updatedAt).toLocaleDateString()}

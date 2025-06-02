@@ -25,12 +25,12 @@ const primaryNavLinks = [
   },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
-const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" /> };
+const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" />, label: "Admin" }; // Added label for mobile
 
 export default function Navbar() {
   const isLoggedIn = true; // Placeholder for auth state
   const isAdmin = true; // Placeholder for admin state
-  const unreadCount = 3; // Placeholder for unread chat count
+  const unreadCount = 3; // Placeholder for unread chat count, ideally from state/props
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
@@ -39,7 +39,7 @@ export default function Navbar() {
         {/* Desktop Navigation - Main Links (left-aligned) */}
         <nav className="hidden md:flex items-center gap-1">
           {primaryNavLinks.map((link) => (
-            <Button key={link.href} variant="ghost" asChild>
+            <Button key={link.label} variant="ghost" asChild>
               <Link href={link.href} className="relative flex items-center gap-2 text-sm px-3 py-2">
                 {link.icon}
                 {link.label}
@@ -103,9 +103,9 @@ export default function Navbar() {
           {/* Admin Report Button - Desktop (Icon only, far right) */}
           {isLoggedIn && isAdmin && (
             <Button variant="ghost" size="icon" asChild className="hidden md:flex text-muted-foreground hover:text-foreground">
-              <Link href={adminLinkConfig.href} title="Admin Reports">
+              <Link href={adminLinkConfig.href} title={adminLinkConfig.label}>
                 {adminLinkConfig.icon}
-                <span className="sr-only">Admin Reports</span>
+                <span className="sr-only">{adminLinkConfig.label}</span>
               </Link>
             </Button>
           )}
@@ -121,12 +121,12 @@ export default function Navbar() {
               <SheetContent side="right">
                 <nav className="flex flex-col gap-4 mt-8">
                   {primaryNavLinks.map((link) => (
-                    <Button key={link.href} variant="ghost" asChild className="justify-start">
+                    <Button key={`mobile-${link.label}`} variant="ghost" asChild className="justify-start">
                       <Link href={link.href} className="relative flex items-center gap-3 text-base py-2">
                         {link.icon}
                         {link.label}
                         {link.hasNotification && unreadCount > 0 && (
-                           <span className="absolute top-1 right-1 h-4 min-w-[1rem] rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center px-1">
+                           <span className="ml-auto h-5 min-w-[1.25rem] rounded-full bg-red-500 text-white text-xs flex items-center justify-center px-1.5">
                              {unreadCount > 9 ? '9+' : unreadCount}
                            </span>
                         )}
@@ -142,12 +142,12 @@ export default function Navbar() {
                       </Link>
                     </Button>
                   )}
-                  {/* Mobile Admin Report Link (Icon only) */}
+                  {/* Mobile Admin Report Link */}
                   {isLoggedIn && isAdmin && (
                      <Button variant="ghost" asChild className="justify-start">
-                      <Link href={adminLinkConfig.href} className="flex items-center gap-3 text-base py-2" title="Admin Reports">
+                      <Link href={adminLinkConfig.href} className="flex items-center gap-3 text-base py-2" title={adminLinkConfig.label}>
                         {adminLinkConfig.icon}
-                        <span className="sr-only">Admin Reports</span>
+                        <span>{adminLinkConfig.label}</span>
                       </Link>
                     </Button>
                   )}

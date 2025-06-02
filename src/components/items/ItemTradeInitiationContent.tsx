@@ -1,10 +1,11 @@
+
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, X } from 'lucide-react';
-import ChatWindow from '@/components/chat/ChatWindow';
+import { MessageSquare } from 'lucide-react';
 import type { Item } from '@/types';
+import Link from 'next/link';
+import { dummyUsers } from '@/lib/dummy-data'; // To get current user ID for tradeId
 
 interface ItemTradeInitiationContentProps {
   item: Item;
@@ -13,37 +14,30 @@ interface ItemTradeInitiationContentProps {
 }
 
 export default function ItemTradeInitiationContent({ item, ownerName, ownerId }: ItemTradeInitiationContentProps) {
-  const [showChat, setShowChat] = useState(false);
-
-  // This tradeId is a simple deterministic ID for client-side chat session initiation.
-  // A real application might generate this ID via a backend call upon starting a trade.
-  const tradeId = `chat-for-${item.id}-with-${ownerId}`;
+  // Simulate current user - in a real app, this would come from auth context
+  const currentUserId = dummyUsers[0]?.id || 'currentUserPlaceholder'; 
+  
+  // Construct a tradeId. This is a simplified version.
+  // A real app might involve a backend call to create a trade record and get an ID.
+  // For this demo, we make it somewhat unique based on participants and item.
+  // Let's assume the item being viewed is what the other user is offering.
+  const tradeId = `trade-${currentUserId}-wants-${item.id}-from-${ownerId}`;
 
   return (
     <>
       <p className="text-sm font-body text-muted-foreground mb-4">
-        Start a conversation with {ownerName} to negotiate a trade for {item.name}.
+        Start a conversation with {ownerName} to negotiate a trade for "{item.name}".
       </p>
       <Button
-        onClick={() => setShowChat(!showChat)}
+        asChild
         className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
         size="lg"
       >
-        {showChat ? <X className="mr-2 h-5 w-5" /> : <MessageSquare className="mr-2 h-5 w-5" />}
-        {showChat ? 'Close Negotiation Chat' : 'Start Trade Negotiation'}
+        <Link href={`/trades/${tradeId}`}>
+          <MessageSquare className="mr-2 h-5 w-5" />
+          Open Negotiation Chat
+        </Link>
       </Button>
-
-      {showChat && (
-        <div className="mt-4">
-          <ChatWindow
-            currentItem={item} // The item being viewed, used as context for the chat
-            otherUserId={ownerId}
-            otherUserName={ownerName}
-            tradeId={tradeId}
-            // requestedItemInitial is optional and not provided here as negotiation starts fresh
-          />
-        </div>
-      )}
     </>
   );
 }
