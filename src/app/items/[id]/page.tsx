@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
@@ -5,7 +6,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, HelpingHand } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
@@ -34,7 +35,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
           <Card className="overflow-hidden">
-            <CardHeader className="p-0">
+            <CardHeader className="p-0 relative">
               <div className="aspect-video relative w-full">
                 <Image
                   src={item.imageUrl || 'https://placehold.co/800x450.png'}
@@ -43,10 +44,17 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                   objectFit="cover"
                   data-ai-hint={item.dataAiHint || "item image detail"}
                 />
+                 <Badge
+                    variant={item.listingType === 'offer' ? 'default' : 'secondary'}
+                    className={`absolute top-4 left-4 text-lg p-2 capitalize z-10 ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                  >
+                    {item.listingType === 'offer' ? <Gift className="h-5 w-5 mr-1.5" /> : <Search className="h-5 w-5 mr-1.5" />}
+                    {item.listingType}
+                  </Badge>
                 {item.status !== 'available' && (
                   <Badge
                     variant={item.status === 'traded' ? 'destructive' : 'secondary'}
-                    className="absolute top-4 right-4 text-lg p-2 capitalize"
+                    className="absolute top-4 right-4 text-lg p-2 capitalize z-10"
                   >
                     {item.status}
                   </Badge>
@@ -73,7 +81,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             <CardHeader>
               <CardTitle className="font-headline text-xl flex items-center gap-2">
                 <UserCircle className="h-6 w-6 text-primary" />
-                Owner Details
+                {item.listingType === 'offer' ? "Owner Details" : "Listed By"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -99,7 +107,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             </CardFooter>
           </Card>
 
-          {item.status === 'available' && (
+          {item.status === 'available' && item.listingType === 'offer' && (
             <Card>
               <CardHeader>
                   <CardTitle className="font-headline text-xl flex items-center gap-2">
@@ -112,30 +120,66 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
               </CardContent>
             </Card>
           )}
+
+          {item.status === 'available' && item.listingType === 'want' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-headline text-xl flex items-center gap-2">
+                  <HelpingHand className="h-6 w-6 text-primary" />
+                  Can you fulfill this want?
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm font-body text-muted-foreground mb-4">
+                  If you have the item "{item.name}" that {owner.name} is looking for, you can reach out to them.
+                </p>
+                <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <MessageSquare className="mr-2 h-4 w-4" /> Contact {owner.name}
+                </Button>
+                {/* Future: This could initiate a chat or a specific "offer to fulfill want" flow */}
+              </CardContent>
+            </Card>
+          )}
+
+
           {item.status === 'pending' && (
               <Card className="border-yellow-500">
                   <CardHeader>
-                      <CardTitle className="font-headline text-xl text-yellow-600">Trade Pending</CardTitle>
+                      <CardTitle className="font-headline text-xl text-yellow-600">
+                        {item.listingType === 'offer' ? "Trade Pending" : "Fulfillment Pending"}
+                      </CardTitle>
                   </CardHeader>
                   <CardContent>
-                      <p className="font-body text-yellow-700">This item is currently part of a pending trade negotiation.</p>
+                      <p className="font-body text-yellow-700">
+                        {item.listingType === 'offer' 
+                          ? "This item is currently part of a pending trade negotiation."
+                          : "This want listing is currently in discussion for fulfillment."
+                        }
+                      </p>
                   </CardContent>
               </Card>
           )}
           {item.status === 'traded' && (
               <Card className="border-red-500">
                   <CardHeader>
-                      <CardTitle className="font-headline text-xl text-red-600">Item Traded</CardTitle>
+                      <CardTitle className="font-headline text-xl text-red-600">
+                        {item.listingType === 'offer' ? "Item Traded" : "Want Fulfilled"}
+                        </CardTitle>
                   </CardHeader>
                   <CardContent>
-                      <p className="font-body text-red-700">This item has already been traded.</p>
+                      <p className="font-body text-red-700">
+                        {item.listingType === 'offer' 
+                          ? "This item has already been traded."
+                          : "This want listing has been successfully fulfilled."
+                        }
+                      </p>
                   </CardContent>
               </Card>
           )}
         </div>
       </div>
-      
-      {item.status === 'available' && (
+
+      {item.status === 'available' && item.listingType === 'offer' && (
         <div className="mt-12">
           <Separator className="my-8" />
           <SuggestedMatches currentItem={item} />

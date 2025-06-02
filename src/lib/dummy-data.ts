@@ -1,3 +1,4 @@
+
 import type { Item, User } from '@/types';
 
 export const dummyUsers: User[] = [
@@ -9,7 +10,7 @@ export const dummyUsers: User[] = [
     rating: 4.5,
     tradesCompleted: 12,
     bio: 'Loves vintage books and handmade crafts. Always open for a fair trade!',
-    items: [], 
+    items: [],
   },
   {
     id: 'user2',
@@ -44,6 +45,7 @@ export const dummyItems: Item[] = [
     ownerId: 'user1',
     ownerName: 'Alice Trader',
     status: 'available',
+    listingType: 'offer',
   },
   {
     id: 'item2',
@@ -55,6 +57,7 @@ export const dummyItems: Item[] = [
     ownerId: 'user2',
     ownerName: 'Bob Barterer',
     status: 'available',
+    listingType: 'offer',
   },
   {
     id: 'item3',
@@ -66,6 +69,7 @@ export const dummyItems: Item[] = [
     ownerId: 'user1',
     ownerName: 'Alice Trader',
     status: 'available',
+    listingType: 'offer',
   },
   {
     id: 'item4',
@@ -77,6 +81,7 @@ export const dummyItems: Item[] = [
     ownerId: 'user2',
     ownerName: 'Bob Barterer',
     status: 'pending',
+    listingType: 'offer',
   },
   {
     id: 'item5',
@@ -88,6 +93,7 @@ export const dummyItems: Item[] = [
     ownerId: 'user3',
     ownerName: 'Charlie Swapper',
     status: 'available',
+    listingType: 'offer',
   },
   {
     id: 'item6',
@@ -99,10 +105,35 @@ export const dummyItems: Item[] = [
     ownerId: 'user3',
     ownerName: 'Charlie Swapper',
     status: 'traded',
+    listingType: 'offer',
   },
+  {
+    id: 'item7',
+    name: 'Looking for: First Edition Sci-Fi Novel',
+    description: 'Seeking a first edition copy of "Dune" by Frank Herbert. Must be in good or very good condition. Willing to trade valuable collectibles.',
+    imageUrl: 'https://placehold.co/600x400.png', // Generic placeholder for "want"
+    dataAiHint: 'book search',
+    category: 'Books & Stationery',
+    ownerId: 'user1',
+    ownerName: 'Alice Trader',
+    status: 'available', // 'available' means the want is active
+    listingType: 'want',
+  },
+  {
+    id: 'item8',
+    name: 'Wanted: Specific Model Digital Camera',
+    description: 'I am looking for a Fujifilm X100V digital camera, any color, in good working condition. Open to discussing trades for my electronics.',
+    imageUrl: 'https://placehold.co/600x400.png', // Generic placeholder for "want"
+    dataAiHint: 'camera search',
+    category: 'Electronics',
+    ownerId: 'user2',
+    ownerName: 'Bob Barterer',
+    status: 'available',
+    listingType: 'want',
+  }
 ];
 
 // Assign items to users for profile pages
-dummyUsers[0].items = [dummyItems[0], dummyItems[2]];
-dummyUsers[1].items = [dummyItems[1], dummyItems[3]];
+dummyUsers[0].items = [dummyItems[0], dummyItems[2], dummyItems[6]];
+dummyUsers[1].items = [dummyItems[1], dummyItems[3], dummyItems[7]];
 dummyUsers[2].items = [dummyItems[4], dummyItems[5]];

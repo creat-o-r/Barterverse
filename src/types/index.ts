@@ -4,16 +4,19 @@ export type Item = {
   name: string;
   description: string;
   imageUrl: string;
+  dataAiHint?: string; // Added for placeholder image hints
   category: string;
   ownerId: string;
-  ownerName: string; 
+  ownerName: string;
   status: 'available' | 'traded' | 'pending';
+  listingType: 'offer' | 'want'; // New field
 };
 
 export type User = {
   id: string;
   name: string;
   avatarUrl: string;
+  dataAiHint?: string; // Added for placeholder image hints
   rating: number; // Average rating
   tradesCompleted: number;
   bio?: string;

@@ -1,10 +1,11 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Item } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye } from 'lucide-react';
+import { Eye, Gift, Search } from 'lucide-react';
 
 interface ItemCardProps {
   item: Item;
@@ -13,10 +14,10 @@ interface ItemCardProps {
 export default function ItemCard({ item }: ItemCardProps) {
   return (
     <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl">
-      <CardHeader className="p-0">
+      <CardHeader className="p-0 relative">
         <div className="aspect-[4/3] relative w-full">
           <Image
-            src={item.imageUrl}
+            src={item.imageUrl || `https://placehold.co/600x400.png?text=${item.listingType}`}
             alt={item.name}
             layout="fill"
             objectFit="cover"
@@ -24,14 +25,21 @@ export default function ItemCard({ item }: ItemCardProps) {
             data-ai-hint={item.dataAiHint || "item image"}
           />
            {item.status !== 'available' && (
-            <Badge 
-              variant={item.status === 'traded' ? 'destructive' : 'secondary'} 
-              className="absolute top-2 right-2 capitalize"
+            <Badge
+              variant={item.status === 'traded' ? 'destructive' : 'secondary'}
+              className="absolute top-2 right-2 capitalize z-10"
             >
               {item.status}
             </Badge>
           )}
         </div>
+        <Badge
+            variant={item.listingType === 'offer' ? 'default' : 'secondary'}
+            className={`absolute bottom-2 left-2 capitalize z-10 ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+        >
+            {item.listingType === 'offer' ? <Gift className="h-3 w-3 mr-1" /> : <Search className="h-3 w-3 mr-1" />}
+            {item.listingType}
+        </Badge>
       </CardHeader>
       <CardContent className="p-4 flex-grow">
         <CardTitle className="text-lg font-headline mb-2 leading-tight">

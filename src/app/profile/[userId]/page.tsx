@@ -1,10 +1,11 @@
+
 import Image from 'next/image';
 import { dummyUsers, dummyItems } from '@/lib/dummy-data';
 import type { User, Item } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Award, Edit3, Repeat } from 'lucide-react';
+import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, SearchHeart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -38,14 +39,15 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
 
 export default async function UserProfilePage({ params }: { params: { userId: string } }) {
   const user = await getUserProfile(params.userId);
-  const isCurrentUser = params.userId === 'me'; // Basic check
+  const isCurrentUser = params.userId === 'me' || params.userId === dummyUsers[0].id; // Basic check
 
   if (!user) {
     return <div className="text-center py-10 font-body">User not found.</div>;
   }
 
-  const availableItems = user.items.filter(item => item.status === 'available' || item.status === 'pending');
-  const tradedItems = user.items.filter(item => item.status === 'traded');
+  const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
+  const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
+  const tradedOrFulfilledItems = user.items.filter(item => item.status === 'traded');
 
   return (
     <div className="space-y-8">
@@ -72,36 +74,48 @@ export default async function UserProfilePage({ params }: { params: { userId: st
         </CardHeader>
         <CardContent className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div className="p-4 bg-background rounded-lg">
-                <Package className="h-8 w-8 text-primary mx-auto mb-2"/>
-                <p className="text-2xl font-headline">{user.items.length}</p>
-                <p className="text-sm text-muted-foreground font-body">Items Listed</p>
+                <Gift className="h-8 w-8 text-green-600 mx-auto mb-2"/>
+                <p className="text-2xl font-headline">{user.items.filter(i => i.listingType === 'offer').length}</p>
+                <p className="text-sm text-muted-foreground font-body">Items Offered</p>
+            </div>
+             <div className="p-4 bg-background rounded-lg">
+                <SearchHeart className="h-8 w-8 text-blue-600 mx-auto mb-2"/>
+                <p className="text-2xl font-headline">{user.items.filter(i => i.listingType === 'want').length}</p>
+                <p className="text-sm text-muted-foreground font-body">Items Wanted</p>
             </div>
             <div className="p-4 bg-background rounded-lg">
                 <Repeat className="h-8 w-8 text-accent mx-auto mb-2"/>
                 <p className="text-2xl font-headline">{user.tradesCompleted}</p>
-                <p className="text-sm text-muted-foreground font-body">Trades Completed</p>
-            </div>
-            <div className="p-4 bg-background rounded-lg">
-                <Award className="h-8 w-8 text-yellow-500 mx-auto mb-2"/>
-                <p className="text-2xl font-headline">{user.rating.toFixed(1)} / 5.0</p>
-                <p className="text-sm text-muted-foreground font-body">Average Rating</p>
+                <p className="text-sm text-muted-foreground font-body">Trades Completed / Wants Fulfilled</p>
             </div>
         </CardContent>
       </Card>
-      
+
       <Separator />
 
       <section>
-        <h2 className="text-2xl font-headline mb-4">Items Available for Trade ({availableItems.length})</h2>
-        {availableItems.length > 0 ? <ItemList items={availableItems} /> : <p className="text-muted-foreground font-body">This user has no items currently available for trade.</p>}
+        <h2 className="text-2xl font-headline mb-4 flex items-center gap-2">
+            <Gift className="h-6 w-6 text-green-600" />
+            Items Offered ({offeredItems.length})
+        </h2>
+        {offeredItems.length > 0 ? <ItemList items={offeredItems} /> : <p className="text-muted-foreground font-body">This user has no items currently offered for trade.</p>}
       </section>
 
       <Separator />
-      
+
+       <section>
+        <h2 className="text-2xl font-headline mb-4 flex items-center gap-2">
+            <SearchHeart className="h-6 w-6 text-blue-600" />
+            Items Wanted ({wantedItems.length})
+        </h2>
+        {wantedItems.length > 0 ? <ItemList items={wantedItems} /> : <p className="text-muted-foreground font-body">This user is not currently looking for any specific items.</p>}
+      </section>
+
+      <Separator />
+
       <section>
-        <h2 className="text-2xl font-headline mb-4">Trade History ({tradedItems.length} Traded)</h2>
-        {tradedItems.length > 0 ? <ItemList items={tradedItems} /> : <p className="text-muted-foreground font-body">No traded items yet.</p>}
-        {/* In a real app, this would list actual trades and ratings received */}
+        <h2 className="text-2xl font-headline mb-4">Trade & Fulfillment History ({tradedOrFulfilledItems.length})</h2>
+        {tradedOrFulfilledItems.length > 0 ? <ItemList items={tradedOrFulfilledItems} /> : <p className="text-muted-foreground font-body">No completed trades or fulfilled wants yet.</p>}
       </section>
 
       <Separator />
@@ -111,19 +125,6 @@ export default async function UserProfilePage({ params }: { params: { userId: st
         <Card>
             <CardContent className="p-6">
                 <p className="text-muted-foreground font-body">User reviews and ratings will be displayed here.</p>
-                {/* Example Review Structure 
-                <div className="border-b py-4 last:border-b-0">
-                    <div className="flex items-center mb-1">
-                        <Avatar className="h-8 w-8 mr-2">
-                            <AvatarImage src="https://placehold.co/40x40.png?text=R" alt="Reviewer" />
-                            <AvatarFallback>R</AvatarFallback>
-                        </Avatar>
-                        <span className="font-headline text-sm">Reviewer Name</span>
-                        <RatingStarsDisplay score={5} />
-                    </div>
-                    <p className="text-sm font-body text-foreground/80">"Great trader, item as described. Smooth transaction!"</p>
-                </div>
-                */}
             </CardContent>
         </Card>
       </section>
