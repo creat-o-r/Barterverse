@@ -8,18 +8,19 @@ import ItemList from '@/components/items/ItemList';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
+// Removed useToast as reasoning will be inline
+// import { useToast } from "@/hooks/use-toast";
 
 interface SuggestedMatchesProps {
   currentItem: Item;
 }
 
 export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps) {
-  const [suggestedItemsWithScores, setSuggestedItemsWithScores] = useState<(Item & { matchScore: string })[]>([]);
+  const [suggestedItemsWithScores, setSuggestedItemsWithScores] = useState<(Item & { matchScore: string; isThirdPartyFulfillment?: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
-  const { toast } = useToast();
+  // const { toast } = useToast(); // Removed
 
   useEffect(() => {
     async function fetchSuggestions() {
@@ -30,20 +31,17 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
       if (!currentItem?.id) {
           setLoading(false);
-          setAiReasoning("Cannot fetch suggestions without a current item.");
-          setFetchError("Current item information is missing.");
+          const missingItemError = "Cannot fetch suggestions: current item information is missing.";
+          setAiReasoning(missingItemError);
+          setFetchError(missingItemError);
           return;
       }
       
-      const viewingUserId = dummyUsers[0].id; // Simulate current logged-in user
+      const viewingUserId = dummyUsers[0].id; 
 
       try {
         const otherAvailableItems = dummyItems.filter(
           (item) => item.id !== currentItem.id && 
-                     // For suggestions, we are interested in items from users other than the current item's owner.
-                     // The AI prompt itself handles not suggesting items from currentItem.ownerId if it's a self-suggestion.
-                     // And we are interested in items from users other than the viewingUserId IF currentItem is also not by viewingUserId.
-                     // The main point is that availableItems should be broad.
                      (item.status === 'available' || item.status === 'pending')
         ).map(item => ({
             id: item.id,
@@ -55,7 +53,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         }));
 
         if (otherAvailableItems.length === 0) {
-            const noItemsReasoning = `No other items available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'your item'} "${currentItem.name}".`;
+            const noItemsReasoning = `No other items currently available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'your item'} "${currentItem.name}".`;
             setAiReasoning(noItemsReasoning);
             setSuggestedItemsWithScores([]);
             setLoading(false);
@@ -84,6 +82,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           let isThirdPartyFulfillment = false;
           if (
             currentItem.listingType === 'want' &&
+            itemDetails.listingType === 'offer' && // Only badge offers fulfilling a want
             match.ownerId !== viewingUserId &&
             match.ownerId !== currentItem.ownerId
           ) {
@@ -96,23 +95,22 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         setSuggestedItemsWithScores(augmentedMatchedItems);
         setAiReasoning(result.reasoning || null);
         
+        // Check if the reasoning is actually an error/system message that shouldn't be toasted as "success"
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
             result.reasoning.toLowerCase().includes('error') || 
             result.reasoning.toLowerCase().includes('overloaded') ||
             result.reasoning.toLowerCase().includes('could not process') ||
+            result.reasoning.toLowerCase().includes('could not generate') ||
             result.reasoning.toLowerCase().includes('usage limit') ||
-            result.reasoning.toLowerCase().includes('no other items available') ||
-            result.reasoning.toLowerCase().includes('ai assistant could not generate suggestions')
+            result.reasoning.toLowerCase().includes('no other items available')
         );
 
-        if (augmentedMatchedItems.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
-            toast({
-                title: currentItem.listingType === 'offer' ? "Trade Suggestions Analyzed" : "Potential Fulfillments Found",
-                description: result.reasoning,
-                duration: 7000, 
-            });
-        } else if (augmentedMatchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
+        if (augmentedMatchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
+             // If no items but reasoning is not an error, set it for display
              setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
+        } else if (result.reasoning && reasoningIsErrorOrSystemMessage) {
+            // If reasoning indicates an error or system constraint, set it as fetchError for prominent display
+            setFetchError(result.reasoning);
         }
 
 
@@ -121,11 +119,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         const clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
         setFetchError(clientErrorMsg);
         setAiReasoning(clientErrorMsg); 
-        toast({
-            title: "Suggestion System Error",
-            description: "Failed to connect to the AI suggestion service.",
-            variant: "destructive",
-        });
+        // Removed toast for client-side error too, it will be displayed inline
       } finally {
         setLoading(false);
       }
@@ -167,6 +161,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
   
+  // Display error prominently if fetchError is set
   if (fetchError) {
     return (
       <Card className="border-destructive">
@@ -178,13 +173,14 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         </CardHeader>
         <CardContent>
           <p className="font-body text-destructive">
-            {aiReasoning || "An error occurred while fetching suggestions."}
+            {aiReasoning || fetchError} {/* Display aiReasoning if it contains the error message */}
           </p>
         </CardContent>
       </Card>
     );
   }
   
+  // Display no suggestions found (with reasoning if available)
   if (suggestedItemsWithScores.length === 0) {
      return (
       <Card className="border-border border-dashed">
@@ -203,6 +199,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
   
+  // Display suggestions with reasoning in header
   return (
       <Card>
       <CardHeader>
@@ -210,7 +207,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           <Sparkles className="h-6 w-6 text-primary" />
            {cardTitle}
           </CardTitle>
-           {aiReasoning && (
+           {aiReasoning && ( // Display reasoning if available and no overriding fetchError
               <p className="text-sm text-muted-foreground mt-1 font-body">{aiReasoning}</p>
            )}
       </CardHeader>
