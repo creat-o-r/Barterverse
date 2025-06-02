@@ -238,7 +238,7 @@ export default function MatchReportsPage() {
                           <span className="text-xs text-muted-foreground">None</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs font-body text-muted-foreground max-w-sm break-words whitespace-pre-wrap">
+                      <TableCell className="text-xs font-body text-muted-foreground break-words whitespace-pre-wrap">
                           {report.reasoning || <span className="italic">N/A</span>}
                       </TableCell>
                     </TableRow>
