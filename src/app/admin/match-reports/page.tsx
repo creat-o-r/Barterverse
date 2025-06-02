@@ -6,7 +6,7 @@ import { getLoggedMatchSuggestions, type LoggedMatchSuggestion } from '@/service
 import { getAIMatchingMode, setAIMatchingMode as setAIMatchingModeService, type AIMatchingMode } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Removed ScrollArea import as it's no longer used for the main table
 import { Badge } from '@/components/ui/badge';
 import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon, BrainCircuit, Zap, RefreshCw, Settings2 } from 'lucide-react';
 import Link from 'next/link';
@@ -178,77 +178,77 @@ export default function MatchReportsPage() {
           ) : reports.length === 0 ? (
             <p className="text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</p>
           ) : (
-            <ScrollArea className="w-full border rounded-md">
-              <Table>
-                <TableHeader className="sticky top-0 bg-card z-10">
-                  <TableRow>
-                    <TableHead className="w-[180px]">Timestamp</TableHead>
-                    <TableHead>For User ID</TableHead>
-                    <TableHead>Current Item</TableHead>
-                    <TableHead>Matching Mode</TableHead>
-                    <TableHead>Suggested Items (ID, Owner, Score)</TableHead>
-                    <TableHead className="min-w-[300px]">Reasoning</TableHead>
+            // Removed ScrollArea, Table component itself handles overflow
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="w-[180px]">Timestamp</TableHead>
+                  <TableHead>For User ID</TableHead>
+                  <TableHead>Current Item</TableHead>
+                  <TableHead>Matching Mode</TableHead>
+                  <TableHead>Suggested Items (ID, (Owner ID), Score)</TableHead>
+                  <TableHead className="min-w-[300px]">Reasoning</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reports.map((report, index) => (
+                  <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
+                    <TableCell className="font-mono text-xs">
+                      {new Date(report.timestamp).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-sm">{report.triggeringUserId}</TableCell>
+                    <TableCell>
+                        <div className="font-semibold">{report.currentItemName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          <Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
+                              View Item <LinkIcon className="h-3 w-3" />
+                          </Link>
+                        </div>
+                    </TableCell>
+                    <TableCell className="text-xs capitalize">
+                      {report.usedMatchingMode ? (
+                          <Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>
+                              {report.usedMatchingMode}
+                          </Badge>
+                      ): (
+                          <Badge variant="outline">N/A</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                          {report.suggestedMatches.map(match => (
+                            <div key={match.itemId} className="flex items-center gap-2 text-xs">
+                              <Badge
+                                className={`py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
+                              >
+                                {getMatchScoreIcon(match.matchScore)}
+                                {match.matchScore || 'N/A'}
+                              </Badge>
+                              <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
+                                {match.itemId} <LinkIcon className="h-3 w-3" />
+                              </Link>
+                              <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">
+                                ({match.ownerId} <UserIcon className="h-3 w-3" />)
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">None</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs font-body text-muted-foreground break-words whitespace-pre-wrap">
+                        {report.reasoning || <span className="italic">N/A</span>}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reports.map((report, index) => (
-                    <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
-                      <TableCell className="font-mono text-xs">
-                        {new Date(report.timestamp).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-sm">{report.triggeringUserId}</TableCell>
-                      <TableCell>
-                          <div className="font-semibold">{report.currentItemName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            <Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
-                                View Item <LinkIcon className="h-3 w-3" />
-                            </Link>
-                          </div>
-                      </TableCell>
-                      <TableCell className="text-xs capitalize">
-                        {report.usedMatchingMode ? (
-                            <Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>
-                                {report.usedMatchingMode}
-                            </Badge>
-                        ): (
-                            <Badge variant="outline">N/A</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
-                          <div className="flex flex-col gap-1.5">
-                            {report.suggestedMatches.map(match => (
-                              <div key={match.itemId} className="flex items-center gap-2 text-xs">
-                                <Badge
-                                  className={`py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
-                                >
-                                  {getMatchScoreIcon(match.matchScore)}
-                                  {match.matchScore || 'N/A'}
-                                </Badge>
-                                <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
-                                  {match.itemId} <LinkIcon className="h-3 w-3" />
-                                </Link>
-                                <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">
-                                  ({match.ownerId} <UserIcon className="h-3 w-3" />)
-                                </Link>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">None</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs font-body text-muted-foreground break-words whitespace-pre-wrap">
-                          {report.reasoning || <span className="italic">N/A</span>}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
     </div>
   );
 }
+
