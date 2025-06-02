@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Sparkles, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { suggestCategory } from '@/ai/flows/suggest-category-flow';
+import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { useState, useCallback } from 'react';
 
 const itemFormSchema = z.object({
@@ -50,10 +51,16 @@ export default function NewItemPage() {
 
     if (name.length >= 3 && description.length >= 10) {
       setIsSuggestingCategory(true);
-      form.setValue('category', ''); // Clear previous suggestion
+      form.setValue('category', ''); 
       try {
-        const result = await suggestCategory({ name, description });
-        if (result.suggestedCategory) {
+        const result: SuggestCategoryOutput = await suggestCategory({ name, description });
+        if (result.errorMessage) {
+          toast({
+            title: "Category Suggestion Error",
+            description: result.errorMessage,
+            variant: "destructive",
+          });
+        } else if (result.suggestedCategory) {
           form.setValue('category', result.suggestedCategory, { shouldValidate: true });
           toast({
             title: "Category Suggested!",
@@ -62,15 +69,15 @@ export default function NewItemPage() {
         } else {
           toast({
             title: "Hmm...",
-            description: "Couldn't automatically suggest a category. Please enter one manually.",
-            variant: "default" // Changed from destructive to default, as it's not a critical error
+            description: "Couldn't automatically suggest a category. Please enter one manually if needed, or try rephrasing your description.",
+            variant: "default"
           });
         }
       } catch (error) {
-        console.error("Error suggesting category:", error);
+        console.error("Error calling suggestCategory flow:", error);
         toast({
-          title: "AI Error",
-          description: "Could not suggest a category due to an error.",
+          title: "AI System Error",
+          description: "Could not connect to the category suggestion service.",
           variant: "destructive",
         });
       } finally {
@@ -130,8 +137,8 @@ export default function NewItemPage() {
                         rows={5}
                         {...field}
                         onBlur={() => {
-                            field.onBlur(); // Call original onBlur
-                            handleSuggestCategory(); // Then suggest category
+                            field.onBlur(); 
+                            handleSuggestCategory(); 
                         }}
                       />
                     </FormControl>
@@ -153,11 +160,11 @@ export default function NewItemPage() {
                       <Input 
                         placeholder={isSuggestingCategory ? "AI is suggesting a category..." : "e.g., Books & Stationery"} 
                         {...field} 
-                        readOnly // Category is AI-suggested
+                        readOnly 
                       />
                     </FormControl>
                     <FormDescription className="font-body">
-                      Category will be suggested by AI based on name and description.
+                      Category will be suggested by AI based on name and description. You can edit it if needed.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

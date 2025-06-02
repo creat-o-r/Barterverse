@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -55,8 +56,34 @@ const suggestTradesFlow = ai.defineFlow(
     inputSchema: SuggestTradesInputSchema,
     outputSchema: SuggestTradesOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input): Promise<SuggestTradesOutput> => {
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        console.warn("suggestTradesFlow: Prompt returned null output");
+        return { 
+            suggestedTrades: "",
+            reasoning: "The AI assistant could not generate trade suggestions at this time." 
+        };
+      }
+      return output;
+    } catch (error: any) {
+      console.error("Error in suggestTradesFlow calling prompt:", error);
+      let userMessage = "An unexpected error occurred while trying to get AI trade suggestions.";
+
+      if (error.message && typeof error.message === 'string') {
+        if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+          userMessage = "The AI trade suggestion service has reached its current usage limit. Please try again later.";
+        } else if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+          userMessage = "The AI trade suggestion service is temporarily overloaded. Please try again in a few moments.";
+        } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
+            userMessage = "The AI trade suggestion service could not process the request due to content restrictions or safety settings.";
+        }
+      }
+      return { 
+        suggestedTrades: "",
+        reasoning: userMessage
+      };
+    }
   }
 );

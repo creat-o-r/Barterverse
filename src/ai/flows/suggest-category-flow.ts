@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Suggests a category for an item based on its name and description.
@@ -18,6 +19,7 @@ export type SuggestCategoryInput = z.infer<typeof SuggestCategoryInputSchema>;
 
 const SuggestCategoryOutputSchema = z.object({
   suggestedCategory: z.string().describe('The suggested category for the item.'),
+  errorMessage: z.string().optional().describe('An error message if category suggestion failed.'),
 });
 export type SuggestCategoryOutput = z.infer<typeof SuggestCategoryOutputSchema>;
 
@@ -28,7 +30,7 @@ export async function suggestCategory(input: SuggestCategoryInput): Promise<Sugg
 const prompt = ai.definePrompt({
   name: 'suggestCategoryPrompt',
   input: {schema: SuggestCategoryInputSchema},
-  output: {schema: SuggestCategoryOutputSchema},
+  output: {schema: z.object({ suggestedCategory: z.string() }) }, // AI only outputs category
   prompt: `You are an expert product categorizer for an online bartering platform.
   Based on the item name and description, suggest a concise and relevant category for this item.
   Item Name: {{{name}}}
@@ -44,8 +46,34 @@ const suggestCategoryFlow = ai.defineFlow(
     inputSchema: SuggestCategoryInputSchema,
     outputSchema: SuggestCategoryOutputSchema,
   },
-  async (input: SuggestCategoryInput) => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input: SuggestCategoryInput): Promise<SuggestCategoryOutput> => {
+    try {
+      const {output} = await prompt(input);
+      if (!output || !output.suggestedCategory) {
+        console.warn("suggestCategoryFlow: Prompt returned null or empty output for suggestedCategory");
+        return { 
+            suggestedCategory: "",
+            errorMessage: "The AI assistant could not suggest a category at this time." 
+        };
+      }
+      return { suggestedCategory: output.suggestedCategory };
+    } catch (error: any) {
+      console.error("Error in suggestCategoryFlow calling prompt:", error);
+      let userMessage = "An unexpected error occurred while trying to get an AI category suggestion.";
+
+      if (error.message && typeof error.message === 'string') {
+        if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+          userMessage = "The AI category suggestion service has reached its current usage limit. Please try again later.";
+        } else if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+          userMessage = "The AI category suggestion service is temporarily overloaded. Please try again in a few moments.";
+        } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
+            userMessage = "The AI category suggestion service could not process the request due to content restrictions.";
+        }
+      }
+      return { 
+        suggestedCategory: "",
+        errorMessage: userMessage
+      };
+    }
   }
 );

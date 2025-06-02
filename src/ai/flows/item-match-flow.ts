@@ -100,7 +100,9 @@ const itemMatchFlow = ai.defineFlow(
       let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
 
       if (error.message && typeof error.message === 'string') {
-        if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+        if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+          userMessage = "The AI matching service has reached its current usage limit. Please try again later.";
+        } else if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
           userMessage = "The AI matching service is temporarily overloaded. Please try again in a few moments.";
         } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
             userMessage = "The AI matching service could not process the request due to content restrictions or safety settings.";
