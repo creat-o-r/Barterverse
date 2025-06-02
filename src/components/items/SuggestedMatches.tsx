@@ -5,9 +5,9 @@ import { useEffect, useState } from 'react';
 import type { Item } from '@/types';
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
-import { dummyItems } from '@/lib/dummy-data';
+import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Added dummyUsers for ownerId check
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 interface SuggestedMatchesProps {
@@ -26,21 +26,34 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setLoading(true);
       setFetchError(null);
       setAiReasoning(null);
-      setSuggestedItemsWithScores([]); // Clear previous suggestions
+      setSuggestedItemsWithScores([]); 
+
+      if (!currentItem?.id) {
+          setLoading(false);
+          setAiReasoning("Cannot fetch suggestions without a current item.");
+          setFetchError("Current item information is missing.");
+          return;
+      }
+      
+      // Assuming currentItem.ownerId is the ID of the user viewing the page or owning the item
+      const viewingUserId = currentItem.ownerId; 
 
       try {
         const otherAvailableItems = dummyItems.filter(
-          (item) => item.id !== currentItem.id && (item.status === 'available' || item.status === 'pending')
+          (item) => item.id !== currentItem.id && 
+                     item.ownerId !== viewingUserId && // Exclude items from the current item's owner
+                     (item.status === 'available' || item.status === 'pending')
         ).map(item => ({
             id: item.id,
             name: item.name,
             description: item.description,
             category: item.category,
-            ownerId: item.ownerId, // Ensure ownerId is passed
+            ownerId: item.ownerId, 
+            listingType: item.listingType,
         }));
 
         if (otherAvailableItems.length === 0) {
-            const noItemsReasoning = "No other items available in the system to suggest matches for.";
+            const noItemsReasoning = `No other items available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'your item'} "${currentItem.name}".`;
             setAiReasoning(noItemsReasoning);
             setSuggestedItemsWithScores([]);
             setLoading(false);
@@ -48,30 +61,27 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         }
 
         const inputForFlow = {
-          triggeringUserId: currentItem.ownerId, 
+          triggeringUserId: viewingUserId, 
           currentItem: {
             id: currentItem.id,
             name: currentItem.name,
             description: currentItem.description,
             category: currentItem.category,
-            ownerId: currentItem.ownerId, // Ensure ownerId is passed
+            ownerId: currentItem.ownerId,
+            listingType: currentItem.listingType,
           },
           availableItems: otherAvailableItems,
         };
 
         const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
         
-        const matchedItems = result.suggestedMatches.map(match => {
-          const item = dummyItems.find(dItem => dItem.id === match.itemId);
-          // We already have match.ownerId from the flow, so no need to pull it from dItem again.
-          return item ? { ...item, matchScore: match.matchScore } : null;
-        }).filter(Boolean) as (Item & { matchScore: string })[]; // Type assertion
+        const matchedItems = (result.suggestedMatches || []).map(match => {
+          const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
+          return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+        }).filter(Boolean) as (Item & { matchScore: string })[];
 
         setSuggestedItemsWithScores(matchedItems);
-
-        if (result.reasoning) {
-            setAiReasoning(result.reasoning);
-        }
+        setAiReasoning(result.reasoning || null);
         
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
             result.reasoning.toLowerCase().includes('error') || 
@@ -84,11 +94,15 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
         if (matchedItems.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
             toast({
-                title: "Trade Suggestions Analyzed",
+                title: currentItem.listingType === 'offer' ? "Trade Suggestions Analyzed" : "Potential Fulfillments Found",
                 description: result.reasoning,
                 duration: 7000, 
             });
+        } else if (matchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
+            // No matches found, but AI gave a reason
+             setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
         }
+
 
       } catch (err: any) {
         console.error("Failed to fetch item matches from flow (client-side catch):", err);
@@ -105,14 +119,14 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       }
     }
 
-    if (currentItem?.id) {
-        fetchSuggestions();
-    } else {
-        setLoading(false);
-        setAiReasoning("Cannot fetch suggestions without a current item.");
-    }
+    fetchSuggestions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem.id, currentItem.name]); // Added currentItem.name to dep array for re-fetch if item changes significantly
+  }, [currentItem.id, currentItem.name, currentItem.listingType, currentItem.ownerId]);
+
+
+  const cardTitle = currentItem.listingType === 'offer' 
+    ? `AI Matches for ${currentItem.name}`
+    : `AI Fulfillments for ${currentItem.name}`;
 
   if (loading) {
     return (
@@ -120,52 +134,77 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         <CardHeader>
           <CardTitle className="font-headline text-xl flex items-center gap-2">
             <Loader2 className="h-6 w-6 text-primary animate-spin" />
-            Finding Potential Matches...
+            {currentItem.listingType === 'offer' ? "Finding Potential Matches..." : "Searching for Fulfillments..."}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground font-body">Our AI is looking for great trades for you!</p>
+          <p className="text-muted-foreground font-body">Our AI is looking for great connections for you!</p>
+           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-4">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50">
+                <div className="aspect-[4/3] bg-muted animate-pulse"></div>
+                <CardContent className="p-4 flex-grow space-y-2">
+                  <div className="h-5 bg-muted-foreground/20 rounded animate-pulse w-3/4"></div>
+                  <div className="h-4 bg-muted-foreground/20 rounded animate-pulse w-full"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </CardContent>
       </Card>
     );
   }
   
-  if ((suggestedItemsWithScores.length === 0 && aiReasoning) || fetchError) {
+  if (fetchError) {
     return (
-      <Card className={fetchError ? "border-destructive" : ""}>
+      <Card className="border-destructive">
         <CardHeader>
-          <CardTitle className={`font-headline text-xl flex items-center gap-2 ${fetchError ? 'text-destructive' : ''}`}>
-            <Sparkles className={`h-6 w-6 ${fetchError ? 'text-destructive': 'text-primary'}`} />
-            {fetchError ? "Suggestion Error" : "Potential Matches"}
+          <CardTitle className="font-headline text-xl flex items-center gap-2 text-destructive">
+            <AlertCircle className="h-6 w-6 text-destructive" />
+            Suggestion Error
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className={`font-body ${fetchError ? 'text-destructive' : 'text-muted-foreground'}`}>
-            {aiReasoning || "No specific AI-powered matches found at this moment. Happy browsing!"}
+          <p className="font-body text-destructive">
+            {aiReasoning || "An error occurred while fetching suggestions."}
           </p>
         </CardContent>
       </Card>
     );
   }
   
-  if (suggestedItemsWithScores.length > 0 && !fetchError && !loading) {
-    return (
-        <Card>
+  if (suggestedItemsWithScores.length === 0) {
+     return (
+      <Card className="border-border border-dashed">
         <CardHeader>
-            <CardTitle className="font-headline text-xl flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" />
-            AI-Suggested Matches for {currentItem.name}
-            </CardTitle>
-             {aiReasoning && (
-                <p className="text-sm text-muted-foreground mt-1 font-body">{aiReasoning}</p>
-             )}
+          <CardTitle className="font-headline text-xl flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-muted-foreground" />
+             {cardTitle}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-            <ItemList items={suggestedItemsWithScores} />
+          <p className="font-body text-muted-foreground text-center py-4">
+            {aiReasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found at this moment." : "No specific AI-powered fulfillments found for this want at this moment.")}
+          </p>
         </CardContent>
-        </Card>
+      </Card>
     );
   }
-
-  return null; 
+  
+  return (
+      <Card>
+      <CardHeader>
+          <CardTitle className="font-headline text-xl flex items-center gap-2">
+          <Sparkles className="h-6 w-6 text-primary" />
+           {cardTitle}
+          </CardTitle>
+           {aiReasoning && (
+              <p className="text-sm text-muted-foreground mt-1 font-body">{aiReasoning}</p>
+           )}
+      </CardHeader>
+      <CardContent>
+          <ItemList items={suggestedItemsWithScores} />
+      </CardContent>
+      </Card>
+  );
 }

@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Suggests matching items for a given item based on LLM analysis.
+ * @fileOverview Suggests matching items for a given item based on LLM analysis, considering item listing types (offer/want).
  *
  * - suggestMatchingItems - A function that suggests trade matches.
  * - ItemMatchInput - The input type for the suggestMatchingItems function.
@@ -17,23 +17,23 @@ const ItemBriefSchema = z.object({
   name: z.string(),
   description: z.string(),
   category: z.string(),
-  ownerId: z.string(), // Added ownerId
+  ownerId: z.string(),
+  listingType: z.enum(['offer', 'want']),
 });
 
 const ItemMatchInputSchema = z.object({
   triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
-  currentItem: ItemBriefSchema.describe("The item for which to find matches."),
-  availableItems: z.array(ItemBriefSchema).describe("A list of other items available for trade, including their ownerIds."),
+  currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches."),
+  availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform, including their ownerIds and listingTypes."),
 });
 export type ItemMatchInput = z.infer<typeof ItemMatchInputSchema>;
 
 const SuggestedItemWithScoreSchema = z.object({
   itemId: z.string().describe("The ID of the suggested matching item."),
   matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low)."),
-  ownerId: z.string().describe("The ID of the owner of the suggested item."), // Added ownerId
+  ownerId: z.string().describe("The ID of the owner of the suggested item."),
 });
 
-// This is the schema for the prompt's direct output for suggestedMatches
 const PromptSuggestedItemSchema = z.object({
   itemId: z.string().describe("The ID of the suggested matching item."),
   matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low).")
@@ -48,40 +48,45 @@ export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 const prompt = ai.definePrompt({
   name: 'itemMatchPrompt',
   input: {schema: ItemMatchInputSchema},
-  // The prompt itself only needs to output itemId and matchScore. ownerId is added by the flow.
   output: {schema: z.object({
     suggestedMatches: z.array(PromptSuggestedItemSchema),
     reasoning: z.string().optional(),
   })},
-  prompt: `You are an expert at finding complementary items for trade.
-  Given a "Current Item" and a list of "Available Items", identify items from the "Available Items" list that would be a good trade match for the "Current Item".
+  prompt: `You are an expert at finding suitable trade connections on a barter platform.
+Given a "Current Item" (which can be an 'offer' the user has, or a 'want' the user is looking for) and a list of "Available Items" from other users (which can also be 'offers' or 'wants'), identify items from the "Available Items" list that would be a good match.
 
-  For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
-  "High" indicates a very strong potential trade.
-  "Medium" indicates a decent potential trade.
-  "Low" indicates a possible, but less compelling, trade.
+Current Item:
+ID: {{{currentItem.id}}}
+Name: {{{currentItem.name}}}
+Description: {{{currentItem.description}}}
+Category: {{{currentItem.category}}}
+Owner ID: {{{currentItem.ownerId}}}
+Listing Type: {{{currentItem.listingType}}}
 
-  Consider the following factors for a good match:
-  - Category similarity or complementarity.
-  - Potential interest based on item descriptions.
-  - Items that are different from the current item but could be desired by someone who owns the current item.
-  - Do not suggest the current item itself if it appears in the available items list.
+Available Items (format: ID :: Type :: Name :: Category :: OwnerID :: Description):
+{{#each availableItems}}
+- {{id}} :: {{listingType}} :: {{name}} :: {{category}} :: {{ownerId}} :: {{description}}
+{{/each}}
 
-  Current Item:
-  ID: {{{currentItem.id}}}
-  Name: {{{currentItem.name}}}
-  Description: {{{currentItem.description}}}
-  Category: {{{currentItem.category}}}
-  Owner ID: {{{currentItem.ownerId}}}
+Your goal is to find relevant matches:
+1. If the "Current Item" is an 'offer':
+   - Prioritize suggesting 'want' items from "Available Items" that the "Current Item" could directly fulfill. These are high-value matches.
+   - Also consider suggesting other 'offer' items from "Available Items" that would be a good complementary trade for someone who owns the "Current Item".
+2. If the "Current Item" is a 'want':
+   - Prioritize suggesting 'offer' items from "Available Items" that could directly fulfill the "Current Item". These are high-value matches.
 
-  Available Items (format: ID :: Name :: Category :: OwnerID :: Description):
-  {{#each availableItems}}
-  - {{id}} :: {{name}} :: {{category}} :: {{ownerId}} :: {{description}}
-  {{/each}}
+For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
+"High" indicates a very strong potential match (e.g., direct fulfillment or very complementary).
+"Medium" indicates a good potential match.
+"Low" indicates a possible, but less compelling, match.
 
-  Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
-  If no good matches are found, return an empty list for 'suggestedMatches'.
-  Optionally, provide a brief (1-2 sentences) overall reasoning for your suggestions.
+Do not suggest:
+- The current item itself if it appears in the available items list (ID: {{{currentItem.id}}}).
+- Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}).
+
+Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
+If no good matches are found, return an empty list for 'suggestedMatches'.
+Optionally, provide a brief (1-2 sentences) overall reasoning for your suggestions, considering the listing types.
   `,
 });
 
@@ -93,10 +98,16 @@ const itemMatchFlow = ai.defineFlow(
   },
   async (input: ItemMatchInput): Promise<ItemMatchOutput> => {
     const flowName = 'itemMatchFlow';
-    const filteredAvailableItems = input.availableItems.filter(item => item.id !== input.currentItem.id);
+    
+    // Filter out the current item itself and items from the same owner from the availableItems list before sending to AI.
+    // The AI prompt also reinforces this, but pre-filtering is good practice.
+    const filteredAvailableItems = input.availableItems.filter(item => 
+        item.id !== input.currentItem.id && item.ownerId !== input.currentItem.ownerId
+    );
 
     if (filteredAvailableItems.length === 0) {
-        const output: ItemMatchOutput = { suggestedMatches: [], reasoning: "No other items available to suggest matches for." };
+        const reasoning = `No other relevant items available from other users to suggest matches for your ${input.currentItem.listingType} "${input.currentItem.name}".`;
+        const output: ItemMatchOutput = { suggestedMatches: [], reasoning: reasoning };
         await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
@@ -109,9 +120,9 @@ const itemMatchFlow = ai.defineFlow(
 
     try {
       const {output: promptOutput} = await prompt({
-          triggeringUserId: input.triggeringUserId,
+          triggeringUserId: input.triggeringUserId, // This field is for the prompt, not used by AI directly
           currentItem: input.currentItem,
-          availableItems: filteredAvailableItems
+          availableItems: filteredAvailableItems // Pass the pre-filtered list
       });
 
       if (!promptOutput) {
@@ -124,18 +135,17 @@ const itemMatchFlow = ai.defineFlow(
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
-            suggestedMatches: errorOutput.suggestedMatches, // This expects the augmented schema
+            suggestedMatches: errorOutput.suggestedMatches,
             reasoning: errorOutput.reasoning,
           });
           return errorOutput;
       }
 
-      // Augment AI suggestions with ownerId
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = filteredAvailableItems.find(item => item.id === aiSuggestion.itemId);
         return {
           ...aiSuggestion,
-          ownerId: originalItem?.ownerId || 'unknown', // Fallback if ownerId not found
+          ownerId: originalItem?.ownerId || 'unknown', 
         };
       });
       

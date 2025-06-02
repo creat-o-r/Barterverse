@@ -107,7 +107,8 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             </CardFooter>
           </Card>
 
-          {item.status === 'available' && item.listingType === 'offer' && (
+          {/* Trade initiation / Contact for 'available' items */}
+          {item.status === 'available' && item.listingType === 'offer' && item.ownerId !== dummyUsers[0].id && ( // Assuming dummyUsers[0] is current user
             <Card>
               <CardHeader>
                   <CardTitle className="font-headline text-xl flex items-center gap-2">
@@ -121,7 +122,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             </Card>
           )}
 
-          {item.status === 'available' && item.listingType === 'want' && (
+          {item.status === 'available' && item.listingType === 'want' && item.ownerId !== dummyUsers[0].id && ( // Assuming dummyUsers[0] is current user
             <Card>
               <CardHeader>
                 <CardTitle className="font-headline text-xl flex items-center gap-2">
@@ -131,17 +132,15 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
               </CardHeader>
               <CardContent>
                 <p className="text-sm font-body text-muted-foreground mb-4">
-                  If you have the item "{item.name}" that {owner.name} is looking for, you can reach out to them.
+                  If you have an item that matches "{item.name}" which {owner.name} is looking for, you can initiate a discussion.
                 </p>
-                <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <MessageSquare className="mr-2 h-4 w-4" /> Contact {owner.name}
-                </Button>
-                {/* Future: This could initiate a chat or a specific "offer to fulfill want" flow */}
+                 {/* This could be an ItemTradeInitiationContent if offering one of your items, or a general message button */}
+                <ItemTradeInitiationContent item={item} ownerName={owner.name} ownerId={owner.id} />
               </CardContent>
             </Card>
           )}
-
-
+          
+          {/* Status indicators for non-available items */}
           {item.status === 'pending' && (
               <Card className="border-yellow-500">
                   <CardHeader>
@@ -179,7 +178,8 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
         </div>
       </div>
 
-      {item.status === 'available' && item.listingType === 'offer' && (
+      {/* AI Suggested Matches/Fulfillments for 'available' items not owned by current user */}
+      {item.status === 'available' && item.ownerId !== dummyUsers[0].id && (
         <div className="mt-12">
           <Separator className="my-8" />
           <SuggestedMatches currentItem={item} />

@@ -25,7 +25,10 @@ export default function HomePage() {
   const [overallLoading, setOverallLoading] = useState(true);
   const { toast } = useToast();
 
-  const allAvailableOrPendingItems = dummyItems.filter(item => item.status === 'available' || item.status === 'pending');
+  const allAvailableOrPendingItemsFromOtherUsers = dummyItems.filter(item => 
+    (item.status === 'available' || item.status === 'pending') && item.ownerId !== dummyUsers[0].id // Simulate current user is dummyUsers[0]
+  );
+
 
   useEffect(() => {
     async function fetchAllUserItemMatches() {
@@ -39,9 +42,9 @@ export default function HomePage() {
 
       if (userOfferItems.length === 0) {
         setUserItemSuggestions([{
-          userItem: { id: 'no-offers', name: 'No Offers Found', description: '', imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' }, // Dummy item for structure
+          userItem: { id: 'no-offers', name: 'No Offers Found', description: "You haven't listed any 'offer' items yet.", imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' },
           suggestedMatches: [],
-          reasoning: "List an 'offer' item to see personalized matches here!",
+          reasoning: "List an 'offer' item to see personalized AI matches and potential trades here!",
           isLoading: false,
           error: null,
         }]);
@@ -49,7 +52,6 @@ export default function HomePage() {
         return;
       }
 
-      // Initialize state for each item
       const initialSuggestions = userOfferItems.map(item => ({
         userItem: item,
         suggestedMatches: [],
@@ -58,26 +60,27 @@ export default function HomePage() {
         error: null,
       }));
       setUserItemSuggestions(initialSuggestions);
-      setOverallLoading(false); // Overall loading done, now individual items load
+      setOverallLoading(false); 
 
       const suggestionPromises = userOfferItems.map(async (userItem, index) => {
-        const otherAvailableItemsForMatching = dummyItems.filter(
-          (item) => item.id !== userItem.id && (item.status === 'available' || item.status === 'pending') && item.listingType === 'offer'
+        const otherItemsForMatching = dummyItems.filter(
+          (item) => item.id !== userItem.id && item.ownerId !== currentUser.id && (item.status === 'available' || item.status === 'pending')
         ).map(item => ({
           id: item.id,
           name: item.name,
           description: item.description,
           category: item.category,
           ownerId: item.ownerId,
+          listingType: item.listingType,
         }));
 
-        if (otherAvailableItemsForMatching.length === 0) {
+        if (otherItemsForMatching.length === 0) {
           return {
             index,
             success: true,
             data: {
               suggestedMatches: [],
-              reasoning: `No other 'offer' items currently available to suggest matches for your "${userItem.name}".`,
+              reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
             },
           };
         }
@@ -91,8 +94,9 @@ export default function HomePage() {
               description: userItem.description,
               category: userItem.category,
               ownerId: userItem.ownerId,
+              listingType: userItem.listingType,
             },
-            availableItems: otherAvailableItemsForMatching,
+            availableItems: otherItemsForMatching,
           });
           return { index, success: true, data: result };
         } catch (error) {
@@ -132,13 +136,7 @@ export default function HomePage() {
                 error: promiseError || "Failed to process suggestions for this item.",
               };
             }
-          } else { // rejected
-            // This case should ideally be caught by the try/catch in suggestionPromises,
-            // but as a fallback for unhandled rejections from suggestMatchingItems directly.
-            console.error("Unhandled promise rejection in suggestion fetching:", settledResult.reason);
-            // Attempt to find which item failed if possible, otherwise, this error might be hard to map.
-            // For simplicity, this example doesn't try to map unhandled rejections back to specific items.
-          }
+          } 
         });
         return newSuggestions;
       });
@@ -164,11 +162,11 @@ export default function HomePage() {
             <CardHeader>
               <CardTitle className="font-headline text-2xl flex items-center gap-2">
                 <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                Loading Your Items & Suggestions...
+                Loading Your Items & AI Suggestions...
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {[...Array(2)].map((_, i) => (
+              {[...Array(1)].map((_, i) => ( // Show skeleton for one user item section
                 <div key={i} className="p-4 border rounded-md bg-muted/30">
                   <div className="h-6 bg-muted-foreground/20 rounded animate-pulse w-1/2 mb-4"></div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -200,11 +198,11 @@ export default function HomePage() {
                  <CardHeader>
                     <CardTitle className="font-headline text-2xl flex items-center gap-2">
                         <Sparkles className="h-6 w-6 text-muted-foreground" />
-                        Trade Ideas
+                        AI Trade Ideas
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground font-body">{userItemSuggestions[0].reasoning}</p>
+                    <p className="text-muted-foreground font-body text-center py-4">{userItemSuggestions[0].reasoning}</p>
                 </CardContent>
             </Card>
             <Separator className="my-8" />
@@ -232,7 +230,7 @@ export default function HomePage() {
               <CardContent>
                 {itemSuggestion.isLoading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {[...Array(3)].map((_, i) => (
+                    {[...Array(3)].map((_, i) => ( // Skeleton for suggested items
                       <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50">
                         <div className="aspect-[4/3] bg-muted animate-pulse"></div>
                         <CardContent className="p-4 flex-grow space-y-2">
@@ -249,7 +247,7 @@ export default function HomePage() {
                 ) : !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 ? (
                   <ItemList items={itemSuggestion.suggestedMatches} />
                 ) : !itemSuggestion.error && (
-                  <p className="text-muted-foreground font-body">{itemSuggestion.reasoning || "No specific suggestions found for this item at the moment."}</p>
+                  <p className="text-muted-foreground font-body text-center py-4">{itemSuggestion.reasoning || "No specific AI suggestions found for this item at the moment."}</p>
                 )}
               </CardContent>
             </Card>
@@ -264,8 +262,8 @@ export default function HomePage() {
       />
 
       <section>
-        <h2 className="text-3xl font-headline text-foreground mb-6">Browse All Items</h2>
-        <ItemList items={allAvailableOrPendingItems} />
+        <h2 className="text-3xl font-headline text-foreground mb-6">Browse All Items from Other Users</h2>
+        <ItemList items={allAvailableOrPendingItemsFromOtherUsers} />
       </section>
     </div>
   );
