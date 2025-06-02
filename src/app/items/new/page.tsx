@@ -16,13 +16,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { suggestCategory } from '@/ai/flows/suggest-category-flow';
+import { useState, useCallback } from 'react';
 
 const itemFormSchema = z.object({
   name: z.string().min(3, { message: 'Item name must be at least 3 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
-  category: z.string().min(2, { message: 'Category is required.' }),
+  category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
 });
 
@@ -30,6 +32,8 @@ type ItemFormValues = z.infer<typeof itemFormSchema>;
 
 export default function NewItemPage() {
   const { toast } = useToast();
+  const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
+
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
@@ -40,14 +44,49 @@ export default function NewItemPage() {
     },
   });
 
+  const handleSuggestCategory = useCallback(async () => {
+    const name = form.getValues('name');
+    const description = form.getValues('description');
+
+    if (name.length >= 3 && description.length >= 10) {
+      setIsSuggestingCategory(true);
+      form.setValue('category', ''); // Clear previous suggestion
+      try {
+        const result = await suggestCategory({ name, description });
+        if (result.suggestedCategory) {
+          form.setValue('category', result.suggestedCategory, { shouldValidate: true });
+          toast({
+            title: "Category Suggested!",
+            description: `We've suggested "${result.suggestedCategory}" as the category.`,
+          });
+        } else {
+          toast({
+            title: "Hmm...",
+            description: "Couldn't automatically suggest a category. Please enter one manually.",
+            variant: "default" // Changed from destructive to default, as it's not a critical error
+          });
+        }
+      } catch (error) {
+        console.error("Error suggesting category:", error);
+        toast({
+          title: "AI Error",
+          description: "Could not suggest a category due to an error.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSuggestingCategory(false);
+      }
+    }
+  }, [form, toast]);
+
+
   function onSubmit(data: ItemFormValues) {
-    // In a real app, you would send this data to your backend
     console.log(data);
     toast({
       title: "Item Listed!",
       description: `${data.name} has been successfully listed for trade.`,
     });
-    form.reset(); // Reset form after submission
+    form.reset(); 
   }
 
   return (
@@ -59,7 +98,7 @@ export default function NewItemPage() {
             List a New Item for Barter
           </CardTitle>
           <CardDescription className="font-body">
-            Provide details about the item you want to trade. Good descriptions and images attract more offers!
+            Provide details about the item you want to trade. Good descriptions and images attract more offers! Our AI will help suggest a category.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -90,6 +129,10 @@ export default function NewItemPage() {
                         className="resize-none"
                         rows={5}
                         {...field}
+                        onBlur={() => {
+                            field.onBlur(); // Call original onBlur
+                            handleSuggestCategory(); // Then suggest category
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -101,12 +144,20 @@ export default function NewItemPage() {
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-headline">Category</FormLabel>
+                    <FormLabel className="font-headline flex items-center gap-2">
+                      Category 
+                      {isSuggestingCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                      {!isSuggestingCategory && form.getValues('category') && <Sparkles className="h-4 w-4 text-accent" />}
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Books & Stationery, Electronics" {...field} />
+                      <Input 
+                        placeholder={isSuggestingCategory ? "AI is suggesting a category..." : "e.g., Books & Stationery"} 
+                        {...field} 
+                        readOnly // Category is AI-suggested
+                      />
                     </FormControl>
                     <FormDescription className="font-body">
-                      Help others find your item by categorizing it.
+                      Category will be suggested by AI based on name and description.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -128,7 +179,16 @@ export default function NewItemPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">List Item</Button>
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSuggestingCategory}>
+                {isSuggestingCategory ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Suggesting Category...
+                  </>
+                ) : (
+                  "List Item"
+                )}
+              </Button>
             </form>
           </Form>
         </CardContent>
