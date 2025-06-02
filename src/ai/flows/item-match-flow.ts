@@ -24,7 +24,7 @@ const ItemBriefSchema = z.object({
 });
 
 const ItemMatchInputSchema = z.object({
-  triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
+  triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested (the viewer of the current item)."),
   currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches."),
   availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform, including their ownerIds and listingTypes."),
 });
@@ -59,14 +59,15 @@ const advancedItemMatchPrompt = ai.definePrompt({
     reasoning: z.string().optional(),
   })},
   prompt: `You are an expert at finding suitable trade connections on a barter platform.
-Given a "Current Item" (which can be an 'offer' the user has, or a 'want' the user is looking for) and a list of "Available Items" from other users (which can also be 'offers' or 'wants'), identify items from the "Available Items" list that would be a good match.
+Given a "Current Item" (which can be an 'offer' the user has, or a 'want' the user is looking for) and a list of "Available Items" from other users, identify items from the "Available Items" list that would be a good match.
+The "triggeringUserId" ({{{triggeringUserId}}}) is the user who is VIEWING the "Current Item" and for whom these suggestions are being generated.
 
-Current Item:
+Current Item Details:
 ID: {{{currentItem.id}}}
 Name: {{{currentItem.name}}}
 Description: {{{currentItem.description}}}
 Category: {{{currentItem.category}}}
-Owner ID: {{{currentItem.ownerId}}}
+Owner ID: {{{currentItem.ownerId}}} (Let's call this User_CurrentItem_Owner)
 Listing Type: {{{currentItem.listingType}}}
 
 Available Items (format: ID :: Type :: Name :: Category :: OwnerID :: Description):
@@ -74,25 +75,39 @@ Available Items (format: ID :: Type :: Name :: Category :: OwnerID :: Descriptio
 - {{id}} :: {{listingType}} :: {{name}} :: {{category}} :: {{ownerId}} :: {{description}}
 {{/each}}
 
-Your goal is to find relevant matches:
-1. If the "Current Item" is an 'offer':
-   - Prioritize suggesting 'want' items from "Available Items" that the "Current Item" could directly fulfill. These are high-value matches.
-   - Also consider suggesting other 'offer' items from "Available Items" that would be a good complementary trade for someone who owns the "Current Item".
-2. If the "Current Item" is a 'want':
-   - Prioritize suggesting 'offer' items from "Available Items" that could directly fulfill the "Current Item". These are high-value matches.
+Your goal is to find relevant matches based on the "Current Item"'s type:
 
-For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
-"High" indicates a very strong potential match (e.g., direct fulfillment or very complementary).
-"Medium" indicates a good potential match.
-"Low" indicates a possible, but less compelling, match.
+1. If the "Current Item" is an 'offer' (listed by User_CurrentItem_Owner):
+   - Scenario 1.1 (High Priority): Find 'want' items from "Available Items" (owned by other users, not User_CurrentItem_Owner) that the "Current Item" could directly fulfill.
+   - Scenario 1.2 (Medium Priority): Find other 'offer' items from "Available Items" (owned by other users, not User_CurrentItem_Owner) that would be a good complementary trade for someone who has the "Current Item".
+   - Reasoning should explain why the suggested items are good matches (e.g., direct fulfillment of a want, or good value exchange for an offer).
+
+2. If the "Current Item" is a 'want' (listed by User_CurrentItem_Owner):
+   - Your main task is to find 'offer' items from "Available Items" that could fulfill this 'want'.
+   - Scenario 2.1 (High Priority - Fulfillment with Reciprocity Hint):
+     If an 'offer' item (let's call it Fulfilling_Offer, owned by User_Fulfilling_Offer) from "Available Items" directly fulfills the "Current Item" (the 'want'),
+     AND User_CurrentItem_Owner (who listed the 'want') ALSO has 'offer' items listed in "Available Items" that User_Fulfilling_Offer might find appealing for a trade,
+     then this is a strong match. Suggest Fulfilling_Offer. Your reasoning should mention that User_CurrentItem_Owner also has items they are offering, potentially facilitating a trade.
+   - Scenario 2.2 (Medium Priority - Fulfillment by Viewer):
+     If Fulfilling_Offer is owned by the '{{{triggeringUserId}}}' (the viewer), and it fulfills the "Current Item",
+     but User_CurrentItem_Owner does NOT have obvious 'offer' items for clear reciprocation visible in "Available Items",
+     still suggest Fulfilling_Offer. The reasoning should state that the viewer ({{{triggeringUserId}}}) has an item that matches the want, and they can initiate a negotiation to discuss a fair trade.
+   - Scenario 2.3 (Low Priority - Fulfillment by Third Party):
+     If Fulfilling_Offer (owned by a User_Fulfilling_Offer who is NOT '{{{triggeringUserId}}}' and NOT User_CurrentItem_Owner) fulfills the "Current Item", suggest this.
+     The reasoning can indicate that another user has a suitable item, which the '{{{triggeringUserId}}}' might be able to help broker or be aware of.
+
+For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low" based on the scenarios.
+"High" indicates a very strong potential match (e.g., direct fulfillment with reciprocity hint, or a highly sought-after complementary offer).
+"Medium" indicates a good potential match (e.g., direct fulfillment by viewer even if reciprocation isn't immediately obvious).
+"Low" indicates a possible, but less compelling, match (e.g., fulfillment by a third party).
 
 Do not suggest:
 - The current item itself if it appears in the available items list (ID: {{{currentItem.id}}}).
-- Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}).
+- Any items owned by User_CurrentItem_Owner (Owner ID: {{{currentItem.ownerId}}}) as *fulfilling their own 'want'* or as a *direct match for their own 'offer' against itself*. They can offer their items for trade, but not to fulfill their own wants in this context.
 
-Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
+Respond with a list of suggested matches, each including the 'itemId' (of the suggested 'offer' or 'want' from "Available Items") and its 'matchScore'.
 If no good matches are found, return an empty list for 'suggestedMatches'.
-Optionally, provide a brief (1-2 sentences) overall reasoning for your suggestions, considering the listing types.
+Provide a brief (1-2 sentences) overall reasoning for your suggestions, considering the listing types and scenarios.
   `,
 });
 
@@ -117,9 +132,9 @@ Owner ID: {{{currentItem.ownerId}}}
 Listing Type: {{{currentItem.listingType}}} (Note: for simple matching, you can largely ignore this, just provide generally relevant items)
 
 
-Available Items (format: ID :: Name :: Category :: Description):
+Available Items (format: ID :: Name :: Category :: OwnerID :: Description):
 {{#each availableItems}}
-- {{id}} :: {{name}} :: {{category}} :: {{description}}
+- {{id}} :: {{name}} :: {{category}} :: {{ownerId}} :: {{description}}
 {{/each}}
 
 For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
@@ -129,7 +144,7 @@ For each item you identify as a match, assign a qualitative match score: "High",
 
 Do not suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
-- Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}).
+- Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}) as direct matches for their own items.
 
 Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
 If no good matches are found, return an empty list for 'suggestedMatches'.
@@ -148,12 +163,13 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     const matchingMode = await getAIMatchingMode();
     
-    const filteredAvailableItems = input.availableItems.filter(item => 
-        item.id !== input.currentItem.id && item.ownerId !== input.currentItem.ownerId
+    // Filter out only the current item itself. Prompts will handle owner-based exclusions.
+    const itemsToConsider = input.availableItems.filter(item => 
+        item.id !== input.currentItem.id
     );
 
-    if (filteredAvailableItems.length === 0) {
-        const reasoning = `No other relevant items available from other users to suggest matches for your ${input.currentItem.listingType} "${input.currentItem.name}".`;
+    if (itemsToConsider.length === 0) {
+        const reasoning = `No other items available from other users to suggest matches for ${input.currentItem.listingType} "${input.currentItem.name}".`;
         const output: ItemMatchOutput = { suggestedMatches: [], reasoning: reasoning, usedMatchingMode: matchingMode };
         await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
@@ -168,11 +184,13 @@ const itemMatchFlow = ai.defineFlow(
 
     try {
       let promptOutput;
+      const promptInput = { ...input, availableItems: itemsToConsider };
+
       if (matchingMode === 'advanced') {
-        const { output } = await advancedItemMatchPrompt({ ...input, availableItems: filteredAvailableItems });
+        const { output } = await advancedItemMatchPrompt(promptInput);
         promptOutput = output;
       } else { // 'simple' mode
-        const { output } = await simpleItemMatchPrompt({ ...input, availableItems: filteredAvailableItems });
+        const { output } = await simpleItemMatchPrompt(promptInput);
         promptOutput = output;
       }
 
@@ -194,14 +212,14 @@ const itemMatchFlow = ai.defineFlow(
           return errorOutput;
       }
 
-      // Augment AI suggestions with ownerId from the filteredAvailableItems list
+      // Augment AI suggestions with ownerId from the itemsToConsider list
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
-        const originalItem = filteredAvailableItems.find(item => item.id === aiSuggestion.itemId);
+        const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
           ...aiSuggestion,
           ownerId: originalItem?.ownerId || 'unknown', 
         };
-      });
+      }).filter(match => match.ownerId !== 'unknown'); // Ensure we only return matches for which we found an owner
       
       const validatedOutput: ItemMatchOutput = {
         suggestedMatches: augmentedMatches,
@@ -240,7 +258,7 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = `The AI's response (${matchingMode} mode) was not in the expected format. Please try again. If the problem persists, item data might be causing an issue.`;
         console.error(`${flowName} (${matchingMode} mode): AI response format error. Issues/Message:`, error.issues || error.message);
       }
-
+      
       const errorOutput: ItemMatchOutput = {
         suggestedMatches: [],
         reasoning: userMessage,
@@ -262,3 +280,4 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
+
