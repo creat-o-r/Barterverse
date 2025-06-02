@@ -22,6 +22,7 @@ export type User = {
   tradesCompleted: number;
   bio?: string;
   items: Item[]; // Items listed by the user
+  interestedInThirdPartyFulfillment?: boolean; // New setting for 3rd party trades
 };
 
 export type TradeOffer = {

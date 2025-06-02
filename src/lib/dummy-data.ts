@@ -11,6 +11,7 @@ export const dummyUsers: User[] = [
     tradesCompleted: 12,
     bio: 'Loves vintage books and handmade crafts. Always open for a fair trade!',
     items: [],
+    interestedInThirdPartyFulfillment: true,
   },
   {
     id: 'user2',
@@ -21,6 +22,7 @@ export const dummyUsers: User[] = [
     tradesCompleted: 25,
     bio: 'Electronics enthusiast and collector of rare video games.',
     items: [],
+    interestedInThirdPartyFulfillment: false,
   },
   {
     id: 'user3',
@@ -31,6 +33,7 @@ export const dummyUsers: User[] = [
     tradesCompleted: 8,
     bio: 'Into sustainable fashion and upcycled goods. Let\'s make a deal!',
     items: [],
+    interestedInThirdPartyFulfillment: true,
   },
   {
     id: 'user4',
@@ -41,6 +44,7 @@ export const dummyUsers: User[] = [
     tradesCompleted: 15,
     bio: 'Collector of quirky antiques and vintage clothing. Always on the lookout for unique pieces.',
     items: [],
+    interestedInThirdPartyFulfillment: false,
   },
   {
     id: 'user5',
@@ -51,6 +55,7 @@ export const dummyUsers: User[] = [
     tradesCompleted: 30,
     bio: 'Sports gear and outdoor equipment fanatic. Ready to trade for my next adventure!',
     items: [],
+    interestedInThirdPartyFulfillment: true,
   },
 ];
 
@@ -239,3 +244,4 @@ dummyItems.forEach(item => {
     item.ownerName = owner.name;
   }
 });
+

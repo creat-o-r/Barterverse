@@ -5,10 +5,11 @@ import type { User, Item } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, Search } from 'lucide-react';
+import { Star, Package, MessageSquare, Award, Edit3, Repeat, Gift, Search, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 // Helper function to find user (simulates data fetching)
 async function getUserProfile(userId: string): Promise<User | null> {
@@ -92,6 +93,31 @@ export default async function UserProfilePage({ params }: { params: { userId: st
       </Card>
 
       <Separator />
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-xl flex items-center gap-2">
+            <Network className="h-6 w-6 text-primary" />
+            Trading Preferences
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-body text-sm text-muted-foreground">Interest in 3rd Party Fulfillments:</span>
+            <Badge variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"}>
+              {user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct"}
+            </Badge>
+          </div>
+          {/* Future: Add UI for editing this preference if isCurrentUser */}
+           {isCurrentUser && (
+             <p className="text-xs text-muted-foreground font-body italic pt-2">
+                You can change your trading preferences in the &quot;Edit Profile&quot; section (coming soon).
+            </p>
+           )}
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       <section>
         <h2 className="text-2xl font-headline mb-4 flex items-center gap-2">
@@ -131,3 +157,4 @@ export default async function UserProfilePage({ params }: { params: { userId: st
     </div>
   );
 }
+
