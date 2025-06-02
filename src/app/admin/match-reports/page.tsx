@@ -178,7 +178,7 @@ export default function MatchReportsPage() {
           ) : reports.length === 0 ? (
             <p className="text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</p>
           ) : (
-            <ScrollArea className="h-[calc(100vh-26rem)] w-full border rounded-md">
+            <ScrollArea className="w-full border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
