@@ -10,29 +10,33 @@ const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 
 interface AISettings {
   matchingMode: AIMatchingMode;
+  useUserProfilePreferencesInMatching: boolean; // New setting
 }
+
+// Default settings
+const defaultSettings: AISettings = {
+  matchingMode: 'advanced',
+  useUserProfilePreferencesInMatching: true, // Default to true
+};
 
 async function readSettings(): Promise<AISettings> {
   try {
     await fs.access(SETTINGS_FILE_PATH);
     const fileContent = await fs.readFile(SETTINGS_FILE_PATH, 'utf-8');
     if (fileContent.trim() === '') {
-      // Default settings if file is empty
-      const defaultSettings: AISettings = { matchingMode: 'advanced' };
       await writeSettings(defaultSettings);
       return defaultSettings;
     }
-    return JSON.parse(fileContent) as AISettings;
+    // Merge with defaults to ensure new settings are present
+    const parsedSettings = JSON.parse(fileContent);
+    return { ...defaultSettings, ...parsedSettings };
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      // File doesn't exist, create with default
-      const defaultSettings: AISettings = { matchingMode: 'advanced' };
       await writeSettings(defaultSettings);
       return defaultSettings;
     }
     console.error('[AI Config Service] Error reading settings file:', error);
-    // Fallback to default on other errors
-    return { matchingMode: 'advanced' };
+    return defaultSettings; // Fallback to default on other errors
   }
 }
 
@@ -49,7 +53,6 @@ export async function getAIMatchingMode(): Promise<AIMatchingMode> {
   return settings.matchingMode;
 }
 
-// This function will be called from a Server Action triggered by the admin panel
 export async function setAIMatchingMode(mode: AIMatchingMode): Promise<{success: boolean; message?: string}> {
   try {
     const currentSettings = await readSettings();
@@ -60,5 +63,23 @@ export async function setAIMatchingMode(mode: AIMatchingMode): Promise<{success:
   } catch (error: any) {
     console.error('[AI Config Service] Error in setAIMatchingMode:', error);
     return { success: false, message: 'Failed to update AI matching mode.' };
+  }
+}
+
+export async function getUseUserProfilePreferencesInMatching(): Promise<boolean> {
+  const settings = await readSettings();
+  return settings.useUserProfilePreferencesInMatching;
+}
+
+export async function setUseUserProfilePreferencesInMatching(usePrefs: boolean): Promise<{success: boolean; message?: string}> {
+  try {
+    const currentSettings = await readSettings();
+    currentSettings.useUserProfilePreferencesInMatching = usePrefs;
+    await writeSettings(currentSettings);
+    console.log(`[AI Config Service] Use User Profile Preferences in Matching set to: ${usePrefs}`);
+    return { success: true, message: `Consideration of user preferences in matching set to ${usePrefs}.` };
+  } catch (error: any) {
+    console.error('[AI Config Service] Error in setUseUserProfilePreferencesInMatching:', error);
+    return { success: false, message: 'Failed to update user preference setting for matching.' };
   }
 }

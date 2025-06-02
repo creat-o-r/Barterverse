@@ -5,8 +5,8 @@ import { useState, useEffect } from 'react';
 import ItemList from '@/components/items/ItemList';
 import SearchBar from '@/components/items/SearchBar';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item } from '@/types';
-import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
+import type { Item, User } from '@/types';
+import { suggestMatchingItems, type ItemMatchOutput, type UserProfilePreferences } from '@/ai/flows/item-match-flow';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -18,6 +18,7 @@ interface UserItemSuggestion {
   reasoning: string | null;
   isLoading: boolean;
   error: string | null;
+  preferencesConsidered?: boolean;
 }
 
 export default function HomePage() {
@@ -58,9 +59,18 @@ export default function HomePage() {
         reasoning: null,
         isLoading: true,
         error: null,
+        preferencesConsidered: false,
       }));
       setUserItemSuggestions(initialSuggestions);
       setOverallLoading(false); 
+
+      // Prepare current user's preferences to pass to the flow
+      const currentUserPreferences: UserProfilePreferences = {
+        motivations: currentUser.motivations,
+        locationPreference: currentUser.locationPreference,
+        tradeTimingPreference: currentUser.tradeTimingPreference,
+        interestedInThirdPartyFulfillment: currentUser.interestedInThirdPartyFulfillment,
+      };
 
       const suggestionPromises = userOfferItems.map(async (userItem, index) => {
         const otherItemsForMatching = dummyItems.filter(
@@ -81,6 +91,7 @@ export default function HomePage() {
             data: {
               suggestedMatches: [],
               reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
+              preferencesConsidered: false, // Or true if prefs were technically "sent" but no items
             },
           };
         }
@@ -97,6 +108,7 @@ export default function HomePage() {
               listingType: userItem.listingType,
             },
             availableItems: otherItemsForMatching,
+            triggeringUserPreferences: currentUserPreferences, // Pass preferences
           });
           return { index, success: true, data: result };
         } catch (error) {
@@ -128,6 +140,7 @@ export default function HomePage() {
                 reasoning: data.reasoning || (matchedItems.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
                 isLoading: false,
                 error: null,
+                preferencesConsidered: data.preferencesConsidered,
               };
             } else {
               newSuggestions[index] = {
@@ -166,7 +179,7 @@ export default function HomePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {[...Array(1)].map((_, i) => ( // Show skeleton for one user item section
+              {[...Array(1)].map((_, i) => ( 
                 <div key={i} className="p-4 border rounded-md bg-muted/30">
                   <div className="h-6 bg-muted-foreground/20 rounded animate-pulse w-1/2 mb-4"></div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -214,12 +227,17 @@ export default function HomePage() {
           <section key={itemSuggestion.userItem.id || idx}>
             <Card className={itemSuggestion.error ? "border-destructive" : (itemSuggestion.suggestedMatches.length === 0 && !itemSuggestion.isLoading ? "border-border border-dashed" : "border-border")}>
               <CardHeader>
-                <CardTitle className={`font-headline text-2xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
-                  {itemSuggestion.isLoading ? <Loader2 className="h-6 w-6 text-primary animate-spin" /> : (itemSuggestion.error ? <AlertCircle className="h-6 w-6 text-destructive" /> : <Sparkles className={`h-6 w-6 ${itemSuggestion.suggestedMatches.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />)}
-                  {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.name}...` : 
-                   itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` : 
-                   `AI Matches for your ${itemSuggestion.userItem.name}`}
-                </CardTitle>
+                <div className="flex justify-between items-start">
+                    <CardTitle className={`font-headline text-2xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
+                    {itemSuggestion.isLoading ? <Loader2 className="h-6 w-6 text-primary animate-spin" /> : (itemSuggestion.error ? <AlertCircle className="h-6 w-6 text-destructive" /> : <Sparkles className={`h-6 w-6 ${itemSuggestion.suggestedMatches.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />)}
+                    {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.name}...` : 
+                    itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` : 
+                    `AI Matches for your ${itemSuggestion.userItem.name}`}
+                    </CardTitle>
+                    {!itemSuggestion.isLoading && !itemSuggestion.error && itemSuggestion.preferencesConsidered && (
+                        <Badge variant="outline" className="text-xs ml-2">Preferences Used</Badge>
+                    )}
+                </div>
                 {!itemSuggestion.isLoading && itemSuggestion.reasoning && !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 && (
                   <p className="text-sm text-muted-foreground mt-1 font-body">{itemSuggestion.reasoning}</p>
                 )}
@@ -230,7 +248,7 @@ export default function HomePage() {
               <CardContent>
                 {itemSuggestion.isLoading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {[...Array(3)].map((_, i) => ( // Skeleton for suggested items
+                    {[...Array(3)].map((_, i) => ( 
                       <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50">
                         <div className="aspect-[4/3] bg-muted animate-pulse"></div>
                         <CardContent className="p-4 flex-grow space-y-2">
@@ -268,5 +286,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

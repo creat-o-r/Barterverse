@@ -3,11 +3,17 @@
 
 import { useEffect, useState } from 'react';
 import { getLoggedMatchSuggestions, type LoggedMatchSuggestion } from '@/services/match-report-service';
-import { getAIMatchingMode, setAIMatchingMode as setAIMatchingModeService, type AIMatchingMode } from '@/services/ai-config-service';
+import { 
+  getAIMatchingMode, 
+  setAIMatchingMode as setAIMatchingModeService, 
+  type AIMatchingMode,
+  getUseUserProfilePreferencesInMatching,
+  setUseUserProfilePreferencesInMatching as setUseUserProfilePreferencesInMatchingService
+} from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon, BrainCircuit, Zap, RefreshCw, Settings2 } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIcon, BrainCircuit, Zap, RefreshCw, Settings2, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -38,7 +44,9 @@ export default function MatchReportsPage() {
   const [reports, setReports] = useState<LoggedMatchSuggestion[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
+  const [useUserPrefs, setUseUserPrefs] = useState(true);
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
+  const [isUpdatingPrefsToggle, setIsUpdatingPrefsToggle] = useState(false);
   const { toast } = useToast();
 
   const fetchReports = async () => {
@@ -54,19 +62,21 @@ export default function MatchReportsPage() {
     }
   };
 
-  const fetchMode = async () => {
+  const fetchAdminSettings = async () => {
     try {
       const mode = await getAIMatchingMode();
       setCurrentMatchingMode(mode);
+      const prefsEnabled = await getUseUserProfilePreferencesInMatching();
+      setUseUserPrefs(prefsEnabled);
     } catch (error) {
-      console.error("Failed to fetch AI matching mode:", error);
-      // Keep default or last known, toast is optional here
+      console.error("Failed to fetch AI settings:", error);
+      toast({ title: "Error", description: "Could not load AI settings.", variant: "destructive" });
     }
   };
 
   useEffect(() => {
     fetchReports();
-    fetchMode();
+    fetchAdminSettings();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -93,10 +103,37 @@ export default function MatchReportsPage() {
         description: error.message || "Could not update AI matching mode.",
         variant: "destructive",
       });
-      // Revert UI switch if backend update fails by re-fetching the actual mode
-      fetchMode(); 
+      fetchAdminSettings(); 
     } finally {
       setIsUpdatingMode(false);
+    }
+  };
+
+  const handlePrefsToggle = async (newPrefsChecked: boolean) => {
+    if (newPrefsChecked === useUserPrefs) return;
+
+    setIsUpdatingPrefsToggle(true);
+    try {
+      const result = await setUseUserProfilePreferencesInMatchingService(newPrefsChecked);
+      if (result.success) {
+        setUseUserPrefs(newPrefsChecked);
+        toast({
+          title: "AI Preference Usage Updated",
+          description: `AI will ${newPrefsChecked ? 'now consider' : 'no longer consider'} user profile preferences in matching.`,
+        });
+      } else {
+        throw new Error(result.message || "Failed to update preference usage setting.");
+      }
+    } catch (error: any) {
+      console.error("Failed to set preference usage setting:", error);
+      toast({
+        title: "Update Failed",
+        description: error.message || "Could not update preference usage setting.",
+        variant: "destructive",
+      });
+      fetchAdminSettings();
+    } finally {
+      setIsUpdatingPrefsToggle(false);
     }
   };
 
@@ -113,7 +150,7 @@ export default function MatchReportsPage() {
             Control AI behavior for item matching. Changes will apply to new suggestions.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
             <div className="flex items-center space-x-3 p-4 border rounded-lg bg-muted/30">
                 <Switch
                 id="ai-matching-mode"
@@ -122,27 +159,55 @@ export default function MatchReportsPage() {
                 disabled={isUpdatingMode}
                 />
                 <Label htmlFor="ai-matching-mode" className="flex-grow font-headline text-lg">
-                Use Advanced AI Matching
+                  Use Advanced AI Matching
                 </Label>
                 {isUpdatingMode && <RefreshCw className="h-5 w-5 animate-spin text-primary" />}
             </div>
-            <div className="flex items-start gap-4 text-sm text-muted-foreground p-4 border-l-4 border-primary/50 bg-primary/5 rounded-md">
-                <BrainCircuit className="h-6 w-6 text-primary mt-0.5 shrink-0" />
-                <div>
-                    <strong className="text-foreground">Advanced Mode:</strong> Considers 'offer' vs. 'want' types, aims for direct fulfillment and complementary trades. More nuanced but potentially more complex/costly.
+            <div className="text-sm text-muted-foreground p-4 border-l-4 border-primary/50 bg-primary/5 rounded-md space-y-1">
+                <div className="flex items-start gap-2">
+                  <BrainCircuit className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div>
+                      <strong className="text-foreground">Advanced Mode:</strong> Considers 'offer' vs. 'want' types, aims for direct fulfillment and complementary trades. More nuanced.
+                  </div>
+                </div>
+                 <div className="flex items-start gap-2">
+                  <Zap className="h-5 w-5 text-secondary-foreground mt-0.5 shrink-0" />
+                  <div>
+                      <strong className="text-foreground">Simple Mode:</strong> Focuses on general relevance, category similarity, and keyword matches. Less nuanced.
+                  </div>
                 </div>
             </div>
-            <div className="flex items-start gap-4 text-sm text-muted-foreground p-4 border-l-4 border-secondary/50 bg-secondary/5 rounded-md">
-                <Zap className="h-6 w-6 text-secondary-foreground mt-0.5 shrink-0" />
-                 <div>
-                    <strong className="text-foreground">Simple Mode:</strong> Focuses on general relevance, category similarity, and keyword matches. Less nuanced, potentially faster/cheaper.
+
+            <Separator />
+
+            <div className="flex items-center space-x-3 p-4 border rounded-lg bg-muted/30">
+                <Switch
+                id="ai-use-user-prefs"
+                checked={useUserPrefs}
+                onCheckedChange={handlePrefsToggle}
+                disabled={isUpdatingPrefsToggle}
+                />
+                <Label htmlFor="ai-use-user-prefs" className="flex-grow font-headline text-lg">
+                  Consider User Profile Preferences in Matching
+                </Label>
+                {isUpdatingPrefsToggle && <RefreshCw className="h-5 w-5 animate-spin text-primary" />}
+            </div>
+             <div className="text-sm text-muted-foreground p-4 border-l-4 border-primary/50 bg-primary/5 rounded-md space-y-1">
+                <div className="flex items-start gap-2">
+                  <UserCog className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                  <div>
+                      <strong className="text-foreground">Preferences Enabled:</strong> AI matching will consider the viewing user's motivations, location preferences, trade timing, and 3rd party fulfillment interest to tailor suggestions.
+                  </div>
+                </div>
+                 <div className="text-xs">
+                    (Note: This primarily impacts 'Advanced' matching mode.)
                 </div>
             </div>
         </CardContent>
         <CardFooter>
             <div className="text-xs text-muted-foreground font-body">
-                Current active mode: <Badge variant={currentMatchingMode === 'advanced' ? "default" : "secondary"} className="capitalize">{currentMatchingMode}</Badge>.
-                Refresh suggestion logs below to see mode used for past suggestions.
+                Current active mode: <Badge variant={currentMatchingMode === 'advanced' ? 'default' : 'secondary'} className="capitalize">{currentMatchingMode}</Badge>.
+                User preferences in matching: <Badge variant={useUserPrefs ? 'default' : 'secondary'}>{useUserPrefs ? 'Enabled' : 'Disabled'}</Badge>.
             </div>
         </CardFooter>
       </Card>
@@ -177,76 +242,77 @@ export default function MatchReportsPage() {
           ) : reports.length === 0 ? (
             <p className="text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</p>
           ) : (
-            <Table>
-              <TableHeader className="sticky top-0 bg-card z-10">
-                <TableRow>
-                  <TableHead className="w-[180px]">Timestamp</TableHead>
-                  <TableHead>For User ID</TableHead>
-                  <TableHead>Current Item</TableHead>
-                  <TableHead>Matching Mode</TableHead>
-                  <TableHead>Suggested Items (ID, (Owner ID), Score)</TableHead>
-                  <TableHead className="min-w-[300px]">Reasoning</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reports.map((report, index) => (
-                  <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
-                    <TableCell className="font-mono text-xs">
-                      {new Date(report.timestamp).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-sm">{report.triggeringUserId}</TableCell>
-                    <TableCell>
-                        <div className="font-semibold">{report.currentItemName}</div>
-                        <div className="text-xs text-muted-foreground">
-                          <Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
-                              View Item <LinkIcon className="h-3 w-3" />
-                          </Link>
-                        </div>
-                    </TableCell>
-                    <TableCell className="text-xs capitalize">
-                      {report.usedMatchingMode ? (
-                          <Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>
-                              {report.usedMatchingMode}
-                          </Badge>
-                      ): (
-                          <Badge variant="outline">N/A</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
-                        <div className="flex flex-col gap-1.5">
-                          {report.suggestedMatches.map(match => (
-                            <div key={match.itemId} className="flex items-center gap-2 text-xs">
-                              <Badge
-                                className={`py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
-                              >
-                                {getMatchScoreIcon(match.matchScore)}
-                                {match.matchScore || 'N/A'}
-                              </Badge>
-                              <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
-                                {match.itemId} <LinkIcon className="h-3 w-3" />
-                              </Link>
-                              <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">
-                                ({match.ownerId} <UserIcon className="h-3 w-3" />)
-                              </Link>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">None</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs font-body text-muted-foreground break-words whitespace-pre-wrap">
-                        {report.reasoning || <span className="italic">N/A</span>}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table className="min-w-full">
+                <TableHeader className="sticky top-0 bg-card z-10">
+                  <TableRow>
+                    <TableHead className="w-[180px]">Timestamp</TableHead>
+                    <TableHead>For User ID</TableHead>
+                    <TableHead>Current Item</TableHead>
+                    <TableHead>Matching Mode</TableHead>
+                    <TableHead>Suggested Items (ID, (Owner ID), Score)</TableHead>
+                    <TableHead className="min-w-[300px]">Reasoning</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {reports.map((report, index) => (
+                    <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
+                      <TableCell className="font-mono text-xs">
+                        {new Date(report.timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-sm">{report.triggeringUserId}</TableCell>
+                      <TableCell>
+                          <div className="font-semibold">{report.currentItemName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            <Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
+                                View Item <LinkIcon className="h-3 w-3" />
+                            </Link>
+                          </div>
+                      </TableCell>
+                      <TableCell className="text-xs capitalize">
+                        {report.usedMatchingMode ? (
+                            <Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>
+                                {report.usedMatchingMode}
+                            </Badge>
+                        ): (
+                            <Badge variant="outline">N/A</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
+                          <div className="flex flex-col gap-1.5">
+                            {report.suggestedMatches.map(match => (
+                              <div key={match.itemId} className="flex items-center gap-2 text-xs">
+                                <Badge
+                                  className={`py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}
+                                >
+                                  {getMatchScoreIcon(match.matchScore)}
+                                  {match.matchScore || 'N/A'}
+                                </Badge>
+                                <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">
+                                  {match.itemId} <LinkIcon className="h-3 w-3" />
+                                </Link>
+                                <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">
+                                  ({match.ownerId} <UserIcon className="h-3 w-3" />)
+                                </Link>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">None</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs font-body text-muted-foreground break-words whitespace-pre-wrap">
+                          {report.reasoning || <span className="italic">N/A</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
     </div>
   );
 }
-

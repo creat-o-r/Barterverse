@@ -2,14 +2,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Item } from '@/types';
-import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
+import type { Item, User } from '@/types';
+import { suggestMatchingItems, type ItemMatchOutput, type UserProfilePreferences } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
-// Removed useToast as reasoning will be inline
-// import { useToast } from "@/hooks/use-toast";
+import { Badge } from '@/components/ui/badge';
+
 
 interface SuggestedMatchesProps {
   currentItem: Item;
@@ -20,7 +20,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
-  // const { toast } = useToast(); // Removed
+  const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
+
 
   useEffect(() => {
     async function fetchSuggestions() {
@@ -28,6 +29,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setFetchError(null);
       setAiReasoning(null);
       setSuggestedItemsWithScores([]); 
+      setPreferencesWereConsidered(false);
 
       if (!currentItem?.id) {
           setLoading(false);
@@ -37,7 +39,15 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           return;
       }
       
-      const viewingUserId = dummyUsers[0].id; 
+      const viewingUser = dummyUsers[0]; // Simulate current user is dummyUsers[0]
+
+      // Prepare viewing user's preferences
+      const viewingUserPreferences: UserProfilePreferences = {
+        motivations: viewingUser.motivations,
+        locationPreference: viewingUser.locationPreference,
+        tradeTimingPreference: viewingUser.tradeTimingPreference,
+        interestedInThirdPartyFulfillment: viewingUser.interestedInThirdPartyFulfillment,
+      };
 
       try {
         const otherAvailableItems = dummyItems.filter(
@@ -53,7 +63,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         }));
 
         if (otherAvailableItems.length === 0) {
-            const noItemsReasoning = `No other items currently available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'your item'} "${currentItem.name}".`;
+            const noItemsReasoning = `No other items currently available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'this item'} "${currentItem.name}".`;
             setAiReasoning(noItemsReasoning);
             setSuggestedItemsWithScores([]);
             setLoading(false);
@@ -61,7 +71,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         }
 
         const inputForFlow = {
-          triggeringUserId: viewingUserId, 
+          triggeringUserId: viewingUser.id, 
           currentItem: {
             id: currentItem.id,
             name: currentItem.name,
@@ -71,20 +81,23 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             listingType: currentItem.listingType,
           },
           availableItems: otherAvailableItems,
+          triggeringUserPreferences: viewingUserPreferences, // Pass preferences
         };
 
         const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
         
+        setPreferencesWereConsidered(result.preferencesConsidered || false);
+
         const augmentedMatchedItems = (result.suggestedMatches || []).map(match => {
           const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
           if (!itemDetails) return null;
 
           let isThirdPartyFulfillment = false;
           if (
-            currentItem.listingType === 'want' &&
-            itemDetails.listingType === 'offer' && // Only badge offers fulfilling a want
-            match.ownerId !== viewingUserId &&
-            match.ownerId !== currentItem.ownerId
+            currentItem.listingType === 'want' && // Current item is a want
+            itemDetails.listingType === 'offer' && // Suggested item is an offer
+            match.ownerId !== viewingUser.id && // Suggested item owner is not the viewer
+            match.ownerId !== currentItem.ownerId // Suggested item owner is not the current item owner
           ) {
             isThirdPartyFulfillment = true;
           }
@@ -95,7 +108,6 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         setSuggestedItemsWithScores(augmentedMatchedItems);
         setAiReasoning(result.reasoning || null);
         
-        // Check if the reasoning is actually an error/system message that shouldn't be toasted as "success"
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
             result.reasoning.toLowerCase().includes('error') || 
             result.reasoning.toLowerCase().includes('overloaded') ||
@@ -106,20 +118,16 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         );
 
         if (augmentedMatchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
-             // If no items but reasoning is not an error, set it for display
              setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
         } else if (result.reasoning && reasoningIsErrorOrSystemMessage) {
-            // If reasoning indicates an error or system constraint, set it as fetchError for prominent display
             setFetchError(result.reasoning);
         }
-
 
       } catch (err: any) {
         console.error("Failed to fetch item matches from flow (client-side catch):", err);
         const clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
         setFetchError(clientErrorMsg);
         setAiReasoning(clientErrorMsg); 
-        // Removed toast for client-side error too, it will be displayed inline
       } finally {
         setLoading(false);
       }
@@ -130,7 +138,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
   }, [currentItem.id, currentItem.name, currentItem.listingType, currentItem.ownerId]);
 
 
-  const cardTitle = currentItem.listingType === 'offer' 
+  const cardTitleText = currentItem.listingType === 'offer' 
     ? `AI Matches for ${currentItem.name}`
     : `AI Fulfillments for ${currentItem.name}`;
 
@@ -161,7 +169,6 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
   
-  // Display error prominently if fetchError is set
   if (fetchError) {
     return (
       <Card className="border-destructive">
@@ -173,42 +180,49 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         </CardHeader>
         <CardContent>
           <p className="font-body text-destructive">
-            {aiReasoning || fetchError} {/* Display aiReasoning if it contains the error message */}
+            {aiReasoning || fetchError}
           </p>
         </CardContent>
       </Card>
     );
   }
   
-  // Display no suggestions found (with reasoning if available)
   if (suggestedItemsWithScores.length === 0) {
      return (
       <Card className="border-border border-dashed">
         <CardHeader>
-          <CardTitle className="font-headline text-xl flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-muted-foreground" />
-             {cardTitle}
-          </CardTitle>
+          <div className="flex justify-between items-start">
+            <CardTitle className="font-headline text-xl flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-muted-foreground" />
+              {cardTitleText}
+            </CardTitle>
+            {preferencesWereConsidered && <Badge variant="outline" className="text-xs">Preferences Used</Badge>}
+          </div>
+          {aiReasoning && (
+            <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>
+          )}
         </CardHeader>
         <CardContent>
           <p className="font-body text-muted-foreground text-center py-4">
-            {aiReasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found at this moment." : "No specific AI-powered fulfillments found for this want at this moment.")}
+            {aiReasoning ? "" : (currentItem.listingType === 'offer' ? "No specific AI-powered matches found at this moment." : "No specific AI-powered fulfillments found for this want at this moment.")}
           </p>
         </CardContent>
       </Card>
     );
   }
   
-  // Display suggestions with reasoning in header
   return (
       <Card>
       <CardHeader>
-          <CardTitle className="font-headline text-xl flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-primary" />
-           {cardTitle}
-          </CardTitle>
-           {aiReasoning && ( // Display reasoning if available and no overriding fetchError
-              <p className="text-sm text-muted-foreground mt-1 font-body">{aiReasoning}</p>
+          <div className="flex justify-between items-start">
+            <CardTitle className="font-headline text-xl flex items-center gap-2">
+                <Sparkles className="h-6 w-6 text-primary" />
+                {cardTitleText}
+            </CardTitle>
+            {preferencesWereConsidered && <Badge variant="outline" className="text-xs">Preferences Used</Badge>}
+          </div>
+           {aiReasoning && (
+              <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>
            )}
       </CardHeader>
       <CardContent>
@@ -217,4 +231,3 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       </Card>
   );
 }
-
