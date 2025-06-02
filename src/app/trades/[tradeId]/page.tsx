@@ -8,6 +8,7 @@ import type { Item, User } from '@/types';
 import Image from 'next/image';
 import Link from 'next/link';
 import ChatWindow from '@/components/chat/ChatWindow';
+import { Button } from '@/components/ui/button'; // Added missing import
 
 interface TradeContext {
   tradeId: string;
