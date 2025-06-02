@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { useState, useEffect } from 'react'; // Updated import
+import { use, useState, useEffect } from 'react'; // Updated import
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Helper function to find user (simulates data fetching)
@@ -88,19 +88,22 @@ const generateMockActivitySummary = (user: User): string => {
 };
 
 
-export default function UserProfilePage({ params }: { params: { userId: string } }) {
+export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
+  const resolvedParams = use(paramsProp); // Use React.use to unwrap params
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { // Changed from React.useEffect
+  useEffect(() => {
     async function loadUserProfile() {
       setLoading(true);
-      const profile = await getUserProfile(params.userId);
+      const profile = await getUserProfile(resolvedParams.userId); // Use resolvedParams.userId
       setUser(profile);
       setLoading(false);
     }
-    loadUserProfile();
-  }, [params.userId]);
+    if (resolvedParams.userId) {
+        loadUserProfile();
+    }
+  }, [resolvedParams.userId]); // Depend on resolvedParams.userId
 
   if (loading) {
     return <div className="text-center py-10 font-body">Loading profile...</div>;
@@ -110,7 +113,7 @@ export default function UserProfilePage({ params }: { params: { userId: string }
     return <div className="text-center py-10 font-body">User not found.</div>;
   }
 
-  const isCurrentUser = params.userId === 'me' || params.userId === dummyUsers[0].id;
+  const isCurrentUser = resolvedParams.userId === 'me' || resolvedParams.userId === dummyUsers[0].id;
 
   const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
   const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
@@ -393,5 +396,3 @@ function UserProfileAIInsights({ user, mockAISuggestions, mockActivitySummary }:
     </Card>
   );
 }
-
-    
