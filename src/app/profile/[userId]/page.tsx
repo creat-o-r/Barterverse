@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Updated import
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Helper function to find user (simulates data fetching)
@@ -89,15 +89,10 @@ const generateMockActivitySummary = (user: User): string => {
 
 
 export default function UserProfilePage({ params }: { params: { userId: string } }) {
-  // This page is now a Client Component because of "use client" at the top.
-  // However, data fetching like getUserProfile should ideally be done in a Server Component
-  // and passed down, or fetched via useEffect/SWR if it must be a Client Component.
-  // For this iteration, we'll keep the direct async call, but acknowledge this pattern.
-  
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => { // Changed from React.useEffect
     async function loadUserProfile() {
       setLoading(true);
       const profile = await getUserProfile(params.userId);
@@ -108,7 +103,6 @@ export default function UserProfilePage({ params }: { params: { userId: string }
   }, [params.userId]);
 
   if (loading) {
-    // Basic loading state
     return <div className="text-center py-10 font-body">Loading profile...</div>;
   }
 
@@ -116,13 +110,12 @@ export default function UserProfilePage({ params }: { params: { userId: string }
     return <div className="text-center py-10 font-body">User not found.</div>;
   }
 
-  const isCurrentUser = params.userId === 'me' || params.userId === dummyUsers[0].id; // Basic check
+  const isCurrentUser = params.userId === 'me' || params.userId === dummyUsers[0].id;
 
   const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
   const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
   const tradedOrFulfilledItems = user.items.filter(item => item.status === 'traded');
 
-  // Mocked AI preference output for display - varies slightly per user for demo
   const getMockAISuggestions = (currentUser: User) => {
     let suggestions: any = {
         motivations: ['convenience-focused'] as UserMotivation[],
@@ -132,7 +125,7 @@ export default function UserProfilePage({ params }: { params: { userId: string }
         confidence: 'Medium',
         reasoning: "General activity suggests a flexible approach to trading."
     };
-    if (currentUser.id === 'user1') { // Alice
+    if (currentUser.id === 'user1') {
         suggestions = {
             motivations: ['unique-finds', 'community-building'] as UserMotivation[],
             locationPreference: { isSensitive: false, notes: "Appears flexible with shipping." },
@@ -141,7 +134,7 @@ export default function UserProfilePage({ params }: { params: { userId: string }
             confidence: 'High',
             reasoning: "Activity suggests a focus on unique items and positive community interactions. Mentions shipping."
         };
-    } else if (currentUser.id === 'user2') { // Bob
+    } else if (currentUser.id === 'user2') {
         suggestions = {
             motivations: ['maximize-trades'] as UserMotivation[],
             locationPreference: { isSensitive: true, notes: 'Strong preference for local pickup for electronics.' },
@@ -150,7 +143,7 @@ export default function UserProfilePage({ params }: { params: { userId: string }
             confidence: 'High',
             reasoning: "User seems focused on item value, direct exchanges, and mentions local pickup preferences."
         };
-    } else if (currentUser.id === 'user3') { // Charlie
+    } else if (currentUser.id === 'user3') {
         suggestions = {
             motivations: ['help-others', 'convenience-focused'] as UserMotivation[],
             locationPreference: { isSensitive: false },
@@ -266,7 +259,6 @@ export default function UserProfilePage({ params }: { params: { userId: string }
 
       <Separator />
 
-      {/* AI Preference Insights Card */}
       <UserProfileAIInsights user={user} mockAISuggestions={mockAISuggestions} mockActivitySummary={mockActivitySummary} />
 
       <Separator />
@@ -310,7 +302,6 @@ export default function UserProfilePage({ params }: { params: { userId: string }
   );
 }
 
-// Extracted client component for AI Insights section
 function UserProfileAIInsights({ user, mockAISuggestions, mockActivitySummary }: { user: User, mockAISuggestions: any, mockActivitySummary: string }) {
   const [showSampleActivity, setShowSampleActivity] = useState(false);
 
