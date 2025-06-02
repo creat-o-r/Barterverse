@@ -55,7 +55,7 @@ const suggestTradeCombinations = ai.defineTool(
   },
   async (input: SuggestTradeCombinationsToolInput) => {
     // Mock implementation for trade suggestion, replace with actual logic.
-    return `Based on the item offered: ${input.itemOfferedDescription}, and the item wanted: ${input.itemWantedDescription}, a possible trade combination could be discussed.`;
+    return `Based on the item offered: ${input.itemOfferedDescription}, and the item wanted: ${input.itemWantedDescription}, a possible trade combination could be discussed. Consider asking if they are open to this specific exchange.`;
   }
 );
 
@@ -64,7 +64,7 @@ const tradeNegotiationChatPrompt = ai.definePrompt({
   input: {schema: TradeNegotiationChatInputSchema},
   output: {schema: TradeNegotiationChatOutputSchema},
   tools: [suggestTradeCombinations],
-  prompt: `You are a helpful assistant facilitating trade negotiations between two users.
+  prompt: `You are a helpful assistant facilitating trade negotiations between two users. Your tone is friendly and encouraging.
 
   The user is offering: {{{itemOfferedDescription}}}
   The user wants: {{{itemWantedDescription}}}
@@ -73,7 +73,10 @@ const tradeNegotiationChatPrompt = ai.definePrompt({
 
   The user just said: {{{userMessage}}}
 
-  Use the suggestTradeCombinations tool to suggest mutually beneficial trade combinations if needed.  Otherwise respond to the user in a way that facilitates trade.
+  Your goal is to help them reach a mutually agreeable trade.
+  - If the conversation seems stalled or they need ideas, use the 'suggestTradeCombinations' tool to propose potential trade options.
+  - Otherwise, respond to the user in a way that facilitates trade. You can ask clarifying questions, summarize points, or gently guide the conversation.
+  - Keep your responses concise and focused on the negotiation.
   `,
 });
 
@@ -86,8 +89,8 @@ const tradeNegotiationChatFlow = ai.defineFlow(
   async (input: TradeNegotiationChatInput): Promise<TradeNegotiationChatOutput> => {
     try {
       const {output} = await tradeNegotiationChatPrompt(input);
-      if (!output) {
-        console.warn("tradeNegotiationChatFlow: Prompt returned null output");
+      if (!output || !output.response) {
+        console.warn("tradeNegotiationChatFlow: Prompt returned null or empty output for response");
         return { response: "I'm having trouble generating a response right now. Please try again." };
       }
       return output;
@@ -96,12 +99,13 @@ const tradeNegotiationChatFlow = ai.defineFlow(
       let userMessage = "I encountered an unexpected issue. Please try sending your message again.";
 
       if (error.message && typeof error.message === 'string') {
-        if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
-          userMessage = "I'm experiencing high demand right now (quota exceeded). Please try again in a little while.";
-        } else if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+        const lowerErrorMessage = error.message.toLowerCase();
+        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
+          userMessage = "The negotiation assistant has reached its current usage limit. Please try again later.";
+        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
           userMessage = "The negotiation assistant service is temporarily overloaded. Please try again in a few moments.";
-        } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
-            userMessage = "I couldn't process that due to content restrictions. Could you rephrase or try something different?";
+        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
+            userMessage = "I couldn't process that due to content restrictions or safety settings. Could you rephrase or try something different?";
         }
       }
       return { response: userMessage };

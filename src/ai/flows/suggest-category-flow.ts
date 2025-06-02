@@ -30,7 +30,7 @@ export async function suggestCategory(input: SuggestCategoryInput): Promise<Sugg
 const prompt = ai.definePrompt({
   name: 'suggestCategoryPrompt',
   input: {schema: SuggestCategoryInputSchema},
-  output: {schema: z.object({ suggestedCategory: z.string() }) }, // AI only outputs category
+  output: {schema: z.object({ suggestedCategory: z.string() }) }, 
   prompt: `You are an expert product categorizer for an online bartering platform.
   Based on the item name and description, suggest a concise and relevant category for this item.
   Item Name: {{{name}}}
@@ -62,12 +62,13 @@ const suggestCategoryFlow = ai.defineFlow(
       let userMessage = "An unexpected error occurred while trying to get an AI category suggestion.";
 
       if (error.message && typeof error.message === 'string') {
-        if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+        const lowerErrorMessage = error.message.toLowerCase();
+        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
           userMessage = "The AI category suggestion service has reached its current usage limit. Please try again later.";
-        } else if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
           userMessage = "The AI category suggestion service is temporarily overloaded. Please try again in a few moments.";
-        } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
-            userMessage = "The AI category suggestion service could not process the request due to content restrictions.";
+        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
+            userMessage = "The AI category suggestion service could not process the request due to content restrictions or safety settings.";
         }
       }
       return { 

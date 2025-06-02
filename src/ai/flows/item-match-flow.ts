@@ -70,7 +70,7 @@ const itemMatchFlow = ai.defineFlow(
     const filteredAvailableItems = input.availableItems.filter(item => item.id !== input.currentItem.id);
 
     if (filteredAvailableItems.length === 0) {
-        return { suggestedItemIds: [], reasoning: "No other items available to suggest." };
+        return { suggestedItemIds: [], reasoning: "No other items available to suggest matches for." };
     }
 
     try {
@@ -79,40 +79,38 @@ const itemMatchFlow = ai.defineFlow(
           availableItems: filteredAvailableItems
       });
       if (!output) {
-          console.warn("ItemMatchFlow: Prompt returned null output");
+          console.warn("itemMatchFlow: Prompt returned null output");
           return {
               suggestedItemIds: [],
-              reasoning: "AI could not generate suggestions at this time."
+              reasoning: "The AI assistant could not generate suggestions at this time."
           };
       }
       return output;
     } catch (error: any) {
       console.error("Error in itemMatchFlow calling prompt:", error);
-      // Log more details if possible, useful for server-side debugging
-      if (error && typeof error === 'object') {
-        try {
-          console.error("Detailed error object in itemMatchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        } catch (e) {
-          console.error("Could not stringify detailed error object:", e);
-        }
+      try {
+        console.error("Detailed error object in itemMatchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      } catch (e) {
+        console.error("Could not stringify detailed error object in itemMatchFlow:", e);
       }
 
       let userMessage = "An unexpected error occurred while trying to get AI suggestions.";
 
       if (error.message && typeof error.message === 'string') {
-        if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+        const lowerErrorMessage = error.message.toLowerCase();
+        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
           userMessage = "The AI matching service has reached its current usage limit. Please try again later.";
-        } else if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
           userMessage = "The AI matching service is temporarily overloaded. Please try again in a few moments.";
-        } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
+        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
             userMessage = "The AI matching service could not process the request due to content restrictions or safety settings.";
-        } else if (error.name === 'ZodError' || (error.message && (error.message.includes('invalid_type') || error.message.includes('Expected')) )) {
-            userMessage = "The AI's response was not in the expected format. Please try again. If the problem persists, the item data might be causing an issue.";
-            console.error("AI response format error (ZodError or similar). Issues/Message:", error.issues || error.message);
+        } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
+            userMessage = "The AI's response was not in the expected format. Please try again. If the problem persists, item data might be causing an issue.";
+            console.error("itemMatchFlow: AI response format error. Issues/Message:", error.issues || error.message);
         }
-      } else if (error.name === 'ZodError' && error.issues) { // Catch ZodError even if message isn't standard
+      } else if (error.name === 'ZodError' && error.issues) {
         userMessage = "The AI's response had an unexpected data structure. Please try again.";
-        console.error("AI response format error (ZodError issues):", error.issues);
+        console.error("itemMatchFlow: AI response format error (ZodError issues):", error.issues);
       }
       
       return {

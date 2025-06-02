@@ -72,11 +72,12 @@ const suggestTradesFlow = ai.defineFlow(
       let userMessage = "An unexpected error occurred while trying to get AI trade suggestions.";
 
       if (error.message && typeof error.message === 'string') {
-        if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+        const lowerErrorMessage = error.message.toLowerCase();
+        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
           userMessage = "The AI trade suggestion service has reached its current usage limit. Please try again later.";
-        } else if (error.message.includes('503') || error.message.toLowerCase().includes('overloaded')) {
+        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
           userMessage = "The AI trade suggestion service is temporarily overloaded. Please try again in a few moments.";
-        } else if (error.message.toLowerCase().includes('blocked') || error.message.toLowerCase().includes('safety settings')) {
+        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
             userMessage = "The AI trade suggestion service could not process the request due to content restrictions or safety settings.";
         }
       }
