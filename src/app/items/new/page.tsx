@@ -34,8 +34,8 @@ const itemFormSchema = z.object({
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  minimumMatchRatingOverride: z.enum(['', 'Low', 'Medium', 'High']).optional()
-    .describe("Optional override for the minimum match rating for this specific item."),
+  minimumMatchRatingOverride: z.enum(['none', 'Low', 'Medium', 'High'])
+    .describe("Optional override for the minimum match rating for this specific item. 'none' means no override."),
 });
 
 type ItemFormValues = z.infer<typeof itemFormSchema>;
@@ -58,7 +58,7 @@ export default function NewItemPage() {
       category: '',
       imageUrl: '',
       listingType: 'offer',
-      minimumMatchRatingOverride: '', // Default to "None"
+      minimumMatchRatingOverride: 'none', 
     },
   });
 
@@ -166,7 +166,7 @@ export default function NewItemPage() {
         listingType: data.listingType,
         imageUrl: data.imageUrl || '', 
         ownerId: currentUserId,
-        minimumMatchRatingOverride: data.minimumMatchRatingOverride === '' ? undefined : data.minimumMatchRatingOverride as 'Low' | 'Medium' | 'High',
+        minimumMatchRatingOverride: data.minimumMatchRatingOverride === 'none' ? undefined : data.minimumMatchRatingOverride as 'Low' | 'Medium' | 'High',
       };
       const addedItem = addNewItemToDummyData(newItemData);
       
@@ -348,18 +348,20 @@ export default function NewItemPage() {
                     <Select 
                         onValueChange={(value) => {
                             field.onChange(value);
-                            form.setValue('minimumMatchRatingOverride', value as '' | 'Low' | 'Medium' | 'High', {shouldDirty: true});
+                            form.setValue('minimumMatchRatingOverride', value as 'none' | 'Low' | 'Medium' | 'High', {shouldDirty: true});
                         }} 
-                        defaultValue={field.value || ""}
+                        value={field.value} // Ensures the Select is controlled by the form state
                         disabled={isLoadingOverall}
                     >
                       <FormControl>
                         <SelectTrigger disabled={isLoadingOverall}>
+                          {/* The placeholder in SelectValue is shown if field.value is undefined.
+                              Since we default to 'none', it will show the "None (use profile default)" item text. */}
                           <SelectValue placeholder="None (use profile default)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None (use profile default)</SelectItem>
+                        <SelectItem value="none">None (use profile default)</SelectItem>
                         <SelectItem value="Low">Low</SelectItem>
                         <SelectItem value="Medium">Medium</SelectItem>
                         <SelectItem value="High">High</SelectItem>
