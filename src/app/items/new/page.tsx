@@ -35,8 +35,8 @@ const itemFormSchema = z.object({
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  minimumMatchRatingOverride: z.enum(['', 'Low', 'Medium', 'High']).optional()
-    .describe("Optional override for the minimum match rating for this specific item. Empty string means use profile default."),
+  minimumMatchRatingOverride: z.enum(['use_profile_default', 'Low', 'Medium', 'High'])
+    .describe("Optional override for the minimum match rating for this specific item. 'use_profile_default' means use profile setting."),
   isGiftItForward: z.boolean().optional(),
 });
 
@@ -59,7 +59,7 @@ export default function NewItemPage() {
       category: '',
       imageUrl: '',
       listingType: 'offer',
-      minimumMatchRatingOverride: '', 
+      minimumMatchRatingOverride: 'use_profile_default', 
       isGiftItForward: false,
     },
   });
@@ -169,7 +169,7 @@ export default function NewItemPage() {
         listingType: data.listingType,
         imageUrl: data.imageUrl || '', 
         ownerId: currentUserId,
-        minimumMatchRatingOverride: data.minimumMatchRatingOverride === '' ? undefined : data.minimumMatchRatingOverride as 'Low' | 'Medium' | 'High',
+        minimumMatchRatingOverride: data.minimumMatchRatingOverride === 'use_profile_default' ? undefined : data.minimumMatchRatingOverride as 'Low' | 'Medium' | 'High',
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false, // Only 'offer' items can be gifts
       };
       const addedItem = addNewItemToDummyData(newItemData);
@@ -352,7 +352,7 @@ export default function NewItemPage() {
                     <Select 
                         onValueChange={(value) => {
                             field.onChange(value);
-                            form.setValue('minimumMatchRatingOverride', value as '' | 'Low' | 'Medium' | 'High', {shouldDirty: true});
+                            form.setValue('minimumMatchRatingOverride', value as 'use_profile_default' | 'Low' | 'Medium' | 'High', {shouldDirty: true});
                         }} 
                         value={field.value} 
                         disabled={isLoadingOverall}
@@ -363,7 +363,7 @@ export default function NewItemPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Use profile default</SelectItem>
+                        <SelectItem value="use_profile_default">Use profile default</SelectItem>
                         <SelectItem value="Low">Low</SelectItem>
                         <SelectItem value="Medium">Medium</SelectItem>
                         <SelectItem value="High">High</SelectItem>
