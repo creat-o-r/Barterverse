@@ -38,6 +38,14 @@ async function getUserProfile(userId: string): Promise<User | null> {
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
 const tradeTimingTextMap: Record<TradeTimingPreference, string> = { 'simultaneous': 'Prefers Simultaneous', 'staged': 'Open to Staged Trades', 'flexible': 'Flexible Timing', };
+const deliveryMethodDisplayMapConcrete: Record<ItemDeliveryMethod, string> = {
+  pickup_only: "Pickup",
+  willing_to_ship: "Willing to Ship",
+  delivery_area: "Delivery Area",
+  possible_delivery: "Possible Delivery",
+  public_meetup: "Public Meetup",
+  flexible_meetup: "Flexible Meetup",
+};
 
 
 const preparePreferenceInferenceInput = (user: User | null): InferUserPreferencesInput | null => {
@@ -97,15 +105,6 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
     <span className="ml-2 text-sm text-muted-foreground">{score.toFixed(1)} {count ? `(${count} ratings)` : ''}</span>
   </div>
 );
-
-const deliveryMethodDisplayMapConcrete: Record<ItemDeliveryMethod, string> = {
-  pickup_only: "Pickup",
-  willing_to_ship: "Willing to Ship",
-  delivery_area: "Delivery Area",
-  possible_delivery: "Possible Delivery",
-  public_meetup: "Public Meetup",
-  flexible_meetup: "Flexible Meetup",
-};
 
 
 export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
@@ -193,7 +192,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
   const effectiveMinimumMatchRating = user.minimumMatchRating;
 
   const preferredLocation = user.logisticsPreferences?.preferredStoredLocationId && user.locations
-    ? user.locations.find(loc => loc.id === user.logisticsPreferences.preferredStoredLocationId)
+    ? user.locations.find(loc => loc.id === user.logisticsPreferences!.preferredStoredLocationId)
     : null;
 
   let preferredLocationIcon = <MapPin className="h-4 w-4 text-muted-foreground"/>;
@@ -251,6 +250,43 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
               {effectiveMinimumMatchRating}
             </Badge>
           </div>
+          {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
+          
+          {/* Consolidated Location Section */}
+          <div>
+            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location &amp; Delivery:</h4>
+            <div className="space-y-2 pl-5">
+                <Badge variant={user.locationPreference?.isSensitive ? "secondary" : "outline"} className="text-xs">
+                    {user.locationPreference?.isSensitive ? "Location Sensitive" : "Location Flexible"}
+                </Badge>
+                {user.locationPreference?.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic">{user.locationPreference.notes}</p>)}
+                
+                <div className="flex items-center gap-1.5 text-xs">
+                    {preferredLocationIcon}
+                    <span className="text-muted-foreground">Preferred Spot:</span>
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-auto max-w-full truncate">
+                    {preferredLocation ? `${preferredLocation.name}${preferredLocation.address ? ` (${preferredLocation.address})` : ''}` : 
+                    (user.logisticsPreferences?.preferredStoredLocationId ? `Stored ID: ${user.logisticsPreferences.preferredStoredLocationId} (Not Found)` : 'Not set')}
+                    </Badge>
+                </div>
+
+                {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 && (
+                    <div className="text-xs">
+                        <span className="text-muted-foreground mr-1.5">Default Delivery Methods:</span>
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                            {user.logisticsPreferences.defaultDeliveryMethods.map(method => (
+                            <Badge key={method} variant="outline" className="text-xs cursor-default py-0.5 px-1.5">
+                                {deliveryMethodDisplayMapConcrete[method] || method}
+                            </Badge>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+          </div>
+
+          {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
+          
           <div>
             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4>
             <Badge 
@@ -260,8 +296,9 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
                 {user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}
             </Badge>
           </div>
-           <div>
-            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Network className="h-4 w-4 text-muted-foreground"/>Chain Delivery:</h4>
+
+          <div>
+             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Network className="h-4 w-4 text-muted-foreground"/>Chain Delivery:</h4>
             <Badge 
                 variant={user.logisticsPreferences?.openToChainDelivery ? "default" : (user.logisticsPreferences?.openToChainDelivery === false ? "secondary" : "outline")} 
                 className="text-xs"
@@ -269,32 +306,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
                 {user.logisticsPreferences?.openToChainDelivery === true ? "Yes" : (user.logisticsPreferences?.openToChainDelivery === false ? "No" : "Not Specified")}
             </Badge>
           </div>
-          {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
-          {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Sensitivity:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
-          {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
           
-          {/* Moved Logistics Preferences Here */}
-          <div>
-             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">{preferredLocationIcon}Preferred Item Location:</h4>
-              <Badge variant="outline" className="text-xs px-2 py-1 h-auto max-w-full truncate">
-                {preferredLocation ? `${preferredLocation.name}${preferredLocation.address ? ` (${preferredLocation.address})` : ''}` : 
-                (user.logisticsPreferences?.preferredStoredLocationId ? `Stored ID: ${user.logisticsPreferences.preferredStoredLocationId} (Not Found)` : 'Not set')}
-              </Badge>
-          </div>
-           <div>
-             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground"/>Default Delivery Methods:</h4>
-             {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                    {user.logisticsPreferences.defaultDeliveryMethods.map(method => (
-                    <Badge key={method} variant="outline" className="text-xs cursor-default">
-                        {deliveryMethodDisplayMapConcrete[method] || method}
-                    </Badge>
-                    ))}
-                </div>
-                ) : (
-                    <Badge variant="outline" className="text-xs">Not specified</Badge>
-             )}
-          </div>
           {isOwnProfile && (
             <Button variant="outline" size="sm" className="mt-4 w-full md:w-auto" disabled>
                 <Edit3 className="mr-2 h-4 w-4" /> Edit All Preferences
