@@ -1,5 +1,5 @@
 
-import { use } from 'react';
+import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
@@ -7,136 +7,211 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, HelpingHand, Link2 as LinkIcon } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, HelpingHand, Link2 as LinkIcon, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
-// import SuggestedMatches from '@/components/items/SuggestedMatches'; // Temporarily commented out
-// import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient'; // Temporarily commented out
+import SuggestedMatches from '@/components/items/SuggestedMatches';
+// import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient'; // Commented out for now to simplify
 import { Separator } from '@/components/ui/separator';
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
-  console.log(`[ItemDetailPage] getItemDetails called for ID: ${itemId}`);
+  // console.log(`[ItemDetailsDisplay] getItemDetails called for ID: ${itemId}`);
+  // Simulate network delay if needed for testing suspense
+  // await new Promise(resolve => setTimeout(resolve, 500)); 
   const item = dummyItems.find((i) => i.id === itemId);
   if (!item) {
-    console.error(`[ItemDetailPage] getItemDetails: Item not found for ID: ${itemId}`);
+    console.error(`[ItemDetailsDisplay] getItemDetails: Item not found for ID: ${itemId}`);
     return null;
   }
   const owner = dummyUsers.find((u) => u.id === item.ownerId);
   if (!owner) {
-    console.error(`[ItemDetailPage] getItemDetails: Owner not found for item ID: ${itemId}, owner ID: ${item.ownerId}`);
+    console.error(`[ItemDetailsDisplay] getItemDetails: Owner not found for item ID: ${itemId}, owner ID: ${item.ownerId}`);
     return null;
   }
-  console.log(`[ItemDetailPage] getItemDetails: Found item "${item.name}" and owner "${owner.name}"`);
+  // console.log(`[ItemDetailsDisplay] getItemDetails: Found item "${item.name}" and owner "${owner.name}"`);
   return { item, owner };
 }
 
-export default async function ItemDetailPage({ params: paramsProp }: { params: { id: string } }) {
-  console.log('[ItemDetailPage] Rendering start...');
-  try {
-    const params = use(paramsProp);
-    console.log(`[ItemDetailPage] Params received: ${JSON.stringify(params)}`);
+async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
+  // console.log(`[ItemDetailsDisplay] Rendering for itemId: ${itemId}`);
+  const itemDetails = await getItemDetails(itemId);
 
-    if (!params || !params.id) {
-      console.error('[ItemDetailPage] Params or params.id is missing.');
-      return (
-        <div className="container mx-auto px-4 py-8">
-          <Card className="border-destructive">
-            <CardHeader><CardTitle className="text-destructive font-headline">Error: Missing Item ID</CardTitle></CardHeader>
-            <CardContent><p className="font-body">The item ID was not provided in the request.</p></CardContent>
-          </Card>
-        </div>
-      );
-    }
-    
-    console.log(`[ItemDetailPage] Attempting to fetch details for item ID: ${params.id}`);
-    const itemDetails = await getItemDetails(params.id);
-    console.log(`[ItemDetailPage] Fetched itemDetails: ${itemDetails ? `Item: ${itemDetails.item.name}` : 'null'}`);
-
-    if (!itemDetails) {
-      return (
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardHeader><CardTitle className="text-center">Item Not Found</CardTitle></CardHeader>
-            <CardContent><p className="text-center font-body">Could not find an item with ID: {params.id}</p></CardContent>
-          </Card>
-        </div>
-      );
-    }
-
-    const { item, owner } = itemDetails;
-    // This check needs to be robust, ensure dummyUsers[0] exists if you rely on it.
-    // For safety, let's assume current user is 'user1' if dummyUsers[0] is not defined, or handle appropriately.
-    const currentUserId = dummyUsers[0]?.id || 'user1_fallback'; 
-    const isCurrentUserOwner = item.ownerId === currentUserId;
-    console.log(`[ItemDetailPage] Rendering item: ${item.name}, Owner: ${owner.name}, isCurrentUserOwner: ${isCurrentUserOwner}`);
-
-    // Simplified JSX for debugging
+  if (!itemDetails) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>
-          <CardHeader>
-            <CardTitle className="font-headline text-3xl mb-2">{item.name} (DEBUG MODE)</CardTitle>
-            <div className="flex items-center gap-2 mb-4">
-              <Tag className="h-5 w-5 text-primary" />
-              <Badge variant="secondary" className="text-sm">{item.category}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap">{item.description}</p>
-            <Separator className="my-4" />
-            <h3 className="font-headline text-xl">Owner: {owner.name}</h3>
-            <p>Status: {item.status}</p>
-            <p>Listing Type: {item.listingType}</p>
-            
-            {/* Placeholder for where ItemTradeInitiationContent would go */}
-            {!isCurrentUserOwner && item.status === 'available' && (
-                <div className="mt-4 p-4 border rounded-md bg-muted/30">
-                    <p className="font-semibold">Trade Initiation Area (Simplified)</p>
-                    <p className="text-sm">Chat with {owner.name} for "{item.name}"</p>
-                </div>
-            )}
-          </CardContent>
+          <CardHeader><CardTitle className="text-center font-headline">Item Not Found</CardTitle></CardHeader>
+          <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}</p></CardContent>
         </Card>
-        
-        {/*
-        Temporarily commented out complex components:
-        {!isCurrentUserOwner && item.status === 'available' && (
-          <div className="mt-12">
-            <Separator className="my-8" />
-            <SuggestedMatches currentItem={item} />
-          </div>
-        )}
-        <TemporaryAdminMatchTestPanelClient itemToTest={item} />
-        */}
-         <div className="mt-6 p-4 bg-yellow-100 border border-yellow-300 rounded-md">
-            <h3 className="font-bold text-yellow-700">Debug Information:</h3>
-            <p className="text-sm text-yellow-600">Page rendered with simplified content for debugging.</p>
-            <p className="text-sm text-yellow-600">Item ID: {item.id}</p>
-            <p className="text-sm text-yellow-600">Owner ID: {owner.id}</p>
-            <p className="text-sm text-yellow-600">Is Current User Owner: {isCurrentUserOwner.toString()}</p>
-            <p className="text-sm text-yellow-600">Current User ID (simulated): {currentUserId}</p>
-        </div>
       </div>
     );
+  }
 
-  } catch (e: any) {
-    console.error("[ItemDetailPage] Catastrophic error during page rendering:", e);
-    // This will be rendered by Next.js on the server if an error occurs in the try block
-    return (
-        <div className="container mx-auto px-4 py-8">
-            <Card className="border-destructive">
-                <CardHeader>
-                    <CardTitle className="text-destructive font-headline">Critical Page Error</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="font-body">A critical error occurred while trying to render this page.</p>
-                    <p className="font-body mt-2 text-sm">Error Name: {e.name}</p>
-                    <p className="font-body mt-2 text-sm">Error Message: {e.message}</p>
-                    <h4 className="font-semibold mt-3">Stack Trace:</h4>
-                    <pre className="mt-1 p-2 bg-muted rounded text-xs whitespace-pre-wrap max-h-60 overflow-auto">{e.stack}</pre>
-                </CardContent>
-            </Card>
+  const { item, owner } = itemDetails;
+  const currentUserId = dummyUsers[0]?.id || 'user1_fallback';
+  const isCurrentUserOwner = item.ownerId === currentUserId;
+
+  // console.log(`[ItemDetailsDisplay] Successfully fetched and rendering item: ${item.name}`);
+
+  return (
+    <div className="container mx-auto px-4 py-8 space-y-8">
+      <Card className="overflow-hidden shadow-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2">
+          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0">
+            <Image
+              src={item.imageUrl || 'https://placehold.co/600x400.png'}
+              alt={item.name}
+              fill
+              className="object-cover"
+              data-ai-hint={item.dataAiHint || "item image"}
+              prioritySizesConfig={{sm: '50vw', md: 'calc(50vw - 2rem)'}} // Example sizes, adjust as needed
+              priority
+            />
+          </div>
+          <div className="p-6 flex flex-col">
+            <CardHeader className="p-0 pb-4">
+              <CardTitle className="font-headline text-3xl mb-2">{item.name}</CardTitle>
+              <div className="flex items-center gap-2 mb-1">
+                <Tag className="h-5 w-5 text-primary" />
+                <Badge variant="secondary" className="text-sm">{item.category}</Badge>
+              </div>
+              <Badge
+                variant={item.listingType === 'offer' ? 'default' : 'secondary'}
+                className={`capitalize text-xs w-fit ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              >
+                {item.listingType === 'offer' ? <Gift className="mr-1 h-3 w-3" /> : <Search className="mr-1 h-3 w-3" />}
+                {item.listingType}
+              </Badge>
+            </CardHeader>
+
+            <CardContent className="p-0 flex-grow">
+              <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap mb-4">{item.description}</p>
+              <Separator className="my-4" />
+              <div className="space-y-3">
+                <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={owner.avatarUrl} alt={owner.name} data-ai-hint={owner.dataAiHint || "owner avatar"} />
+                    <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <Link href={`/profile/${owner.id}`} className="font-semibold text-primary hover:underline">{owner.name}</Link>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Star className="h-4 w-4 mr-1 text-yellow-400 fill-yellow-400" /> {owner.rating.toFixed(1)} ({owner.tradesCompleted} trades)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+
+            <CardFooter className="p-0 pt-6">
+              {!isCurrentUserOwner && item.status === 'available' && (
+                <ItemTradeInitiationContent item={item} ownerName={owner.name} ownerId={owner.id} />
+              )}
+              {isCurrentUserOwner && item.status === 'available' && (
+                <Button variant="outline" className="w-full">Manage Your Listing</Button>
+              )}
+              {item.status === 'traded' && <Badge variant="destructive" className="w-full text-center py-2 text-sm">Item Traded</Badge>}
+              {item.status === 'pending' && <Badge variant="secondary" className="w-full text-center py-2 text-sm">Trade Pending</Badge>}
+            </CardFooter>
+          </div>
         </div>
+      </Card>
+
+      {!isCurrentUserOwner && item.status === 'available' && (
+        <Suspense fallback={<SuggestedMatchesLoadingState />}>
+          <SuggestedMatches currentItem={item} />
+        </Suspense>
+      )}
+      {/* <TemporaryAdminMatchTestPanelClient itemToTest={item} /> */}
+    </div>
+  );
+}
+
+function ItemPageLoadingState() {
+  return (
+    <div className="container mx-auto px-4 py-8 space-y-8 animate-pulse">
+      <Card className="overflow-hidden shadow-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2">
+          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted"></div>
+          <div className="p-6 flex flex-col">
+            <CardHeader className="p-0 pb-4">
+              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div>
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/2 mb-1"></div>
+              <div className="h-5 bg-muted-foreground/20 rounded w-1/4"></div>
+            </CardHeader>
+            <CardContent className="p-0 flex-grow">
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-1"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-1"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div>
+              <Separator className="my-4" />
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted-foreground/20"></div>
+                <div>
+                  <div className="h-5 bg-muted-foreground/20 rounded w-24 mb-1"></div>
+                  <div className="h-4 bg-muted-foreground/20 rounded w-32"></div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="p-0 pt-6">
+              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>
+            </CardFooter>
+          </div>
+        </div>
+      </Card>
+      <div className="h-40 bg-muted rounded-lg"></div>
+    </div>
+  );
+}
+
+function SuggestedMatchesLoadingState() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-headline text-xl flex items-center gap-2">
+          <Loader2 className="h-6 w-6 text-primary animate-spin" />
+          Loading Suggested Matches...
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50 animate-pulse">
+              <div className="aspect-[4/3] bg-muted"></div>
+              <CardContent className="p-4 flex-grow space-y-2">
+                <div className="h-5 bg-muted-foreground/20 rounded w-3/4"></div>
+                <div className="h-4 bg-muted-foreground/20 rounded w-full"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function ItemDetailPageWrapper({ params: paramsProp }: { params: { id: string } }) {
+  const params = use(paramsProp);
+  // console.log('[ItemDetailPageWrapper] Rendering, params resolved by `use`');
+
+  if (!params || !params.id) {
+    // console.error('[ItemDetailPageWrapper] Params or params.id is missing.');
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="border-destructive">
+          <CardHeader><CardTitle className="text-destructive font-headline">Error: Missing Item ID</CardTitle></CardHeader>
+          <CardContent><p className="font-body">The item ID was not provided in the request.</p></CardContent>
+        </Card>
+      </div>
     );
   }
+  
+  return (
+    <Suspense fallback={<ItemPageLoadingState />}>
+      <ItemDetailsDisplay itemId={params.id} />
+    </Suspense>
+  );
 }
+
+    
