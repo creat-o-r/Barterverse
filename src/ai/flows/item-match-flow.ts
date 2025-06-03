@@ -68,7 +68,7 @@ const PromptOutputSchema = z.object({
       matchScore: z.enum(["High", "Medium", "Low"]),
     })
   ),
-  reasoning: z.string().optional(),
+  reasoning: z.string().optional(), // Allow AI to omit reasoning if it truly has none, flow will provide default
 });
 
 
@@ -127,8 +127,8 @@ Do not suggest:
 - Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}) as direct matches for their own items.
 
 Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
-If no good matches are found, return an empty list for 'suggestedMatches'.
-Optionally, provide a brief (1-2 sentences) overall reasoning for your suggestions.
+If no good matches are found, return an empty list for 'suggestedMatches' AND provide a brief reasoning like "No direct matches found based on strong keyword or category overlap, but users might explore items based on broader interests."
+Optionally, if matches are found, provide a brief (1-2 sentences) overall reasoning for your suggestions.
 Identify several relevant matches if possible, covering different scenarios or levels of relevance if applicable.
   `,
 });
@@ -142,15 +142,15 @@ const advancedItemMatchPrompt = ai.definePrompt({
 
 Current Item Details:
 ID: {{{currentItem.id}}}
-Name: "{{currentItem.name}}"
-Description: "{{currentItem.description}}"
-Category: "{{currentItem.category}}"
+Name: "{{{currentItem.name}}}"
+Description: "{{{currentItem.description}}}"
+Category: "{{{currentItem.category}}}"
 Listed As: {{{currentItem.listingType}}} (by user {{{currentItem.ownerId}}})
 
 {{#if triggeringUserPreferences}}
 The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the following preferences:
 {{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
-{{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{triggeringUserPreferences.locationPreference.notes}}"{{/if}}){{/if}}
+{{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
 {{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else if triggeringUserPreferences.interestedInThirdPartyFulfillment === false}} - Open to 3rd Party Fulfillment: No{{/if}}
 Consider these preferences when evaluating match quality. For example, if the user is 'convenience-focused', items requiring complex shipping might be lower priority unless highly desired.
@@ -182,16 +182,17 @@ Assign a match score ("High", "Medium", "Low") based on:
     -   Some alignment with user preferences, or no strong misalignment.
 - "Low":
     -   Plausible but less direct connection. Items might be in different categories but could have niche appeal.
-    -   A more speculative trade, perhaps relying on broader user interests or unstated needs.
+    -   A more speculative trade, perhaps relying on broader user interests or unstated needs. Even a low match can be interesting if nothing stronger is found.
     -   May partially align with preferences or have some conflicting aspects (e.g., 'convenience-focused' user but item is far).
 
 Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
-Return a list of 'suggestedMatches' (itemId, matchScore) and a brief 'reasoning' (1-2 sentences for overall approach or key finds).
-If no suitable matches are found, return an empty list for 'suggestedMatches'.
-Aim for quality over quantity.
+Return a list of 'suggestedMatches' (itemId, matchScore).
+If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach or key finds.
+If NO suitable matches are found, return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why no strong reciprocal matches were identified (e.g., "Could not find direct want fulfillments or highly complementary offers for '[Current Item Name]' from the available items. Users might need to browse more broadly.").
+Aim for quality over quantity, but try to find at least one or two "Low" matches if nothing better is available, rather than nothing.
 `,
 });
 
@@ -225,10 +226,9 @@ const itemMatchFlow = ai.defineFlow(
         const output: ItemMatchOutput = {
             suggestedMatches: [],
             reasoning: reasoning,
-            usedMatchingMode: usedMatchingMode, // Could be simple or advanced depending on setting
-            preferencesConsidered: false, // No items, so no prefs considered in matching
+            usedMatchingMode: usedMatchingMode, 
+            preferencesConsidered: false, 
         };
-        // Log this outcome
         await logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
@@ -241,7 +241,7 @@ const itemMatchFlow = ai.defineFlow(
         return output;
     }
 
-    finalInputForPrompt.availableItems = itemsToConsider; // Use filtered list for prompts
+    finalInputForPrompt.availableItems = itemsToConsider; 
 
 
     if (currentMatchingMode === 'advanced') {
@@ -255,7 +255,6 @@ const itemMatchFlow = ai.defineFlow(
             tradeTimingPreference: userProfile.tradeTimingPreference,
             interestedInThirdPartyFulfillment: userProfile.interestedInThirdPartyFulfillment,
           };
-          // Only add preferences if some are actually defined
           if (Object.values(userPrefs).some(val => val !== undefined && (!Array.isArray(val) || val.length > 0))) {
              finalInputForPrompt.triggeringUserPreferences = userPrefs;
              preferencesConsidered = true;
@@ -263,17 +262,22 @@ const itemMatchFlow = ai.defineFlow(
         }
       }
     } else {
-      // Simple mode, no preferences considered for the prompt itself
-      usedMatchingMode = 'simple'; // Ensure this is set if default was advanced but overridden
+      usedMatchingMode = 'simple'; 
     }
 
 
     try {
       const { output: promptOutput } = await promptToUse(finalInputForPrompt);
 
+      let defaultReasoning = `AI (${usedMatchingMode} mode) did not find strong matches for "${input.currentItem.name}" based on the current criteria. Users might explore other items or categories.`;
+      if (itemsToConsider.length < 3) { // If very few items were available to match against
+          defaultReasoning = `AI (${usedMatchingMode} mode) had limited options to find strong matches for "${input.currentItem.name}". More items from other users might yield better suggestions.`;
+      }
+
+
       if (!promptOutput) {
           console.warn(`${flowName} (${usedMatchingMode} mode): Prompt returned null output`);
-          const errorReasoning = `The AI assistant (${usedMatchingMode} mode) could not generate suggestions at this time.`;
+          const errorReasoning = `The AI assistant (${usedMatchingMode} mode) could not generate suggestions at this time. The model might be unavailable or returned an empty response.`;
           const errorOutput: ItemMatchOutput = {
               suggestedMatches: [],
               reasoning: errorReasoning,
@@ -291,19 +295,23 @@ const itemMatchFlow = ai.defineFlow(
           });
           return errorOutput;
       }
-
-      // Augment matches with ownerId from the itemsToConsider list
+      
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
           ...aiSuggestion,
           ownerId: originalItem?.ownerId || 'unknown_owner',
         };
-      }).filter(match => match.ownerId !== 'unknown_owner'); // Filter out if owner couldn't be found (should not happen)
+      }).filter(match => match.ownerId !== 'unknown_owner'); 
+
+      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning) 
+                               ? defaultReasoning 
+                               : promptOutput.reasoning || (augmentedMatches.length > 0 ? `Found some potential matches for "${input.currentItem.name}".` : defaultReasoning);
+
 
       const validatedOutput: ItemMatchOutput = {
         suggestedMatches: augmentedMatches,
-        reasoning: promptOutput.reasoning,
+        reasoning: finalReasoning,
         usedMatchingMode,
         preferencesConsidered,
       };
