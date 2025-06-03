@@ -142,7 +142,7 @@ const advancedItemMatchPrompt = ai.definePrompt({
   name: 'advancedItemMatchPrompt',
   input: {schema: AdvancedItemMatchPromptInputSchema},
   output: {schema: PromptOutputSchema},
-  prompt: `You are an expert AI trade facilitator for a bartering platform. Your goal is to identify highly relevant and mutually beneficial trade opportunities.
+  prompt: `You are an expert AI trade facilitator for a bartering platform. Your goal is to identify highly relevant and mutually beneficial trade opportunities by considering reciprocal want fulfillment.
 
 Current Item Details:
 ID: {{{currentItem.id}}}
@@ -155,26 +155,38 @@ Is Gift: {{#if currentItem.isGiftItForward}}Yes{{else}}No{{/if}}
 This Item's Specific Minimum Match Requirement: '{{{currentItem.minimumMatchRatingOverride}}}' (Overrides user's global preference for this item).
 {{/if}}
 
-The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the following preferences:
+The user viewing these suggestions (ID: {{{triggeringUserId}}}), who owns/wants the 'Current Item', has the following preferences:
 {{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
  - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
+(Consider these preferences when evaluating if an item from another user fulfills the triggeringUser's wants. Also, consider other 'want' items listed by {{{triggeringUserId}}} if available in 'Available Items'.)
 
 Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: IsGift :: Description):
 {{#each availableItems}}
 - {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{{description}}}
 {{/each}}
 
-Analyze the "Current Item" against the "Available Items" to find potential trades. A good match involves RECIPROCAL interest or clear fulfillment of needs.
+RECIPROCAL MATCH SCORE ASSIGNMENT ("High", "Medium", "Low"):
+The primary goal is to find items where the 'Current Item' (owned/wanted by {{{triggeringUserId}}}) fulfills a need of an 'Available Item' (owned/wanted by another user, let's call them User B), AND an 'Available Item' (owned by User B) fulfills a need of the 'triggeringUser'. Also indicate if the suggested matched item 'isGiftItForward'.
 
-Match Score Assignment: Assign "High", "Medium", or "Low" based on factors like direct fulfillment, complementarity, and alignment with user preferences. Also indicate if the suggested matched item 'isGiftItForward'.
+- "High" Match:
+    1. The 'Current Item' ({{{currentItem.listingType}}}) strongly fulfills a complementary 'Available Item' from User B (e.g., your Offer for User B's Want, or your Want for User B's Offer).
+    2. AND, another 'Available Item' (an Offer from that same User B) clearly fulfills an explicit or strongly implied 'want' of the 'triggeringUser' ({{{triggeringUserId}}}). Consider {{{triggeringUserPreferences.motivations}}}, other 'want' items listed by {{{triggeringUserId}}}, or needs inferred from their 'currentItem' context. *Essentially, all explicit wants in a potential 2-way exchange are clearly met.*
 
-GIFT MATCHING:
-- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked as 'isGiftItForward: true' that clearly fulfills this want by category/description, this is generally a 'High' match.
-- If 'Current Item' is an 'offer' marked as 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a strong match.
-When a gift fulfillment occurs, the 'reciprocal potential' is less about item-for-item and more about community goodwill, but still a positive factor.
+- "Medium" Match:
+    1. The 'Current Item' ({{{currentItem.listingType}}}) fulfills a complementary 'Available Item' from User B.
+    2. AND, another 'Available Item' (an Offer from that same User B) partially fulfills or aligns with some of the 'triggeringUser's' preferences or *potential* wants. *Reciprocal benefit is good, but triggeringUser's wants are not all perfectly or explicitly met by User B's offer.*
+
+- "Low" Match:
+    1. The 'Current Item' ({{{currentItem.listingType}}}) has a plausible connection to a complementary 'Available Item' from User B.
+    2. AND, another 'Available Item' (an Offer from that same User B) might speculatively fulfill an *inferred or less obvious* want of the 'triggeringUser'.
+    Alternatively, the primary match (Current Item to an Available Item) is weaker but still plausible, even if strong reciprocal want fulfillment isn't clear. Or if it's an offer-offer match with general appeal but no clear want fulfillment.
+
+GIFT FULFILLMENT OVERRIDE:
+- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked 'isGiftItForward: true' that clearly fulfills this want, this is a 'High' match, overriding other reciprocity scoring for this specific gift.
+- If 'Current Item' is an 'offer' marked 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a 'High' match.
 
 MINIMUM MATCH SCORE RULE:
 {{#if currentItem.minimumMatchRatingOverride}}
@@ -183,23 +195,11 @@ The 'Current Item' has an OVERRIDE, REQUIRING suggestions to have a match score 
 The 'Current Item' uses the user's profile preference. The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level. You MUST NOT suggest items with a match score lower than this.
 {{/if}}
 
-Prioritize:
-1.  Direct Fulfillment & Gift Fulfillments:
-    *   If 'currentItem' is 'offer': Find 'want' items from 'availableItems' that 'currentItem' directly satisfies. If 'currentItem' is 'isGiftItForward: true', this is a strong match.
-    *   If 'currentItem' is 'want': Find 'offer' items from 'availableItems' that directly satisfy 'currentItem's want. If an 'availableItem' is 'isGiftItForward: true' and fulfills the want, this is a strong match.
-2.  Strong Complementary Offers: If 'currentItem' is 'offer' (and not a gift), find 'offer' items from 'availableItems' that would make a compelling direct swap.
-3.  Reciprocal Potential: If a direct match is found (e.g., your Offer for their Want), is there also an item among their Offers (in 'availableItems') that might fulfill a potential Want of yours (related to 'currentItem' or user preferences)? Higher scores for matches that could lead to a good 2-way trade.
-
-Assign a match score ("High", "Medium", "Low") based on:
-- "High": Excellent direct fulfillment (including gift fulfillment) OR highly complementary 'offer'-'offer' swap with strong mutual interest. Strong alignment with explicit preferences. High potential for a reciprocal trade.
-- "Medium": Good potential for mutual benefit. One item generally addresses the type/category of the other. Some alignment with preferences. Some reciprocal potential.
-- "Low": Plausible but less direct connection. More speculative. May partially align with preferences. Minimal reciprocal potential.
-
 Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
-Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status) if available, ensuring ALL suggested items meet the applicable minimum match score rule mentioned above. Aim for variety and strong reciprocal potential if multiple good options exist.
+Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status) if available, ensuring ALL suggested items meet the applicable minimum match score rule. Aim for variety and strong reciprocal potential if multiple good options exist.
 If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential or gift fulfillments if significant.
 If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
   `,
@@ -250,7 +250,7 @@ const itemMatchFlow = ai.defineFlow(
         ...item,
         isGiftItForward: item.isGiftItForward || false, // Ensure boolean
     }));
-    finalInputForPrompt.currentItem = { 
+    finalInputForPrompt.currentItem = {
         ...input.currentItem,
         minimumMatchRatingOverride: input.currentItem.minimumMatchRatingOverride,
         isGiftItForward: input.currentItem.isGiftItForward || false, // Ensure boolean
