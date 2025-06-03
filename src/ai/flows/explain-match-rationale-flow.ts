@@ -18,13 +18,13 @@ const ItemDetailSchema = z.object({
   listingType: z.enum(['offer', 'want']),
 });
 
-export const ExplainMatchRationaleInputSchema = z.object({
+const ExplainMatchRationaleInputSchema = z.object({
   itemA: ItemDetailSchema.describe("The first item in the potential match."),
   itemB: ItemDetailSchema.describe("The second item in the potential match."),
 });
 export type ExplainMatchRationaleInput = z.infer<typeof ExplainMatchRationaleInputSchema>;
 
-export const ExplainMatchRationaleOutputSchema = z.object({
+const ExplainMatchRationaleOutputSchema = z.object({
   rationale: z.string().describe("The AI-generated explanation for why these two items might be a good match for a trade."),
   errorMessage: z.string().optional().describe("An error message if rationale generation failed."),
 });
