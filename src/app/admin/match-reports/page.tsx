@@ -12,12 +12,12 @@ import {
   getEnableAutomaticPreferenceInference,
   setEnableAutomaticPreferenceInference as setEnableAutomaticPreferenceInferenceService
 } from '@/services/ai-config-service';
-import { getFeedbackLogContent } from '@/services/feedback-service';
-import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service'; // New import
+import { getFeedbackLogContent, clearFeedbackLog as clearFeedbackLogService } from '@/services/feedback-service';
+import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,17 @@ import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
 import AdminAIPreferenceInsights from '@/components/admin/AdminAIPreferenceInsights';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 function getMatchScoreColor(score?: string) {
   switch (score?.toLowerCase()) {
@@ -56,6 +67,8 @@ export default function MatchReportsPage() {
   const [isCopyingFeedbackLog, setIsCopyingFeedbackLog] = useState(false);
   const [isCopyingMatchLog, setIsCopyingMatchLog] = useState(false);
   const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
+  const [isClearingFeedbackLog, setIsClearingFeedbackLog] = useState(false);
+  const [showClearFeedbackDialog, setShowClearFeedbackDialog] = useState(false);
   const { toast } = useToast();
 
   const fetchReports = async () => {
@@ -162,6 +175,22 @@ export default function MatchReportsPage() {
   const handleCopyMatchLog = () => copyToClipboard(getMatchSuggestionLogRawContent, setIsCopyingMatchLog, "Raw Match Suggestion Log");
   const handleCopyDiagnosticLog = () => copyToClipboard(getAIDiagnosticLogContent, setIsCopyingDiagnosticLog, "AI Diagnostic Log");
 
+  const performClearFeedbackLog = async () => {
+    setIsClearingFeedbackLog(true);
+    try {
+      const result = await clearFeedbackLogService();
+      if (result.success) {
+        toast({ title: "Feedback Log Cleared", description: result.message });
+      } else {
+        toast({ title: "Clear Failed", description: result.message || "Could not clear feedback log.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Clear Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsClearingFeedbackLog(false);
+      setShowClearFeedbackDialog(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 py-8">
@@ -279,6 +308,33 @@ export default function MatchReportsPage() {
                 <ClipboardCopy className={`mr-2 h-4 w-4 ${isCopyingFeedbackLog ? 'animate-spin' : ''}`} />
                 {isCopyingFeedbackLog ? "Copying..." : "Copy Feedback Log"}
             </Button>
+            <AlertDialog open={showClearFeedbackDialog} onOpenChange={setShowClearFeedbackDialog}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                  <Trash2 className="mr-2 h-4 w-4" /> Clear Feedback Log
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action will permanently delete all entries from the Feedback Log. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isClearingFeedbackLog}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={performClearFeedbackLog}
+                    disabled={isClearingFeedbackLog}
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  >
+                    {isClearingFeedbackLog && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                    Clear Log
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Button onClick={handleCopyMatchLog} disabled={isCopyingMatchLog} variant="outline" size="sm">
                 <ClipboardCopy className={`mr-2 h-4 w-4 ${isCopyingMatchLog ? 'animate-spin' : ''}`} />
                 {isCopyingMatchLog ? "Copying..." : "Copy Raw Match Log"}

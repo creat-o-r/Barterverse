@@ -82,7 +82,7 @@ export async function getFeedbackLogContent(): Promise<{ success: boolean; conte
       return { success: true, content: "[]" }; // Return empty array string if file is empty
     }
     // Validate if it's JSON before returning
-    JSON.parse(fileContent); 
+    JSON.parse(fileContent);
     return { success: true, content: fileContent };
   } catch (error: any) {
     if (error.code === 'ENOENT') {
@@ -93,5 +93,17 @@ export async function getFeedbackLogContent(): Promise<{ success: boolean; conte
          return { success: false, error: 'Feedback log file is not valid JSON. Please check its content.' };
     }
     return { success: false, error: 'Could not read feedback log file.' };
+  }
+}
+
+export async function clearFeedbackLog(): Promise<{ success: boolean; message?: string }> {
+  try {
+    // Overwrite the file with an empty JSON array
+    const writeSuccess = await fs.writeFile(FEEDBACK_LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+    console.log('[Feedback Service] Feedback log cleared.');
+    return { success: true, message: 'Feedback log cleared successfully.' };
+  } catch (error: any) {
+    console.error('[Feedback Service] Error clearing feedback log file:', error);
+    return { success: false, message: 'Failed to clear feedback log file.' };
   }
 }
