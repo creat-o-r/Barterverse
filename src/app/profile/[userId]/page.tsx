@@ -4,13 +4,13 @@
 import { use, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
-import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences } from '@/types';
+import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, UserLogisticsPreferences, UserStoredLocation } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -24,14 +24,12 @@ async function getUserProfile(userId: string): Promise<User | null> {
   let user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
   
-  // Ensure minimumMatchRating has a default of 'Low' if somehow undefined
   if (user.minimumMatchRating === undefined) {
     user.minimumMatchRating = 'Low';
   }
 
-  // Ensure items are fresh for each fetch, in case new items were added globally
   const userItemsFromGlobal = dummyItems.filter(item => item.ownerId === user.id);
-  return JSON.parse(JSON.stringify({...user, items: userItemsFromGlobal})); // Deep copy
+  return JSON.parse(JSON.stringify({...user, items: userItemsFromGlobal}));
 }
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
@@ -43,20 +41,20 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
 
   const userListedItems = dummyItems
     .filter(i => i.ownerId === user.id && (i.status === 'available' || i.status === 'pending'))
-    .slice(0, 5) // Take up to 5 items
+    .slice(0, 5) 
     .map(item => ({
       name: item.name,
-      description: item.description.substring(0,100) + (item.description.length > 100 ? "..." : ""), // Truncate for brevity
+      description: item.description.substring(0,100) + (item.description.length > 100 ? "..." : ""),
       category: item.category,
       listingType: item.listingType,
     }));
 
-  const currentPrefs: UserProfilePreferencesType = { // User type ensures minimumMatchRating is present
+  const currentPrefs: UserProfilePreferencesType = { 
     motivations: user.motivations,
     locationPreference: user.locationPreference,
     tradeTimingPreference: user.tradeTimingPreference,
     interestedInThirdPartyFulfillment: user.interestedInThirdPartyFulfillment,
-    minimumMatchRating: user.minimumMatchRating, // Will always be 'Low', 'Medium', or 'High'
+    minimumMatchRating: user.minimumMatchRating || 'Low',
   };
   
   const engagementNotes: string[] = [];
@@ -81,7 +79,7 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
   return {
     userId: user.id,
     listedItems: userListedItems,
-    currentPreferences: currentPrefs, // Pass the full currentPrefs object
+    currentPreferences: currentPrefs,
     simulatedChatSnippets,
     engagementNotes,
     tradesCompleted: user.tradesCompleted,
@@ -95,6 +93,78 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
     <span className="ml-2 text-sm text-muted-foreground">{score.toFixed(1)} {count ? `(${count} ratings)` : ''}</span>
   </div>
 );
+
+const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile }: { logisticsPreferences?: UserLogisticsPreferences, locations?: UserStoredLocation[], isOwnProfile: boolean }) => {
+  if (!logisticsPreferences && (!locations || locations.length === 0)) {
+    return (
+      <CardContent>
+        <p className="text-muted-foreground font-body">Default logistics preferences not set up yet.</p>
+        {isOwnProfile && (
+          <Button variant="outline" size="sm" className="mt-3">
+            <Edit3 className="mr-2 h-4 w-4" /> Set Up Default Logistics
+          </Button>
+        )}
+      </CardContent>
+    );
+  }
+
+  const shippingOptionMap = {
+    pickup_only: "Local Pickup Only",
+    ship_domestic: "Willing to Ship (Domestic)",
+    ship_international: "Willing to Ship (International)",
+  };
+
+  const meetupOptionMap = {
+    public_meetup: "Public Meetup Preferred",
+    flexible: "Flexible Meetup",
+  };
+
+  const preferredLocation = logisticsPreferences?.preferredStoredLocationId && locations
+    ? locations.find(loc => loc.id === logisticsPreferences.preferredStoredLocationId)
+    : null;
+
+  return (
+    <CardContent className="space-y-3 pt-2">
+      {logisticsPreferences?.defaultShippingOption && (
+        <div>
+          <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" />Default Shipping:</h4>
+          <Badge variant="outline" className="text-xs">{shippingOptionMap[logisticsPreferences.defaultShippingOption] || logisticsPreferences.defaultShippingOption}</Badge>
+        </div>
+      )}
+      {logisticsPreferences?.defaultMeetupOption && (
+        <div>
+          <h4 className="font-headline text-md flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground" />Default Meetup:</h4>
+          <Badge variant="outline" className="text-xs">{meetupOptionMap[logisticsPreferences.defaultMeetupOption] || logisticsPreferences.defaultMeetupOption}</Badge>
+        </div>
+      )}
+      {preferredLocation ? (
+        <div>
+          <h4 className="font-headline text-md flex items-center gap-1.5">
+            {preferredLocation.name.toLowerCase().includes('work') || preferredLocation.name.toLowerCase().includes('office') ? <Briefcase className="h-4 w-4 text-muted-foreground" /> : <Home className="h-4 w-4 text-muted-foreground" />}
+            Preferred Item Location:
+          </h4>
+          <Badge variant="outline" className="text-xs">{preferredLocation.name} ({preferredLocation.address || 'Address not specified'})</Badge>
+        </div>
+      ) : logisticsPreferences?.preferredStoredLocationId ? (
+         <div>
+          <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" />Preferred Item Location:</h4>
+          <Badge variant="outline" className="text-xs">Stored location ID: {logisticsPreferences.preferredStoredLocationId} (Details not found)</Badge>
+        </div>
+      ) : (
+         <div>
+          <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" />Preferred Item Location:</h4>
+          <Badge variant="outline" className="text-xs">Not set</Badge>
+        </div>
+      )}
+      {isOwnProfile && (
+        <Button variant="outline" size="sm" className="mt-4">
+          <Edit3 className="mr-2 h-4 w-4" /> Edit Default Logistics
+        </Button>
+      )}
+    </CardContent>
+  );
+};
+
 
 export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
   const resolvedParams = use(paramsProp); 
@@ -147,7 +217,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       if (result.errorMessage || !result.suggestedPreferences) {
         toast({ title: "AI Preference Learning Error", description: result.errorMessage || "Could not infer preferences.", variant: "destructive" });
       } else {
-        // Type assertion for updateUserPreferencesInDummyData
+        
         const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences as InferredUserPreferences);
         if (updateSuccess) {
           const updatedProfile = await getUserProfile(user.id); 
@@ -178,7 +248,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
   const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
   const tradedOrFulfilledItems = user.items.filter(item => item.status === 'traded');
   
-  // minimumMatchRating is now guaranteed to be set on the user object
   const effectiveMinimumMatchRating = user.minimumMatchRating;
 
   return (
@@ -256,6 +325,32 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       </Card>
 
       <Separator />
+
+       <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <CardTitle className="font-headline text-xl flex items-center gap-3">
+              <Truck className="h-6 w-6 text-primary" />Default Logistics Preferences
+            </CardTitle>
+            {isOwnProfile && (
+               <Button variant="outline" size="sm" disabled> {/* Button is disabled for now */}
+                <Edit3 className="mr-2 h-4 w-4" /> Edit Default Logistics
+              </Button>
+            )}
+          </div>
+           <CardDescription className="font-body mt-1">
+            These are {user.name}&apos;s default settings for item location, shipping, and meetups. Items can override these.
+          </CardDescription>
+        </CardHeader>
+        <DefaultLogisticsDisplay 
+            logisticsPreferences={user.logisticsPreferences} 
+            locations={user.locations}
+            isOwnProfile={isOwnProfile}
+        />
+      </Card>
+
+
+      <Separator />
       <section><h2 className="text-2xl font-headline mb-4 flex items-center gap-2"><Gift className="h-6 w-6 text-green-600" />Items Offered ({offeredItems.length})</h2>{offeredItems.length > 0 ? <ItemList items={offeredItems} /> : <p className="text-muted-foreground font-body">This user has no items currently offered for trade.</p>}</section>
       <Separator />
       <section><h2 className="text-2xl font-headline mb-4 flex items-center gap-2"><Search className="h-6 w-6 text-blue-600" />Items Wanted ({wantedItems.length})</h2>{wantedItems.length > 0 ? <ItemList items={wantedItems} /> : <p className="text-muted-foreground font-body">This user is not currently looking for any specific items.</p>}</section>
@@ -266,3 +361,4 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
+
