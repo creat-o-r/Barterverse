@@ -11,10 +11,12 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput } from '@/ai/flows/explain-match-rationale-flow';
+import { logFeedbackEntry } from '@/services/feedback-service';
+import { useToast } from "@/hooks/use-toast";
 
 
 // Helper to get item and owner details
@@ -114,6 +116,7 @@ const generalMatchScoreCriteria: Record<string, { title: string; points: string[
 
 export default function OpportunityMatchPage() {
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const mainItemIdQuery = searchParams.get('mainItemId');
   const suggestedItemIdQuery = searchParams.get('suggestedItemId');
   const matchScoreQuery = searchParams.get('score');
@@ -126,6 +129,8 @@ export default function OpportunityMatchPage() {
   const [loadingReasoning, setLoadingReasoning] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null); 
   const [matchScore, setMatchScore] = useState<string | null>(null);
+  const [isReportingScore, setIsReportingScore] = useState(false);
+  const [isReportingReasoning, setIsReportingReasoning] = useState(false);
 
   const currentUserId = dummyUsers[0].id; 
 
@@ -195,6 +200,53 @@ export default function OpportunityMatchPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery]);
+
+  const handleReportScore = async () => {
+    if (!matchScore) return;
+    setIsReportingScore(true);
+    try {
+      const result = await logFeedbackEntry({
+        feedbackType: 'match-score',
+        reportedValue: matchScore,
+        mainItemId: mainItemIdQuery,
+        suggestedItemId: suggestedItemIdQuery,
+        reportingUserId: currentUserId,
+      });
+      if (result.success) {
+        toast({ title: "Score Reported", description: "Thank you for your feedback on the match score!" });
+      } else {
+        toast({ title: "Report Failed", description: result.message || "Could not log score feedback.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Report Error", description: "An error occurred while reporting the score.", variant: "destructive" });
+    } finally {
+      setIsReportingScore(false);
+    }
+  };
+
+  const handleReportReasoning = async () => {
+    if (!opportunityReasoning) return;
+    setIsReportingReasoning(true);
+    try {
+      const result = await logFeedbackEntry({
+        feedbackType: 'match-reasoning',
+        reportedValue: opportunityReasoning,
+        mainItemId: mainItemIdQuery,
+        suggestedItemId: suggestedItemIdQuery,
+        reportingUserId: currentUserId,
+      });
+      if (result.success) {
+        toast({ title: "Reasoning Reported", description: "Thank you for your feedback on the reasoning!" });
+      } else {
+        toast({ title: "Report Failed", description: result.message || "Could not log reasoning feedback.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Report Error", description: "An error occurred while reporting the reasoning.", variant: "destructive" });
+    } finally {
+      setIsReportingReasoning(false);
+    }
+  };
+
 
   if (loading) {
     return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><ArrowRightLeft className="h-5 w-5 animate-spin" /> Loading opportunity details...</div>;
@@ -326,6 +378,28 @@ export default function OpportunityMatchPage() {
                             <p className="text-sm font-body text-muted-foreground">No AI insights available for this specific pairing.</p>
                         )}
                     </CardContent>
+                    <CardFooter className="pt-4 flex flex-col sm:flex-row gap-2 justify-end border-t mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleReportScore}
+                        disabled={isReportingScore || !matchScore || !!insightsError || loadingReasoning}
+                        className="text-xs"
+                      >
+                        {isReportingScore ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Flag className="mr-1.5 h-3.5 w-3.5" />}
+                        Report Score
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleReportReasoning}
+                        disabled={isReportingReasoning || !opportunityReasoning || !!insightsError || loadingReasoning}
+                        className="text-xs"
+                      >
+                        {isReportingReasoning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileWarning className="mr-1.5 h-3.5 w-3.5" />}
+                        Report Reasoning
+                      </Button>
+                    </CardFooter>
                 </Card>
             )}
           </div>
