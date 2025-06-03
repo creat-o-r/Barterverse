@@ -11,14 +11,14 @@ const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 interface AISettings {
   matchingMode: AIMatchingMode;
   useUserProfilePreferencesInMatching: boolean;
-  enableAutomaticPreferenceInference: boolean; // New setting
+  enableAutomaticPreferenceInference: boolean;
 }
 
 // Default settings
 const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
-  enableAutomaticPreferenceInference: false, // Default to false
+  enableAutomaticPreferenceInference: false,
 };
 
 async function readSettings(): Promise<AISettings> {
@@ -26,26 +26,37 @@ async function readSettings(): Promise<AISettings> {
     await fs.access(SETTINGS_FILE_PATH);
     const fileContent = await fs.readFile(SETTINGS_FILE_PATH, 'utf-8');
     if (fileContent.trim() === '') {
-      await writeSettings(defaultSettings);
+      // If file is empty, write defaults and return them
+      const writeSuccess = await writeSettings(defaultSettings);
+      if (!writeSuccess) {
+        console.error('[AI Config Service] Failed to write default settings to empty file. Using in-memory defaults.');
+      }
       return defaultSettings;
     }
     const parsedSettings = JSON.parse(fileContent);
     return { ...defaultSettings, ...parsedSettings };
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      await writeSettings(defaultSettings);
+      // If file doesn't exist, create it with defaults
+      const writeSuccess = await writeSettings(defaultSettings);
+       if (!writeSuccess) {
+        console.error('[AI Config Service] Failed to write default settings to new file. Using in-memory defaults.');
+      }
       return defaultSettings;
     }
-    console.error('[AI Config Service] Error reading settings file:', error);
+    console.error('[AI Config Service] Error reading settings file, using defaults:', error);
+    // For other errors (e.g., malformed JSON), return defaults
     return defaultSettings; 
   }
 }
 
-async function writeSettings(settings: AISettings): Promise<void> {
+async function writeSettings(settings: AISettings): Promise<boolean> {
   try {
     await fs.writeFile(SETTINGS_FILE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+    return true; // Indicate success
   } catch (error) {
     console.error('[AI Config Service] Error writing settings file:', error);
+    return false; // Indicate failure
   }
 }
 
@@ -58,12 +69,15 @@ export async function setAIMatchingMode(mode: AIMatchingMode): Promise<{success:
   try {
     const currentSettings = await readSettings();
     currentSettings.matchingMode = mode;
-    await writeSettings(currentSettings);
+    const writeSuccess = await writeSettings(currentSettings);
+    if (!writeSuccess) {
+      return { success: false, message: 'Failed to save AI matching mode to the settings file.' };
+    }
     console.log(`[AI Config Service] AI Matching Mode set to: ${mode}`);
     return { success: true, message: `AI Matching Mode set to ${mode}.` };
   } catch (error: any) {
-    console.error('[AI Config Service] Error in setAIMatchingMode:', error);
-    return { success: false, message: 'Failed to update AI matching mode.' };
+    console.error('[AI Config Service] Unexpected error in setAIMatchingMode:', error);
+    return { success: false, message: 'An unexpected error occurred while updating AI matching mode.' };
   }
 }
 
@@ -76,12 +90,15 @@ export async function setUseUserProfilePreferencesInMatching(usePrefs: boolean):
   try {
     const currentSettings = await readSettings();
     currentSettings.useUserProfilePreferencesInMatching = usePrefs;
-    await writeSettings(currentSettings);
+    const writeSuccess = await writeSettings(currentSettings);
+     if (!writeSuccess) {
+      return { success: false, message: 'Failed to save user preference setting for matching to the settings file.' };
+    }
     console.log(`[AI Config Service] Use User Profile Preferences in Matching set to: ${usePrefs}`);
     return { success: true, message: `Consideration of user preferences in matching set to ${usePrefs}.` };
   } catch (error: any) {
-    console.error('[AI Config Service] Error in setUseUserProfilePreferencesInMatching:', error);
-    return { success: false, message: 'Failed to update user preference setting for matching.' };
+    console.error('[AI Config Service] Unexpected error in setUseUserProfilePreferencesInMatching:', error);
+    return { success: false, message: 'An unexpected error occurred while updating user preference setting for matching.' };
   }
 }
 
@@ -94,11 +111,14 @@ export async function setEnableAutomaticPreferenceInference(enable: boolean): Pr
   try {
     const currentSettings = await readSettings();
     currentSettings.enableAutomaticPreferenceInference = enable;
-    await writeSettings(currentSettings);
+    const writeSuccess = await writeSettings(currentSettings);
+    if (!writeSuccess) {
+      return { success: false, message: 'Failed to save automatic preference inference setting to the settings file.' };
+    }
     console.log(`[AI Config Service] Automatic Preference Inference set to: ${enable}`);
     return { success: true, message: `Automatic AI preference inference ${enable ? 'enabled' : 'disabled'}.` };
   } catch (error: any) {
-    console.error('[AI Config Service] Error in setEnableAutomaticPreferenceInference:', error);
-    return { success: false, message: 'Failed to update automatic preference inference setting.' };
+    console.error('[AI Config Service] Unexpected error in setEnableAutomaticPreferenceInference:', error);
+    return { success: false, message: 'An unexpected error occurred while updating automatic preference inference setting.' };
   }
 }
