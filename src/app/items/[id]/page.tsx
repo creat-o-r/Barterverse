@@ -57,7 +57,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
     <div className="container mx-auto px-4 py-8 space-y-8">
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0">
+          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted"> {/* Added bg-muted */}
             <Image
               src={item.imageUrl || 'https://placehold.co/600x400.png'}
               alt={item.name}
@@ -85,7 +85,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
             </CardHeader>
 
             <CardContent className="p-0 flex-grow">
-              <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap mb-4">{item.description}</p>
+              <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap break-words mb-4">{item.description}</p> {/* Added break-words */}
               <Separator className="my-4" />
               <div className="space-y-3">
                 <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
@@ -133,33 +133,35 @@ function ItemPageLoadingState() {
     <div className="container mx-auto px-4 py-8 space-y-8 animate-pulse">
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted rounded"></div>
+          {/* Image Skeleton */}
+          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted rounded-l-lg md:rounded-l-lg md:rounded-r-none"></div>
+          {/* Details Skeleton */}
           <div className="p-6 flex flex-col">
-            <CardHeader className="p-0 pb-4">
-              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div>
-              <div className="flex items-center gap-2 mb-1">
+            <div className="p-0 pb-4"> {/* Mimicking CardHeader structure */}
+              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div> {/* Title */}
+              <div className="flex items-center gap-2 mb-1"> {/* Badges */}
                 <div className="h-5 w-5 bg-muted-foreground/20 rounded-full"></div>
                 <div className="h-6 bg-muted-foreground/20 rounded w-1/3"></div>
               </div>
-              <div className="h-5 bg-muted-foreground/20 rounded w-1/4"></div>
-            </CardHeader>
-            <CardContent className="p-0 flex-grow">
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
-              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div>
-              <Separator className="my-4" />
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
-              <div className="flex items-center gap-3">
+              <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div> {/* Listing Type Badge */}
+            </div>
+            <div className="p-0 flex-grow"> {/* Mimicking CardContent structure */}
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> {/* Description line 1 */}
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> {/* Description line 2 */}
+              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div> {/* Description line 3 */}
+              <div className="my-4 h-px bg-border"></div> {/* Mimicking Separator */}
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> {/* Owner Details Title */}
+              <div className="flex items-center gap-3"> {/* Owner Info */}
                 <div className="h-12 w-12 rounded-full bg-muted-foreground/20"></div>
                 <div>
                   <div className="h-5 bg-muted-foreground/20 rounded w-24 mb-1"></div>
                   <div className="h-4 bg-muted-foreground/20 rounded w-32"></div>
                 </div>
               </div>
-            </CardContent>
-            <CardFooter className="p-0 pt-6">
-              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>
-            </CardFooter>
+            </div>
+            <div className="p-0 pt-6"> {/* Mimicking CardFooter structure */}
+              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div> {/* Button */}
+            </div>
           </div>
         </div>
       </Card>
@@ -212,9 +214,10 @@ function SuggestedMatchesLoadingState() {
   );
 }
 
+// Main page wrapper component
 export default function ItemDetailPageWrapper({ params: paramsProp }: { params: { id: string } }) {
   // console.log('[ItemDetailPageWrapper] Received paramsProp:', paramsProp);
-  const params = use(paramsProp);
+  const params = use(paramsProp); // This is where 'use' hook is correctly used for params
   // console.log('[ItemDetailPageWrapper] Resolved params by `use`:', params);
 
   if (!params || !params.id) {
@@ -236,3 +239,4 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
     </Suspense>
   );
 }
+
