@@ -35,8 +35,7 @@ const itemFormSchema = z.object({
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional()
-    .describe("Optional override for the minimum match rating for this specific item."),
+  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']),
   isGiftItForward: z.boolean().optional(),
 });
 
@@ -61,7 +60,7 @@ export default function NewItemPage() {
       category: '',
       imageUrl: '',
       listingType: 'offer',
-      minimumMatchRatingOverride: undefined, 
+      minimumMatchRatingOverride: currentUserProfileRating, 
       isGiftItForward: false,
     },
   });
@@ -171,7 +170,7 @@ export default function NewItemPage() {
         listingType: data.listingType,
         imageUrl: data.imageUrl || '', 
         ownerId: currentUserId,
-        minimumMatchRatingOverride: data.minimumMatchRatingOverride, 
+        minimumMatchRatingOverride: data.minimumMatchRatingOverride,
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false, 
       };
       const addedItem = addNewItemToDummyData(newItemData);
@@ -349,7 +348,7 @@ export default function NewItemPage() {
                   <FormItem>
                     <FormLabel className="font-headline flex items-center gap-2">
                       <Filter className="h-5 w-5 text-muted-foreground" />
-                      Minimum Match Rating Override (Optional)
+                      Minimum Match Rating
                     </FormLabel>
                     <Select 
                         onValueChange={field.onChange}
@@ -358,7 +357,7 @@ export default function NewItemPage() {
                     >
                       <FormControl>
                         <SelectTrigger disabled={isLoadingOverall}>
-                          <SelectValue placeholder="Select rating to override profile default..." />
+                          <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -367,9 +366,6 @@ export default function NewItemPage() {
                         <SelectItem value="High">High</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription className="font-body">
-                      If selected, this item will require at least this match quality. Otherwise, your profile default of '{currentUserProfileRating}' will be used.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
