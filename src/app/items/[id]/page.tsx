@@ -7,11 +7,11 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, HelpingHand, Link2 as LinkIcon, Loader2 } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
-// import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient'; // Commented out for now to simplify
+import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient';
 import { Separator } from '@/components/ui/separator';
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
@@ -64,8 +64,8 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
               fill
               className="object-cover"
               data-ai-hint={item.dataAiHint || "item image"}
-              prioritySizesConfig={{sm: '50vw', md: 'calc(50vw - 2rem)'}} // Example sizes, adjust as needed
-              priority
+              priority // Prioritize loading the main item image
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
           <div className="p-6 flex flex-col">
@@ -123,7 +123,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
           <SuggestedMatches currentItem={item} />
         </Suspense>
       )}
-      {/* <TemporaryAdminMatchTestPanelClient itemToTest={item} /> */}
+      <TemporaryAdminMatchTestPanelClient itemToTest={item} />
     </div>
   );
 }
@@ -133,16 +133,19 @@ function ItemPageLoadingState() {
     <div className="container mx-auto px-4 py-8 space-y-8 animate-pulse">
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted"></div>
+          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted rounded"></div>
           <div className="p-6 flex flex-col">
             <CardHeader className="p-0 pb-4">
               <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div>
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/2 mb-1"></div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="h-5 w-5 bg-muted-foreground/20 rounded-full"></div>
+                <div className="h-6 bg-muted-foreground/20 rounded w-1/3"></div>
+              </div>
               <div className="h-5 bg-muted-foreground/20 rounded w-1/4"></div>
             </CardHeader>
             <CardContent className="p-0 flex-grow">
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-1"></div>
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-1"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
               <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div>
               <Separator className="my-4" />
               <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
@@ -160,7 +163,25 @@ function ItemPageLoadingState() {
           </div>
         </div>
       </Card>
-      <div className="h-40 bg-muted rounded-lg"></div>
+      {/* Placeholder for SuggestedMatches loading */}
+      <Card className="animate-pulse">
+        <CardHeader>
+          <div className="h-7 bg-muted-foreground/20 rounded w-1/2"></div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex flex-col overflow-hidden h-full bg-muted/50 rounded-lg border border-muted-foreground/10">
+                <div className="aspect-[4/3] bg-muted-foreground/20"></div>
+                <div className="p-4 flex-grow space-y-2">
+                  <div className="h-5 bg-muted-foreground/20 rounded w-3/4"></div>
+                  <div className="h-4 bg-muted-foreground/20 rounded w-full"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -177,7 +198,7 @@ function SuggestedMatchesLoadingState() {
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-4">
           {[...Array(3)].map((_, i) => (
-            <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50 animate-pulse">
+            <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50 animate-pulse border border-border">
               <div className="aspect-[4/3] bg-muted"></div>
               <CardContent className="p-4 flex-grow space-y-2">
                 <div className="h-5 bg-muted-foreground/20 rounded w-3/4"></div>
@@ -192,8 +213,9 @@ function SuggestedMatchesLoadingState() {
 }
 
 export default function ItemDetailPageWrapper({ params: paramsProp }: { params: { id: string } }) {
+  // console.log('[ItemDetailPageWrapper] Received paramsProp:', paramsProp);
   const params = use(paramsProp);
-  // console.log('[ItemDetailPageWrapper] Rendering, params resolved by `use`');
+  // console.log('[ItemDetailPageWrapper] Resolved params by `use`:', params);
 
   if (!params || !params.id) {
     // console.error('[ItemDetailPageWrapper] Params or params.id is missing.');
@@ -207,11 +229,10 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
     );
   }
   
+  // console.log(`[ItemDetailPageWrapper] Rendering Suspense for ItemDetailsDisplay with itemId: ${params.id}`);
   return (
     <Suspense fallback={<ItemPageLoadingState />}>
       <ItemDetailsDisplay itemId={params.id} />
     </Suspense>
   );
 }
-
-    
