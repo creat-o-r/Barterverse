@@ -26,6 +26,7 @@ const ItemBriefSchema = z.object({
   ownerId: z.string(),
   listingType: z.enum(['offer', 'want']),
   minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional().describe("Item-specific minimum match rating requirement. This is optional and might not be present for all items."),
+  isGiftItForward: z.boolean().optional().describe("Whether the item is offered as a 'Gift It Forward' item."),
 });
 
 // Schema for user preferences to be passed to the advanced prompt
@@ -45,8 +46,8 @@ const UserPreferencesSchema = z.object({
 // Base Input Schema
 const BaseItemMatchInputSchema = z.object({
   triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
-  currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches. It may have its own 'minimumMatchRatingOverride'."),
-  availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform. Each may also have its own 'minimumMatchRatingOverride'."),
+  currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches. It may have its own 'minimumMatchRatingOverride' and 'isGiftItForward' status."),
+  availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform. Each may also have its own 'minimumMatchRatingOverride' and 'isGiftItForward' status."),
 });
 
 // Input schema for the flow, which will conditionally add preferences
@@ -62,6 +63,7 @@ const SuggestedItemWithScoreSchema = z.object({
   itemId: z.string().describe("The ID of the suggested matching item."),
   matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low)."),
   ownerId: z.string().describe("The ID of the owner of the suggested item."),
+  isGiftItForward: z.boolean().optional().describe("Indicates if the suggested item is a gift."),
 });
 
 // This is what prompts are expected to return (subset of the flow's final output)
@@ -70,6 +72,7 @@ const PromptOutputSchema = z.object({
     z.object({
       itemId: z.string(),
       matchScore: z.enum(["High", "Medium", "Low"]),
+      isGiftItForward: z.boolean().optional(),
     })
   ),
   reasoning: z.string().optional(),
@@ -78,7 +81,7 @@ const PromptOutputSchema = z.object({
 
 // Final Output Schema for the flow
 const ItemMatchOutputSchema = z.object({
-  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores and ownerIds. Can be empty if no good matches are found or if they don't meet minimum rating criteria."),
+  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores, ownerIds, and gift status. Can be empty if no good matches are found or if they don't meet minimum rating criteria."),
   reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
   usedMatchingMode: z.enum(['simple', 'advanced']).describe("The matching mode that was used."),
   preferencesConsidered: z.boolean().describe("Whether user profile preferences were considered beyond the default minimum match rating.")
@@ -101,19 +104,24 @@ Description: {{{currentItem.description}}}
 Category: {{{currentItem.category}}}
 Owner ID: {{{currentItem.ownerId}}}
 Listing Type: {{{currentItem.listingType}}}
+Is Gift: {{#if currentItem.isGiftItForward}}Yes{{else}}No{{/if}}
 {{#if currentItem.minimumMatchRatingOverride}}
 Minimum Acceptable Match Score for THIS ITEM: '{{{currentItem.minimumMatchRatingOverride}}}' (You MUST NOT suggest items with a score lower than this for the 'Current Item').
 {{/if}}
 
-Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: Description):
+Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: IsGift :: Description):
 {{#each availableItems}}
-- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{{description}}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{{description}}}
 {{/each}}
 
-For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
+For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low". Also indicate if the suggested matched item 'isGiftItForward'.
 - "High": Strong direct relevance, very similar categories, clear keyword overlap.
 - "Medium": Good general relevance, related categories, some keyword overlap.
 - "Low": Possible but less direct relevance, different categories with niche appeal.
+
+GIFT MATCHING:
+- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked as 'isGiftItForward: true' that clearly fulfills this want by category/description, this is generally a 'High' match.
+- If 'Current Item' is an 'offer' marked as 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a strong match.
 
 {{#if currentItem.minimumMatchRatingOverride}}
 IMPORTANT: The 'Current Item' has a specific minimum match rating requirement of '{{{currentItem.minimumMatchRatingOverride}}}'. When suggesting matches, your assigned score for any suggested item MUST be '{{{currentItem.minimumMatchRatingOverride}}}' or higher (e.g., if min is 'Medium', you can suggest 'Medium' or 'High', but not 'Low'). If no item override is specified, use general relevance.
@@ -123,7 +131,7 @@ Do not suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}) as direct matches for their own items.
 
-Respond with a list of up to 5 suggested matches if available, each including the 'itemId' and its 'matchScore'. Aim for variety if multiple good options exist.
+Respond with a list of up to 5 suggested matches if available, each including the 'itemId', its 'matchScore', and 'isGiftItForward' status. Aim for variety if multiple good options exist.
 If no good matches are found (or none meet the minimum rating if specified), return an empty list for 'suggestedMatches' AND provide a brief reasoning.
 Optionally, if matches are found, provide a brief (1-2 sentences) overall reasoning for your suggestions.
   `,
@@ -142,6 +150,7 @@ Name: "{{{currentItem.name}}}"
 Description: "{{{currentItem.description}}}"
 Category: "{{{currentItem.category}}}"
 Listed As: {{{currentItem.listingType}}} (by user {{{currentItem.ownerId}}})
+Is Gift: {{#if currentItem.isGiftItForward}}Yes{{else}}No{{/if}}
 {{#if currentItem.minimumMatchRatingOverride}}
 This Item's Specific Minimum Match Requirement: '{{{currentItem.minimumMatchRatingOverride}}}' (Overrides user's global preference for this item).
 {{/if}}
@@ -153,14 +162,19 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the followin
  - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
 
-Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: Description):
+Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: IsGift :: Description):
 {{#each availableItems}}
-- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{{description}}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{{description}}}
 {{/each}}
 
 Analyze the "Current Item" against the "Available Items" to find potential trades. A good match involves RECIPROCAL interest or clear fulfillment of needs.
 
-Match Score Assignment: Assign "High", "Medium", or "Low" based on factors like direct fulfillment, complementarity, and alignment with user preferences.
+Match Score Assignment: Assign "High", "Medium", or "Low" based on factors like direct fulfillment, complementarity, and alignment with user preferences. Also indicate if the suggested matched item 'isGiftItForward'.
+
+GIFT MATCHING:
+- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked as 'isGiftItForward: true' that clearly fulfills this want by category/description, this is generally a 'High' match.
+- If 'Current Item' is an 'offer' marked as 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a strong match.
+When a gift fulfillment occurs, the 'reciprocal potential' is less about item-for-item and more about community goodwill, but still a positive factor.
 
 MINIMUM MATCH SCORE RULE:
 {{#if currentItem.minimumMatchRatingOverride}}
@@ -170,14 +184,14 @@ The 'Current Item' uses the user's profile preference. The user's effective mini
 {{/if}}
 
 Prioritize:
-1.  Direct Fulfillment:
-    *   If 'currentItem' is 'offer': Find 'want' items from 'availableItems' that 'currentItem' directly satisfies.
-    *   If 'currentItem' is 'want': Find 'offer' items from 'availableItems' that directly satisfy 'currentItem's want.
-2.  Strong Complementary Offers: If 'currentItem' is 'offer', find 'offer' items from 'availableItems' that would make a compelling direct swap.
+1.  Direct Fulfillment & Gift Fulfillments:
+    *   If 'currentItem' is 'offer': Find 'want' items from 'availableItems' that 'currentItem' directly satisfies. If 'currentItem' is 'isGiftItForward: true', this is a strong match.
+    *   If 'currentItem' is 'want': Find 'offer' items from 'availableItems' that directly satisfy 'currentItem's want. If an 'availableItem' is 'isGiftItForward: true' and fulfills the want, this is a strong match.
+2.  Strong Complementary Offers: If 'currentItem' is 'offer' (and not a gift), find 'offer' items from 'availableItems' that would make a compelling direct swap.
 3.  Reciprocal Potential: If a direct match is found (e.g., your Offer for their Want), is there also an item among their Offers (in 'availableItems') that might fulfill a potential Want of yours (related to 'currentItem' or user preferences)? Higher scores for matches that could lead to a good 2-way trade.
 
 Assign a match score ("High", "Medium", "Low") based on:
-- "High": Excellent direct fulfillment OR highly complementary 'offer'-'offer' swap with strong mutual interest. Strong alignment with explicit preferences. High potential for a reciprocal trade.
+- "High": Excellent direct fulfillment (including gift fulfillment) OR highly complementary 'offer'-'offer' swap with strong mutual interest. Strong alignment with explicit preferences. High potential for a reciprocal trade.
 - "Medium": Good potential for mutual benefit. One item generally addresses the type/category of the other. Some alignment with preferences. Some reciprocal potential.
 - "Low": Plausible but less direct connection. More speculative. May partially align with preferences. Minimal reciprocal potential.
 
@@ -185,8 +199,8 @@ Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
-Return a list of up to 5 suggested matches (itemId, matchScore) if available, ensuring ALL suggested items meet the applicable minimum match score rule mentioned above. Aim for variety and strong reciprocal potential if multiple good options exist.
-If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential if significant.
+Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status) if available, ensuring ALL suggested items meet the applicable minimum match score rule mentioned above. Aim for variety and strong reciprocal potential if multiple good options exist.
+If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential or gift fulfillments if significant.
 If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
   `,
 });
@@ -232,10 +246,14 @@ const itemMatchFlow = ai.defineFlow(
         return output;
     }
 
-    finalInputForPrompt.availableItems = itemsToConsider;
-    finalInputForPrompt.currentItem = { // Ensure currentItem in prompt input also gets its override
+    finalInputForPrompt.availableItems = itemsToConsider.map(item => ({
+        ...item,
+        isGiftItForward: item.isGiftItForward || false, // Ensure boolean
+    }));
+    finalInputForPrompt.currentItem = { 
         ...input.currentItem,
         minimumMatchRatingOverride: input.currentItem.minimumMatchRatingOverride,
+        isGiftItForward: input.currentItem.isGiftItForward || false, // Ensure boolean
     };
 
 
@@ -319,6 +337,7 @@ const itemMatchFlow = ai.defineFlow(
         return {
           ...aiSuggestion,
           ownerId: originalItem?.ownerId || 'unknown_owner',
+          isGiftItForward: aiSuggestion.isGiftItForward || originalItem?.isGiftItForward || false, // Prioritize AI output, fallback to original item
         };
       }).filter(match => match.ownerId !== 'unknown_owner');
 

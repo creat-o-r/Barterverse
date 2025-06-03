@@ -52,7 +52,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             category: item.category,
             ownerId: item.ownerId,
             listingType: item.listingType,
-            minimumMatchRatingOverride: item.minimumMatchRatingOverride, // Added this field
+            minimumMatchRatingOverride: item.minimumMatchRatingOverride,
+            isGiftItForward: item.isGiftItForward, // Pass this field
         }));
 
         if (otherAvailableItems.length === 0) {
@@ -60,7 +61,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             setInternalReasoning(noItemsReasoning);
             setSuggestedItems([]);
             setLoading(false);
-            setMatchModeUsed('simple');
+            setMatchModeUsed('simple'); // Or based on actual config default
             return;
         }
 
@@ -73,7 +74,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             category: currentItem.category,
             ownerId: currentItem.ownerId,
             listingType: currentItem.listingType,
-            minimumMatchRatingOverride: currentItem.minimumMatchRatingOverride, // Added this field
+            minimumMatchRatingOverride: currentItem.minimumMatchRatingOverride,
+            isGiftItForward: currentItem.isGiftItForward, // Pass this field
           },
           availableItems: otherAvailableItems,
         };
@@ -85,7 +87,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
         const itemsWithScores = (result.suggestedMatches || []).map(match => {
           const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-          return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+           // Ensure isGiftItForward is part of the merged item details for ItemCard
+          return itemDetails ? { ...itemDetails, matchScore: match.matchScore, isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward } : null;
         }).filter(Boolean) as (Item & { matchScore: string })[];
 
         setSuggestedItems(itemsWithScores);
@@ -121,11 +124,11 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
     fetchSuggestions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem.id, currentItem.name, currentItem.listingType, currentItem.ownerId, currentItem.minimumMatchRatingOverride]);
+  }, [currentItem.id, currentItem.name, currentItem.listingType, currentItem.ownerId, currentItem.minimumMatchRatingOverride, currentItem.isGiftItForward]);
 
 
   const cardTitleText = currentItem.listingType === 'offer'
-    ? `AI Matches for ${currentItem.name}`
+    ? currentItem.isGiftItForward ? `AI: Who Might Want Your Gift "${currentItem.name}"?` : `AI Matches for ${currentItem.name}`
     : `AI Fulfillments for ${currentItem.name}`;
 
   if (loading) {
@@ -134,7 +137,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         <CardHeader>
           <CardTitle className="font-headline text-xl flex items-center gap-2">
             <Loader2 className="h-6 w-6 text-primary animate-spin" />
-            {currentItem.listingType === 'offer' ? "Finding Potential Matches..." : "Searching for Fulfillments..."}
+            {currentItem.listingType === 'offer' ? (currentItem.isGiftItForward ? "Finding Potential Recipients..." : "Finding Potential Matches...") : "Searching for Fulfillments..."}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -190,7 +193,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         </CardHeader>
         <CardContent>
           <p className="font-body text-muted-foreground text-center py-4">
-            {internalReasoning && !fetchError ? internalReasoning : (currentItem.listingType === 'offer' ? "No specific AI-powered matches found at this moment." : "No specific AI-powered fulfillments found for this want at this moment.")}
+            {internalReasoning && !fetchError ? internalReasoning : (currentItem.listingType === 'offer' ? (currentItem.isGiftItForward ? "No specific 'want' items found that your gift could fulfill right now." : "No specific AI-powered matches found at this moment.") : "No specific AI-powered fulfillments found for this want at this moment.")}
           </p>
         </CardContent>
       </Card>

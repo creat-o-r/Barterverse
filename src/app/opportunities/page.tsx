@@ -11,7 +11,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput } from '@/ai/flows/explain-match-rationale-flow';
@@ -26,7 +26,8 @@ async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; own
   if (!item) return null;
   const owner = dummyUsers.find((u) => u.id === item.ownerId);
   if (!owner) return null;
-  return { item, owner };
+  // Ensure isGiftItForward is a boolean for logic downstream
+  return { item: { ...item, isGiftItForward: !!item.isGiftItForward }, owner };
 }
 
 // Display component for each item in the opportunity
@@ -43,7 +44,7 @@ function OpportunityItemCard({
     <Card className="flex flex-col h-full shadow-lg">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-            {item.listingType === 'offer' ? <Gift className="h-5 w-5 text-green-600 shrink-0" /> : <Search className="h-5 w-5 text-blue-600 shrink-0" />}
+            {item.listingType === 'offer' ? (item.isGiftItForward ? <HeartHandshake className="h-5 w-5 text-pink-500 shrink-0" /> : <Gift className="h-5 w-5 text-green-600 shrink-0" />) : <Search className="h-5 w-5 text-blue-600 shrink-0" />}
             <CardTitle className="font-headline text-xl line-clamp-2">
                 {item.name}
             </CardTitle>
@@ -91,6 +92,7 @@ const generalMatchScoreCriteria: Record<string, { title: string; points: string[
       "Keywords in names/descriptions show clear overlap or direct need fulfillment.",
       "Offer/Want types align well (e.g., an offer fulfilling a specific want).",
       "If both are 'offer' or 'want', they are desirable items in the same niche.",
+      "Gift It Forward items fulfilling a want are often high matches.",
     ],
   },
   medium: {
@@ -157,12 +159,14 @@ export default function OpportunityMatchPage() {
                     description: mainD.item.description,
                     category: mainD.item.category,
                     listingType: mainD.item.listingType,
+                    isGiftItForward: !!mainD.item.isGiftItForward,
                 },
                 itemB: {
                     name: suggestedD.item.name,
                     description: suggestedD.item.description,
                     category: suggestedD.item.category,
                     listingType: suggestedD.item.listingType,
+                    isGiftItForward: !!suggestedD.item.isGiftItForward,
                 }
             };
             
@@ -261,53 +265,54 @@ export default function OpportunityMatchPage() {
 
   let tradeId = '';
   let chatButtonText = 'Start Negotiation';
-  let negotiationContextValid = true;
-  let mainItemOpportunityLabel = '';
-  let suggestedItemOpportunityLabel = '';
+  let actionButtonLink = '';
+  let pageTitle = "Trade Opportunity";
+  let pageDescription = "AI suggests a potential match. Explore the details and see if it's a fit!";
+  let actionButtonIcon = <MessageSquare className="mr-2 h-5 w-5" />;
 
-  if (mainItem.ownerId === currentUserId) { 
-    mainItemOpportunityLabel = `Your ${mainItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
-    if (suggestedItem.listingType === 'want') { 
-      suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s Matching Want`;
-      tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`; 
-      chatButtonText = `Offer your "${mainItem.name}" for their want: "${suggestedItem.name}"`;
-    } else { 
-      suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s Matching Offer`;
+  const mainIsGiftOffer = mainItem.listingType === 'offer' && mainItem.isGiftItForward;
+  const suggestedIsGiftOffer = suggestedItem.listingType === 'offer' && suggestedItem.isGiftItForward;
+
+  if (mainIsGiftOffer && suggestedItem.listingType === 'want') {
+    pageTitle = "Potential Gift Fulfillment";
+    pageDescription = `Your gift "${mainItem.name}" could fulfill a want from ${suggestedItemOwner.name}.`;
+    chatButtonText = `Contact ${suggestedItemOwner.name} about Gifting`;
+    actionButtonLink = `/profile/${suggestedItemOwner.id}`; // Link to user profile to contact
+    actionButtonIcon = <HeartHandshake className="mr-2 h-5 w-5" />;
+  } else if (mainItem.listingType === 'want' && suggestedIsGiftOffer) {
+    pageTitle = "Potential Gift Found!";
+    pageDescription = `A gift "${suggestedItem.name}" from ${suggestedItemOwner.name} might fulfill your want!`;
+    chatButtonText = `View Gift & Contact ${suggestedItemOwner.name}`;
+    actionButtonLink = `/items/${suggestedItem.id}`; // Link to item page to view details and contact owner
+    actionButtonIcon = <Gift className="mr-2 h-5 w-5" />;
+  } else {
+    // Standard trade negotiation
+    pageTitle = "Trade Opportunity";
+    if (mainItem.ownerId === currentUserId) {
       tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
-      chatButtonText = `Negotiate for "${suggestedItem.name}" (Offering your "${mainItem.name}")`;
-    }
-  } else if (suggestedItem.ownerId === currentUserId) { 
-    suggestedItemOpportunityLabel = `Your ${suggestedItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
-     if (mainItem.listingType === 'want') { 
-      mainItemOpportunityLabel = `${mainItemOwner.name}'s Matching Want`;
-      tradeId = `trade-${suggestedItem.ownerId}-wants-${mainItem.id}-from-${mainItem.ownerId}`; 
-      chatButtonText = `Offer your "${suggestedItem.name}" for their want: "${mainItem.name}"`;
-    } else { 
-      mainItemOpportunityLabel = `${mainItemOwner.name}'s Matching Offer`;
+      chatButtonText = `Negotiate for "${suggestedItem.name}"`;
+    } else { // Assuming suggestedItem.ownerId === currentUserId or a third-party view
       tradeId = `trade-${currentUserId}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
-      chatButtonText = `Negotiate for "${mainItem.name}" (Offering your "${suggestedItem.name}")`;
+      chatButtonText = `Negotiate for "${mainItem.name}"`;
     }
-  } else { 
-    mainItemOpportunityLabel = `${mainItemOwner.name}'s ${mainItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
-    suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s ${suggestedItem.listingType === 'offer' ? 'Matching Offer' : 'Matching Want'}`;
-    tradeId = `discuss-${mainItem.id}-with-${suggestedItem.id}`; 
-    chatButtonText = `Discuss This Opportunity`;
+    if (mainItem.ownerId === currentUserId && suggestedItem.ownerId === currentUserId) {
+       chatButtonText = "View Items (Cannot trade with self)"; // Should not happen with filtering
+       actionButtonLink = `/items/${mainItem.id}`; // Fallback
+    } else {
+        actionButtonLink = `/trades/${tradeId}`;
+    }
   }
-   if (mainItem.ownerId === currentUserId && suggestedItem.ownerId === currentUserId) {
-    negotiationContextValid = false; 
-    chatButtonText = "View Items Separately";
-  }
-  
+   
   const scoreCriteria = matchScore ? generalMatchScoreCriteria[matchScore] : null;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       <Card>
         <CardHeader className="text-center pb-4">
-          <Handshake className="mx-auto h-10 w-10 text-primary mb-2" />
-          <CardTitle className="font-headline text-3xl">Trade Opportunity</CardTitle>
+          {mainIsGiftOffer || suggestedIsGiftOffer ? <HeartHandshake className="mx-auto h-10 w-10 text-pink-500 mb-2" /> : <Handshake className="mx-auto h-10 w-10 text-primary mb-2" />}
+          <CardTitle className="font-headline text-3xl">{pageTitle}</CardTitle>
           <CardDescription className="font-body">
-            AI suggests a potential match. Explore the details and see if it's a fit!
+            {pageDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -319,12 +324,12 @@ export default function OpportunityMatchPage() {
             <OpportunityItemCard
                 item={mainItem}
                 owner={mainItemOwner}
-                opportunityContextLabel={mainItemOpportunityLabel}
+                opportunityContextLabel={mainItem.ownerId === currentUserId ? `Your ${mainItem.listingType}` : `${mainItemOwner.name}'s ${mainItem.listingType}`}
             />
             <OpportunityItemCard
                 item={suggestedItem}
                 owner={suggestedItemOwner}
-                opportunityContextLabel={suggestedItemOpportunityLabel}
+                opportunityContextLabel={suggestedItem.ownerId === currentUserId ? `Your ${suggestedItem.listingType}` : `${suggestedItemOwner.name}'s ${suggestedItem.listingType}`}
             />
           </div>
 
@@ -406,11 +411,11 @@ export default function OpportunityMatchPage() {
           
           <Separator className="my-6 md:my-8" />
           <div className="text-center">
-            <h3 className="font-headline text-xl mb-3">Ready to Discuss?</h3>
-            {negotiationContextValid && tradeId ? (
-                 <Button asChild size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-6 text-base">
-                    <Link href={`/trades/${tradeId}`}>
-                        <MessageSquare className="mr-2 h-5 w-5" /> {chatButtonText}
+            <h3 className="font-headline text-xl mb-3">Ready to Proceed?</h3>
+            {actionButtonLink ? (
+                 <Button asChild size="lg" className={`${mainIsGiftOffer || suggestedIsGiftOffer ? 'bg-pink-500 hover:bg-pink-600 text-white' : 'bg-accent hover:bg-accent/90 text-accent-foreground'} px-8 py-6 text-base`}>
+                    <Link href={actionButtonLink}>
+                        {actionButtonIcon} {chatButtonText}
                     </Link>
                 </Button>
             ) : (

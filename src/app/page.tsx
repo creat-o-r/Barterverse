@@ -75,7 +75,8 @@ export default function HomePage() {
           category: item.category,
           ownerId: item.ownerId,
           listingType: item.listingType,
-          minimumMatchRatingOverride: item.minimumMatchRatingOverride, // Added this field
+          minimumMatchRatingOverride: item.minimumMatchRatingOverride,
+          isGiftItForward: item.isGiftItForward, // Pass this field
         }));
 
         if (otherItemsForMatching.length === 0) {
@@ -86,7 +87,7 @@ export default function HomePage() {
               suggestedMatches: [],
               reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
               preferencesConsidered: false,
-              usedMatchingMode: 'simple',
+              usedMatchingMode: 'simple', // Default or determined by config
             } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning' | 'preferencesConsidered' | 'usedMatchingMode'>,
           };
         }
@@ -101,7 +102,8 @@ export default function HomePage() {
               category: userItem.category,
               ownerId: userItem.ownerId,
               listingType: userItem.listingType,
-              minimumMatchRatingOverride: userItem.minimumMatchRatingOverride, // Added this field
+              minimumMatchRatingOverride: userItem.minimumMatchRatingOverride,
+              isGiftItForward: userItem.isGiftItForward, // Pass this field
             },
             availableItems: otherItemsForMatching,
           });
@@ -126,7 +128,8 @@ export default function HomePage() {
             if (success && data) {
               const itemsWithScores = (data.suggestedMatches || []).map(match => {
                 const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-                return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+                // Ensure isGiftItForward is part of the merged item details for ItemCard
+                return itemDetails ? { ...itemDetails, matchScore: match.matchScore, isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward } : null;
               }).filter(Boolean) as (Item & { matchScore: string })[];
 
               newSuggestions[index] = {

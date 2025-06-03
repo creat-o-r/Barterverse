@@ -16,6 +16,7 @@ const ItemDetailSchema = z.object({
   description: z.string(),
   category: z.string(),
   listingType: z.enum(['offer', 'want']),
+  isGiftItForward: z.boolean().optional().describe("Whether the item is offered as a 'Gift It Forward' item."),
 });
 
 const ExplainMatchRationaleInputSchema = z.object({
@@ -46,18 +47,21 @@ Consider factors like:
 - How one item might fulfill the other's listing type (e.g., an 'offer' matching a 'want').
 - Keywords in names or descriptions that suggest a connection.
 - Potential for a fair exchange of value or utility.
+- If one item is a 'Gift It Forward' offer (isGiftItForward: true) and the other is a 'want' that the gift could fulfill, emphasize this generous opportunity or direct fulfillment of a need.
 
 Item A:
 Type: {{{itemA.listingType}}}
 Name: {{{itemA.name}}}
 Category: {{{itemA.category}}}
 Description: {{{itemA.description}}}
+Is Gift It Forward: {{#if itemA.isGiftItForward}}Yes{{else}}No{{/if}}
 
 Item B:
 Type: {{{itemB.listingType}}}
 Name: {{{itemB.name}}}
 Category: {{{itemB.category}}}
 Description: {{{itemB.description}}}
+Is Gift It Forward: {{#if itemB.isGiftItForward}}Yes{{else}}No{{/if}}
 
 Provide only the rationale. If you cannot find a clear rationale, state that "While not an obvious direct match by category or keywords, these items could be explored by users based on individual preferences or unstated needs."
 Do not say "No items from the available list matched..." or similar phrases implying you were searching for a match; you are given two specific items to analyze for a potential rationale.
@@ -72,8 +76,14 @@ const explainMatchRationaleFlow = ai.defineFlow(
   },
   async (input: ExplainMatchRationaleInput): Promise<ExplainMatchRationaleOutput> => {
     const flowName = 'explainMatchRationaleFlow';
+    // Ensure boolean values for isGiftItForward for the prompt
+    const processedInput = {
+        itemA: { ...input.itemA, isGiftItForward: input.itemA.isGiftItForward || false },
+        itemB: { ...input.itemB, isGiftItForward: input.itemB.isGiftItForward || false },
+    };
+
     try {
-      const {output} = await prompt(input);
+      const {output} = await prompt(processedInput);
       if (!output || !output.rationale || output.rationale.trim() === '') {
         console.warn(`${flowName}: Prompt returned null or empty output for rationale.`);
         return {
