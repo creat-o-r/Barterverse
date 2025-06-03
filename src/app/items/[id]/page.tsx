@@ -3,7 +3,7 @@ import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User, ItemLogistics, UserStoredLocation } from '@/types';
+import type { Item, User, ItemLogistics, UserStoredLocation, ItemLogisticsShippingOption, ItemLogisticsMeetupOption } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,40 +22,35 @@ async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User
   return { item, owner };
 }
 
+const shippingOptionDisplayMap: Record<ItemLogisticsShippingOption, string> = {
+  pickup_only: "Local Pickup Only",
+  ship_domestic: "Willing to Ship (Domestic)",
+  ship_international: "Willing to Ship (International)",
+};
+
+const meetupOptionDisplayMap: Record<ItemLogisticsMeetupOption, string> = {
+  public_meetup: "Public Meetup Preferred",
+  flexible: "Flexible Meetup",
+};
+
 function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, owner: User }) {
   if (!logistics) {
     return <p className="text-sm text-muted-foreground font-body">Logistics details not specified for this item.</p>;
   }
 
-  let locationDisplay = "Profile default location";
+  let locationDisplay = "Location not specified.";
   if (logistics.locationType === 'profile_stored_location' && logistics.selectedUserStoredLocationId) {
     const storedLoc = owner.locations?.find(l => l.id === logistics.selectedUserStoredLocationId);
-    locationDisplay = storedLoc ? `${storedLoc.name} (${storedLoc.address || 'Address not set'})` : "Selected stored address (details unavailable)";
+    locationDisplay = storedLoc ? `${storedLoc.name} (${storedLoc.address || 'Address not set'})` : "Stored address (details unavailable)";
   } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
     locationDisplay = logistics.itemSpecificAddress;
-  } else if (logistics.locationType === 'profile_default_location') {
-     const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
-     const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
-     if (defaultLoc) {
-       locationDisplay = `Profile default: ${defaultLoc.name} (${defaultLoc.address || 'Address not specified'})`;
-     } else {
-       locationDisplay = "Uses profile default location (specific address not set on profile).";
-     }
+  } else { // Fallback if locationType or specific details are missing, try owner's default
+    const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
+    const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
+    if (defaultLoc) {
+      locationDisplay = `Owner's default: ${defaultLoc.name} (${defaultLoc.address || 'Address not specified'})`;
+    }
   }
-
-
-  const shippingDisplayMap = {
-    profile_default_shipping: `Profile Default (${owner.logisticsPreferences?.defaultShippingOption.replace(/_/g, ' ') || 'Not Set'})`,
-    pickup_only: "Local Pickup Only",
-    ship_domestic: "Willing to Ship (Domestic)",
-    ship_international: "Willing to Ship (International)"
-  };
-
-  const meetupDisplayMap = {
-    profile_default_meetup: `Profile Default (${owner.logisticsPreferences?.defaultMeetupOption.replace(/_/g, ' ') || 'Not Set'})`,
-    public_meetup: "Public Meetup Preferred",
-    flexible: "Flexible Meetup"
-  };
 
   return (
     <div className="space-y-3">
@@ -65,11 +60,11 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
       </div>
       <div>
         <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Shipping:</h4>
-        <p className="text-sm text-foreground/90 font-body pl-5">{shippingDisplayMap[logistics.shippingOption] || "Not specified"}</p>
+        <p className="text-sm text-foreground/90 font-body pl-5">{shippingOptionDisplayMap[logistics.shippingOption] || "Not specified"}</p>
       </div>
       <div>
         <h4 className="font-headline text-md flex items-center gap-1.5"><Users2 className="h-4 w-4 text-muted-foreground" /> Meetup:</h4>
-        <p className="text-sm text-foreground/90 font-body pl-5">{meetupDisplayMap[logistics.meetupOption] || "Not specified"}</p>
+        <p className="text-sm text-foreground/90 font-body pl-5">{meetupOptionDisplayMap[logistics.meetupOption] || "Not specified"}</p>
       </div>
       {logistics.notes && (
         <div>
@@ -229,9 +224,9 @@ function ItemPageLoadingState() {
                 </div>
               </div>
                <div className="my-4 h-px bg-border"></div>
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> {/* Logistics title skeleton */}
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> {/* Logistics line skeleton */}
-              <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div> {/* Logistics line skeleton */}
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> 
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> 
+              <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div> 
             </div>
             <div className="p-0 pt-6">
               <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>

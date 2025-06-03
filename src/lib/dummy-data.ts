@@ -64,7 +64,10 @@ export const dummyUsers: User[] = [
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'staged' as TradeTimingPreference,
     minimumMatchRating: 'Low',
-    // No specific locations or logistics preferences, will use system defaults
+    logisticsPreferences: { // Added default logistics for Charlie
+      defaultShippingOption: 'ship_domestic',
+      defaultMeetupOption: 'flexible',
+    },
   },
   {
     id: 'user4',
@@ -99,6 +102,10 @@ export const dummyUsers: User[] = [
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
     minimumMatchRating: 'Medium',
+    logisticsPreferences: {
+        defaultShippingOption: 'pickup_only',
+        defaultMeetupOption: 'public_meetup',
+    }
   },
 ];
 
@@ -117,10 +124,10 @@ export let dummyItems: Item[] = [
     minimumMatchRatingOverride: 'High',
     isGiftItForward: false,
     logistics: {
-      locationType: 'profile_stored_location',
+      locationType: 'profile_stored_location', // User1's preferred is 'user1_home'
       selectedUserStoredLocationId: 'user1_home',
-      shippingOption: 'ship_domestic',
-      meetupOption: 'public_meetup',
+      shippingOption: 'ship_domestic', // User1's default
+      meetupOption: 'public_meetup',   // User1's default
       notes: "Can also meet downtown on weekdays."
     }
   },
@@ -139,8 +146,8 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
-      shippingOption: 'pickup_only',
-      meetupOption: 'flexible',
+      shippingOption: 'pickup_only', // Bob's default
+      meetupOption: 'flexible',    // Bob's default
     }
   },
   {
@@ -155,10 +162,11 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: true,
-    logistics: { // Even gifts can have logistics
-      locationType: 'profile_default_location',
-      shippingOption: 'profile_default_shipping',
-      meetupOption: 'profile_default_meetup',
+    logistics: { // Even gifts have logistics, reflecting owner's defaults
+      locationType: 'profile_stored_location',
+      selectedUserStoredLocationId: 'user1_home',
+      shippingOption: 'ship_domestic',
+      meetupOption: 'public_meetup',
     }
   },
   {
@@ -173,6 +181,12 @@ export let dummyItems: Item[] = [
     status: 'pending',
     listingType: 'offer',
     isGiftItForward: false,
+    logistics: {
+      locationType: 'profile_stored_location',
+      selectedUserStoredLocationId: 'user2_apt',
+      shippingOption: 'pickup_only',
+      meetupOption: 'flexible',
+    }
   },
   {
     id: 'item5',
@@ -186,10 +200,11 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
-     logistics: {
-      locationType: 'profile_default_location', // Charlie uses profile defaults
-      shippingOption: 'profile_default_shipping',
-      meetupOption: 'profile_default_meetup',
+     logistics: { // Charlie has no stored locations, so this would likely be item_specific or error if not handled
+      locationType: 'item_specific_location', // Assuming Charlie would have to specify
+      itemSpecificAddress: "Charlie's Balcony Garden",
+      shippingOption: 'ship_domestic', // Charlie's default
+      meetupOption: 'flexible',    // Charlie's default
     }
   },
   {
@@ -204,6 +219,7 @@ export let dummyItems: Item[] = [
     status: 'traded',
     listingType: 'offer',
     isGiftItForward: false,
+    // No logistics for traded item example
   },
   {
     id: 'item7',
@@ -217,6 +233,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     minimumMatchRatingOverride: 'Medium',
+    // Wants might not have logistics in the same way offers do.
   },
   {
     id: 'item8',
@@ -242,6 +259,12 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
+    logistics: {
+        locationType: 'item_specific_location', // Diana has no stored locations
+        itemSpecificAddress: "Diana's Boutique",
+        shippingOption: 'ship_international', // Diana's default
+        meetupOption: 'public_meetup'     // Diana's default
+    }
   },
   {
     id: 'item10',
@@ -267,6 +290,12 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: true,
+    logistics: {
+        locationType: 'item_specific_location', // Ethan has no stored loc
+        itemSpecificAddress: "Ethan's Garage",
+        shippingOption: 'pickup_only', // Ethan's default
+        meetupOption: 'public_meetup' // Ethan's default
+    }
   },
   {
     id: 'item12',
@@ -280,6 +309,12 @@ export let dummyItems: Item[] = [
     status: 'pending',
     listingType: 'offer',
     isGiftItForward: false,
+    logistics: {
+        locationType: 'item_specific_location',
+        itemSpecificAddress: "Ethan's Home Gym",
+        shippingOption: 'pickup_only',
+        meetupOption: 'public_meetup'
+    }
   },
   {
     id: 'item13',
@@ -293,6 +328,12 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
+    logistics: {
+      locationType: 'profile_stored_location',
+      selectedUserStoredLocationId: 'user1_work', // Example of using another stored location
+      shippingOption: 'ship_domestic',
+      meetupOption: 'public_meetup',
+    }
   },
   {
     id: 'item14',
@@ -358,6 +399,39 @@ export function addNewItemToDummyData(
     throw new Error(`Owner not found for ID: ${itemData.ownerId}`);
   }
 
+  // Ensure logistics are concrete and present
+  let finalLogistics: ItemLogistics;
+  if (itemData.logistics) {
+    finalLogistics = {
+        locationType: itemData.logistics.locationType,
+        selectedUserStoredLocationId: itemData.logistics.locationType === 'profile_stored_location' ? itemData.logistics.selectedUserStoredLocationId : undefined,
+        itemSpecificAddress: itemData.logistics.locationType === 'item_specific_location' ? itemData.logistics.itemSpecificAddress : undefined,
+        shippingOption: itemData.logistics.shippingOption,
+        meetupOption: itemData.logistics.meetupOption,
+        notes: itemData.logistics.notes,
+    };
+  } else {
+    // Fallback if logistics somehow not provided by form (should be, due to defaults)
+    let defaultLocType: 'profile_stored_location' | 'item_specific_location' = 'item_specific_location';
+    let defaultStoredId: string | undefined = undefined;
+    if (owner.logisticsPreferences?.preferredStoredLocationId && owner.locations?.find(l => l.id === owner.logisticsPreferences?.preferredStoredLocationId)) {
+        defaultLocType = 'profile_stored_location';
+        defaultStoredId = owner.logisticsPreferences.preferredStoredLocationId;
+    } else if (owner.locations && owner.locations.length > 0) {
+        defaultLocType = 'profile_stored_location';
+        defaultStoredId = owner.locations[0].id;
+    }
+
+    finalLogistics = {
+        locationType: defaultLocType,
+        selectedUserStoredLocationId: defaultStoredId,
+        itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
+        shippingOption: owner.logisticsPreferences?.defaultShippingOption || 'pickup_only',
+        meetupOption: owner.logisticsPreferences?.defaultMeetupOption || 'flexible',
+    };
+  }
+
+
   const newItem: Item = {
     ...itemData,
     id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -366,11 +440,7 @@ export function addNewItemToDummyData(
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`,
     isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false,
-    logistics: itemData.logistics || { // Default logistics if not provided
-      locationType: 'profile_default_location',
-      shippingOption: 'profile_default_shipping',
-      meetupOption: 'profile_default_meetup',
-    }
+    logistics: finalLogistics,
   };
 
   dummyItems.push(newItem);

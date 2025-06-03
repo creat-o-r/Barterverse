@@ -4,7 +4,7 @@ export type Item = {
   name: string;
   description: string;
   imageUrl: string;
-  dataAiHint?: string; // Added for placeholder image hints
+  dataAiHint?: string;
   category: string;
   ownerId: string;
   ownerName: string;
@@ -13,7 +13,7 @@ export type Item = {
   isThirdPartyFulfillment?: boolean;
   minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High';
   isGiftItForward?: boolean;
-  logistics?: ItemLogistics; // New field
+  logistics?: ItemLogistics;
 };
 
 export type UserMotivation = 'help-others' | 'maximize-trades' | 'convenience-focused' | 'community-building' | 'unique-finds';
@@ -34,15 +34,15 @@ export type UserProfilePreferences = {
 
 export type UserStoredLocation = {
   id: string;
-  name: string; // e.g., "Home", "Office"
-  address?: string; // Simple address string for now
+  name: string;
+  address?: string;
   isDefault?: boolean;
 };
 
 export type UserLogisticsPreferences = {
   defaultShippingOption: 'pickup_only' | 'ship_domestic' | 'ship_international';
   defaultMeetupOption: 'public_meetup' | 'flexible';
-  preferredStoredLocationId?: string; // ID of a UserStoredLocation to use as default
+  preferredStoredLocationId?: string;
 };
 
 export type User = {
@@ -54,21 +54,21 @@ export type User = {
   tradesCompleted: number;
   bio?: string;
   items: Item[];
-  locations?: UserStoredLocation[]; // New field
-  logisticsPreferences?: UserLogisticsPreferences; // New field
+  locations?: UserStoredLocation[];
+  logisticsPreferences?: UserLogisticsPreferences;
 } & UserProfilePreferences;
 
-export type ItemLogisticsLocationType = 'profile_default_location' | 'profile_stored_location' | 'item_specific_location';
-export type ItemLogisticsShippingOption = 'profile_default_shipping' | 'pickup_only' | 'ship_domestic' | 'ship_international';
-export type ItemLogisticsMeetupOption = 'profile_default_meetup' | 'public_meetup' | 'flexible';
+export type ItemLogisticsLocationType = 'profile_stored_location' | 'item_specific_location';
+export type ItemLogisticsShippingOption = 'pickup_only' | 'ship_domestic' | 'ship_international';
+export type ItemLogisticsMeetupOption = 'public_meetup' | 'flexible';
 
 export type ItemLogistics = {
   locationType: ItemLogisticsLocationType;
-  selectedUserStoredLocationId?: string; // if locationType is 'profile_stored_location'
-  itemSpecificAddress?: string; // if locationType is 'item_specific_location'
+  selectedUserStoredLocationId?: string;
+  itemSpecificAddress?: string;
   shippingOption: ItemLogisticsShippingOption;
   meetupOption: ItemLogisticsMeetupOption;
-  notes?: string; // Optional notes for logistics
+  notes?: string;
 };
 
 export type TradeOffer = {
