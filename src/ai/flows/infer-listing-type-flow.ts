@@ -17,7 +17,6 @@ const InferListingTypeInputSchema = z.object({
 });
 export type InferListingTypeInput = z.infer<typeof InferListingTypeInputSchema>;
 
-// Output will be a simple string, "offer" or "want"
 const InferListingTypeOutputSchema = z.object({
   inferredListingType: z.enum(['offer', 'want']).describe('The inferred listing type for the item: "offer" or "want".'),
   errorMessage: z.string().optional().describe('An error message if listing type inference failed.'),
@@ -39,7 +38,7 @@ Item Description: {{{description}}}
 Based on common phrasing:
 - If the description or name clearly indicates the user HAS the item (e.g., "I have a vintage camera...", "Selling my old bike...", "Beautiful handmade scarf available for trade...", "My collection of stamps for your..."), classify as "offer".
 - If the description or name clearly indicates the user WANTS the item (e.g., "Looking for a specific book...", "WTB (Want to Buy) a gaming console...", "Need a replacement part for...", "Wanted: Old records"), classify as "want".
-- If unsure, default to "offer".
+- If unsure or ambiguous, default to "offer".
 
 Respond with ONLY the word "offer" or "want".`,
 });
@@ -51,18 +50,19 @@ const inferListingTypeFlow = ai.defineFlow(
     outputSchema: InferListingTypeOutputSchema,
   },
   async (input: InferListingTypeInput): Promise<InferListingTypeOutput> => {
+    const flowName = 'inferListingTypeFlow';
     try {
       const {output} = await prompt(input);
       if (!output || !output.inferredListingType) {
-        console.warn("inferListingTypeFlow: Prompt returned null or empty output for inferredListingType");
+        console.warn(`${flowName}: Prompt returned null or empty output for inferredListingType. Defaulting to 'offer'.`);
         return {
-            inferredListingType: 'offer', // Default to offer on error
-            errorMessage: "The AI assistant could not determine the listing type at this time. Defaulted to 'offer'."
+            inferredListingType: 'offer', 
+            errorMessage: "The AI assistant could not reliably determine the listing type. Defaulted to 'offer'. Please verify."
         };
       }
       return { inferredListingType: output.inferredListingType };
     } catch (error: any) {
-      console.error("Error in inferListingTypeFlow calling prompt:", error);
+      console.error(`Error in ${flowName} calling prompt:`, error);
       let userMessage = "An unexpected error occurred while trying to get an AI listing type suggestion. Defaulted to 'offer'.";
 
       if (error.message && typeof error.message === 'string') {
@@ -73,10 +73,12 @@ const inferListingTypeFlow = ai.defineFlow(
           userMessage = "The AI listing type suggestion service is temporarily overloaded. Please select manually. Defaulted to 'offer'.";
         } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
             userMessage = "The AI listing type suggestion service could not process the request due to content restrictions. Please select manually. Defaulted to 'offer'.";
+        } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
+          userMessage = "The AI's response for listing type was not in the expected format. Defaulted to 'offer'.";
         }
       }
       return {
-        inferredListingType: 'offer', // Default to offer on error
+        inferredListingType: 'offer', 
         errorMessage: userMessage
       };
     }

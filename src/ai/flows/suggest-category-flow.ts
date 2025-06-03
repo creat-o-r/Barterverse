@@ -37,7 +37,7 @@ const prompt = ai.definePrompt({
   Item Description: {{{description}}}
 
   Examples of good categories: "Electronics", "Books & Stationery", "Fashion & Accessories", "Home & Garden", "Collectibles", "Sporting Goods", "Toys & Games", "Handmade Crafts".
-  Try to use one of these if applicable, or a similarly common and clear category. Provide only the category name as your response.`,
+  Try to use one of these if applicable, or a similarly common and clear category. Provide only the category name as your response. If you cannot determine a category, respond with an empty string.`,
 });
 
 const suggestCategoryFlow = ai.defineFlow(
@@ -47,18 +47,26 @@ const suggestCategoryFlow = ai.defineFlow(
     outputSchema: SuggestCategoryOutputSchema,
   },
   async (input: SuggestCategoryInput): Promise<SuggestCategoryOutput> => {
+    const flowName = 'suggestCategoryFlow';
     try {
       const {output} = await prompt(input);
-      if (!output || !output.suggestedCategory) {
-        console.warn("suggestCategoryFlow: Prompt returned null or empty output for suggestedCategory");
+      if (!output) {
+        console.warn(`${flowName}: Prompt returned null output object.`);
         return { 
             suggestedCategory: "",
-            errorMessage: "The AI assistant could not suggest a category at this time." 
+            errorMessage: "The AI assistant gave an empty response for category suggestion." 
+        };
+      }
+      if (!output.suggestedCategory) { // Handles empty string category from LLM
+        console.warn(`${flowName}: Prompt returned an empty string for suggestedCategory.`);
+        return { 
+            suggestedCategory: "",
+            errorMessage: "The AI assistant could not confidently suggest a category for this item. Please enter one manually."
         };
       }
       return { suggestedCategory: output.suggestedCategory };
     } catch (error: any) {
-      console.error("Error in suggestCategoryFlow calling prompt:", error);
+      console.error(`Error in ${flowName} calling prompt:`, error);
       let userMessage = "An unexpected error occurred while trying to get an AI category suggestion.";
 
       if (error.message && typeof error.message === 'string') {
@@ -69,6 +77,8 @@ const suggestCategoryFlow = ai.defineFlow(
           userMessage = "The AI category suggestion service is temporarily overloaded. Please try again in a few moments.";
         } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
             userMessage = "The AI category suggestion service could not process the request due to content restrictions or safety settings.";
+        } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
+          userMessage = "The AI's response for category was not in the expected format.";
         }
       }
       return { 

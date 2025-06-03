@@ -44,7 +44,6 @@ export default function NewItemPage() {
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Simulate current user - in a real app, this would come from auth context
   const currentUserId = dummyUsers[0]?.id;
 
 
@@ -62,69 +61,86 @@ export default function NewItemPage() {
   const handleAiSuggestions = useCallback(async () => {
     const name = form.getValues('name');
     const description = form.getValues('description');
+    console.log('[AI Suggestions] Triggered. Name:', name, 'Description:', description);
+    console.log('[AI Suggestions] Dirty fields:', form.formState.dirtyFields);
+
 
     if (name.length < 3 || description.length < 10) {
+      console.log('[AI Suggestions] Aborted: Name or description too short.');
       return;
     }
 
-    setIsSuggestingCategory(true);
-    try {
-      const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
-      if (categoryResult.errorMessage) {
+    // --- Category Suggestion ---
+    if (!form.formState.dirtyFields.category) {
+        setIsSuggestingCategory(true);
+        console.log('[AI Suggestions] Requesting category suggestion...');
+        try {
+        const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
+        console.log('[AI Suggestions] Category Result:', categoryResult);
+
+        if (categoryResult.errorMessage) {
+            toast({
+            title: "AI Category Suggestion Failed",
+            description: categoryResult.errorMessage,
+            variant: "default",
+            });
+        } else if (categoryResult.suggestedCategory) {
+            form.setValue('category', categoryResult.suggestedCategory, { shouldValidate: true });
+            toast({
+            title: "AI Category Suggested!",
+            description: `We've suggested "${categoryResult.suggestedCategory}" for the category.`,
+            });
+        }
+        // If no error and no suggestion, it means the flow decided not to suggest, which should be handled by an errorMessage from the flow.
+        } catch (error: any) {
+        console.error("Error calling suggestCategory flow from client:", error);
         toast({
-          title: "Category Suggestion Error",
-          description: categoryResult.errorMessage,
-          variant: "destructive",
+            title: "AI System Error (Category)",
+            description: `Could not connect to category suggestion service. ${error.message || ''}`,
+            variant: "destructive",
         });
-      } else if (categoryResult.suggestedCategory) {
-        form.setValue('category', categoryResult.suggestedCategory, { shouldValidate: true });
-        toast({
-          title: "Category Suggested!",
-          description: `We've suggested "${categoryResult.suggestedCategory}" as the category.`,
-        });
-      } else {
-         toast({
-            title: "Category Suggestion",
-            description: "Could not automatically suggest a category. Please enter one if needed.",
-            variant: "default"
-          });
-      }
-    } catch (error) {
-      console.error("Error calling suggestCategory flow:", error);
-      toast({
-        title: "AI System Error",
-        description: "Could not connect to the category suggestion service.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSuggestingCategory(false);
+        } finally {
+        setIsSuggestingCategory(false);
+        console.log('[AI Suggestions] Finished category suggestion attempt.');
+        }
+    } else {
+        console.log('[AI Suggestions] Skipping category suggestion: field is dirty.');
     }
 
-    setIsInferringListingType(true);
-    try {
-      const listingTypeResult: InferListingTypeOutput = await inferListingType({ name, description });
-      if (listingTypeResult.errorMessage) {
+    // --- Listing Type Inference ---
+    if (!form.formState.dirtyFields.listingType) {
+        setIsInferringListingType(true);
+        console.log('[AI Suggestions] Requesting listing type inference...');
+        try {
+        const listingTypeResult: InferListingTypeOutput = await inferListingType({ name, description });
+        console.log('[AI Suggestions] Listing Type Result:', listingTypeResult);
+
+        if (listingTypeResult.errorMessage) {
+            toast({
+            title: "AI Listing Type Inference Failed",
+            description: listingTypeResult.errorMessage,
+            variant: "default",
+            });
+        } else if (listingTypeResult.inferredListingType) {
+            form.setValue('listingType', listingTypeResult.inferredListingType, { shouldValidate: true });
+            toast({
+            title: "AI Listing Type Inferred!",
+            description: `We've inferred this is an "${listingTypeResult.inferredListingType}" listing. You can change it if needed.`,
+            });
+        }
+        } catch (error: any) {
+        console.error("Error calling inferListingType flow from client:", error);
         toast({
-          title: "Listing Type Inference Error",
-          description: listingTypeResult.errorMessage,
-          variant: "destructive",
+            title: "AI System Error (Listing Type)",
+            description: `Could not connect to listing type inference. ${error.message || ''}`,
+            variant: "destructive",
         });
-      } else if (listingTypeResult.inferredListingType) {
-        form.setValue('listingType', listingTypeResult.inferredListingType, { shouldValidate: true });
-        toast({
-          title: "Listing Type Inferred!",
-          description: `We've inferred this is an "${listingTypeResult.inferredListingType}" listing. You can change it if needed.`,
-        });
-      }
-    } catch (error) {
-      console.error("Error calling inferListingType flow:", error);
-      toast({
-        title: "AI System Error",
-        description: "Could not connect to the listing type inference service. Please select manually.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsInferringListingType(false);
+        } finally {
+        setIsInferringListingType(false);
+        console.log('[AI Suggestions] Finished listing type inference attempt.');
+        }
+    } else {
+        console.log('[AI Suggestions] Skipping listing type inference: field is dirty.');
     }
   }, [form, toast]);
 
@@ -145,7 +161,7 @@ export default function NewItemPage() {
         description: data.description,
         category: data.category,
         listingType: data.listingType,
-        imageUrl: data.imageUrl || '', // Ensure imageUrl is always a string
+        imageUrl: data.imageUrl || '', 
         ownerId: currentUserId,
       };
       const addedItem = addNewItemToDummyData(newItemData);
@@ -155,7 +171,6 @@ export default function NewItemPage() {
         description: `${data.name} has been successfully posted.`,
       });
       form.reset();
-      // Redirect to the new item's page or user's profile to see the item
       router.push(`/items/${addedItem.id}`); 
     } catch (error: any) {
         console.error("Error submitting new item:", error);
@@ -214,7 +229,8 @@ export default function NewItemPage() {
                         {...field}
                         disabled={isLoadingOverall}
                         onBlur={() => {
-                            field.onBlur();
+                            field.onBlur(); // Important to call the original onBlur
+                            // Check if specific fields are NOT dirty to trigger AI
                             if (!form.formState.dirtyFields.category || !form.formState.dirtyFields.listingType) {
                                 handleAiSuggestions();
                             }
@@ -238,7 +254,10 @@ export default function NewItemPage() {
                     </FormLabel>
                     <FormControl>
                       <RadioGroup
-                        onValueChange={field.onChange}
+                        onValueChange={(value) => {
+                            field.onChange(value);
+                            form.setValue('listingType', value as 'offer' | 'want', {shouldDirty: true});
+                        }}
                         value={field.value}
                         className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4"
                         disabled={isLoadingOverall}
@@ -262,7 +281,7 @@ export default function NewItemPage() {
                       </RadioGroup>
                     </FormControl>
                      <FormDescription className="font-body">
-                      AI will suggest this based on your description. You can change it.
+                      AI may suggest this based on your description. You can change it.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -283,11 +302,15 @@ export default function NewItemPage() {
                       <Input
                         placeholder={isSuggestingCategory ? "AI is suggesting a category..." : "e.g., Books & Stationery"}
                         {...field}
+                        onChange={(e) => {
+                            field.onChange(e);
+                            form.setValue('category', e.target.value, {shouldDirty: true});
+                        }}
                         disabled={isLoadingOverall} 
                       />
                     </FormControl>
                     <FormDescription className="font-body">
-                      Category will be suggested by AI. Type to override.
+                      AI may suggest a category. Type to override.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -326,4 +349,3 @@ export default function NewItemPage() {
     </div>
   );
 }
-
