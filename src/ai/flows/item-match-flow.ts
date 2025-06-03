@@ -153,7 +153,7 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the followin
 {{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
-{{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else if triggeringUserPreferences.interestedInThirdPartyFulfillment === false}} - Open to 3rd Party Fulfillment: No{{/if}}
+{{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else}} - Open to 3rd Party Fulfillment: No{{/if}}
 Consider these preferences when evaluating match quality. For example, if the user is 'convenience-focused', items requiring complex shipping might be lower priority unless highly desired.
 {{else}}
 No specific preferences provided for the triggering user (ID: {{{triggeringUserId}}}). Focus on general item compatibility and mutual benefit.
@@ -360,7 +360,11 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = `The AI's response (${usedMatchingMode} mode) was not in the expected format. This may indicate a problem with the AI model's output.`;
       } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
         userMessage = `The AI service (${usedMatchingMode} mode) reported an internal error. Please try again later.`;
+      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status || error.name === 'Error' && lowerErrorMessage.includes('parse error')) {
+        // Added check for Handlebars parse error
+        userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue interpreting the request structure. This is often due to template formatting. Please check server logs.`;
       }
+
 
       logAIDiagnostic({
         flowName: flowName,

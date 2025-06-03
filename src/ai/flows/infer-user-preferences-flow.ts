@@ -108,7 +108,7 @@ User's Current Explicit Preferences (to consider and refine):
 {{#if currentPreferences.motivations}} - Motivations: {{#each currentPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if currentPreferences.locationPreference}} - Location: {{#if currentPreferences.locationPreference.isSensitive}}Sensitive (Notes: {{#if currentPreferences.locationPreference.notes}}"{{currentPreferences.locationPreference.notes}}"{{else}}Not specified{{/if}}){{else}}Flexible{{/if}}{{/if}}
 {{#if currentPreferences.tradeTimingPreference}} - Timing: {{{currentPreferences.tradeTimingPreference}}}{{/if}}
-{{#if currentPreferences.interestedInThirdPartyFulfillment}} - 3rd Party Fulfillment: Open{{else if currentPreferences.interestedInThirdPartyFulfillment === false}} - 3rd Party Fulfillment: Prefers Direct{{/if}}
+{{#if currentPreferences.interestedInThirdPartyFulfillment}} - 3rd Party Fulfillment: Open{{else}} - 3rd Party Fulfillment: Prefers Direct{{/if}}
 {{else}}
 User has not specified explicit preferences. Infer based on other data.
 {{/if}}
@@ -281,9 +281,10 @@ const inferUserPreferencesFlow = ai.defineFlow(
         userMessage = "The AI's response for preferences was not in the expected format. This might indicate a schema validation issue with the AI model's output.";
       } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
         userMessage = "The AI preference service reported an internal error. Please try again later.";
-      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status) {
-        userMessage = "The AI model encountered an issue processing the request for preference inference. Default preferences applied. Please check server logs for specific details.";
-        if (error.message && !lowerErrorMessage.includes('unexpected') && !lowerErrorMessage.includes('internal') && !lowerErrorMessage.includes('unknown')) {
+      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status || (error.name === 'Error' && lowerErrorMessage.includes('parse error'))) {
+        // Added check for Handlebars parse error
+        userMessage = "The AI model encountered an issue processing the request for preference inference. This might be due to template formatting. Default preferences applied. Please check server logs for specific details.";
+        if (error.message && !lowerErrorMessage.includes('unexpected') && !lowerErrorMessage.includes('internal') && !lowerErrorMessage.includes('unknown') && !lowerErrorMessage.includes('parse error')) {
             userMessage += ` (Details: ${error.message.substring(0,150)}${error.message.length > 150 ? "..." : ""})`;
         }
       }
