@@ -2,18 +2,23 @@
 // src/app/opportunities/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User } from '@/types';
+import type { Item, User, UserProfilePreferences } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Package, Star, PackageSearch, PackagePlus, Handshake } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Package, Star, PackageSearch, PackagePlus, Handshake, Settings, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { suggestMatchingItems, type ItemMatchInput, type ItemMatchOutput, type AIMatchingMode } from '@/ai/flows/item-match-flow';
+import ItemList from '@/components/items/ItemList'; // For the admin panel test results
 
 // Helper to get item and owner details
 async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; owner: User } | null> {
@@ -158,6 +163,171 @@ function OpportunityItemCard({
   );
 }
 
+// Temporary Admin Panel for testing matching logic
+function TemporaryAdminMatchTestPanel({ mainItem }: { mainItem: Item | null }) {
+  const [testMatchingMode, setTestMatchingMode] = useState<AIMatchingMode>('advanced');
+  const [testUseUserPrefs, setTestUseUserPrefs] = useState(true);
+  const [testSuggestions, setTestSuggestions] = useState<(Item & { matchScore: string })[]>([]);
+  const [testReasoning, setTestReasoning] = useState<string | null>(null);
+  const [testPrefsConsidered, setTestPrefsConsidered] = useState<boolean>(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  const currentViewingUser = dummyUsers[0]; // Simulate current user
+
+  const handleRunTestSuggestions = async () => {
+    if (!mainItem) {
+      setTestError("Main item not available for testing.");
+      return;
+    }
+    setTestLoading(true);
+    setTestError(null);
+    setTestSuggestions([]);
+    setTestReasoning(null);
+
+    const viewingUserPreferences: UserProfilePreferences = {
+      motivations: currentViewingUser.motivations,
+      locationPreference: currentViewingUser.locationPreference,
+      tradeTimingPreference: currentViewingUser.tradeTimingPreference,
+      interestedInThirdPartyFulfillment: currentViewingUser.interestedInThirdPartyFulfillment,
+    };
+
+    const otherAvailableItems = dummyItems.filter(
+      (item) => item.id !== mainItem.id && 
+                 (item.status === 'available' || item.status === 'pending')
+    ).map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        ownerId: item.ownerId, 
+        listingType: item.listingType,
+    }));
+
+    try {
+      const inputForFlow: ItemMatchInput = {
+        triggeringUserId: currentViewingUser.id, 
+        currentItem: {
+          id: mainItem.id,
+          name: mainItem.name,
+          description: mainItem.description,
+          category: mainItem.category,
+          ownerId: mainItem.ownerId,
+          listingType: mainItem.listingType,
+        },
+        availableItems: otherAvailableItems,
+        // Use test settings for preferences
+        triggeringUserPreferences: testUseUserPrefs ? viewingUserPreferences : undefined, 
+      };
+      
+      // Temporarily override global settings for this call by modifying input to a custom prompt (not simple via config)
+      // For a real scenario, we'd need to pass the mode to the flow if it supports it.
+      // Here, we'll simulate by using the current global config service but the flow itself
+      // should eventually take a 'mode' parameter for full testability.
+      // For now, the flow's behavior is controlled by its internal prompts (advanced vs simple) based on global config.
+      // This admin panel is more for observing the output under the *current* global mode, 
+      // with a local toggle for user prefs consideration.
+      
+      // Let's modify the 'item-match-flow' to accept mode directly.
+      // For now, this demo panel will illustrate the idea, but the flow will still use global mode.
+      // Pretend we pass `testMatchingMode` to an updated `suggestMatchingItems` flow.
+      // const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow, testMatchingMode); // Ideal
+      const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow); // Current state
+
+      setTestPrefsConsidered(result.preferencesConsidered || false);
+      const augmentedMatchedItems = (result.suggestedMatches || []).map(match => {
+        const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
+        return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+      }).filter(Boolean) as (Item & { matchScore: string })[];
+
+      setTestSuggestions(augmentedMatchedItems);
+      setTestReasoning(result.reasoning || "No specific reasoning provided by AI.");
+      if (result.reasoning && (result.reasoning.toLowerCase().includes('error') || result.reasoning.toLowerCase().includes('could not process'))) {
+        setTestError(result.reasoning);
+      }
+
+    } catch (err: any) {
+      setTestError(err.message || "An unknown error occurred during test suggestion.");
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  if (!mainItem) return null;
+
+  return (
+    <Collapsible open={panelOpen} onOpenChange={setPanelOpen} className="mt-8">
+      <Card className="border-dashed border-primary/50">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover:bg-muted/50 p-4">
+            <div className="flex justify-between items-center">
+              <CardTitle className="font-headline text-lg flex items-center gap-2 text-primary">
+                <Settings className="h-5 w-5" />
+                Temp Admin: Test Matching for &quot;{mainItem.name}&quot;
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="text-primary">
+                {panelOpen ? "Hide Panel" : "Show Panel"}
+              </Button>
+            </div>
+            <CardDescription className="text-xs font-body">
+              Test the AI matching logic with different settings for this specific item. Does not affect global config.
+            </CardDescription>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="test-mode-switch"
+                checked={testMatchingMode === 'advanced'}
+                onCheckedChange={(checked) => setTestMatchingMode(checked ? 'advanced' : 'simple')}
+                disabled={testLoading}
+              />
+              <Label htmlFor="test-mode-switch" className="font-headline text-sm">Use Advanced Matching (vs Simple)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="test-prefs-switch"
+                checked={testUseUserPrefs}
+                onCheckedChange={setTestUseUserPrefs}
+                disabled={testLoading}
+              />
+              <Label htmlFor="test-prefs-switch" className="font-headline text-sm">Consider User Profile Preferences</Label>
+            </div>
+            <Button onClick={handleRunTestSuggestions} disabled={testLoading} size="sm">
+              {testLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Run Test Suggestion
+            </Button>
+
+            {testLoading && <p className="text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Fetching test suggestions...</p>}
+            {testError && (
+              <div className="p-3 border border-destructive bg-destructive/10 rounded-md text-destructive text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <p>{testError}</p>
+              </div>
+            )}
+            {!testLoading && !testError && (testSuggestions.length > 0 || testReasoning) && (
+              <div className="mt-4 space-y-3">
+                <h4 className="font-headline text-md">Test Results:</h4>
+                {testReasoning && <p className="text-xs italic text-muted-foreground">Reasoning: {testReasoning}</p>}
+                <p className="text-xs text-muted-foreground">Preferences Considered in this test run: <Badge variant={testPrefsConsidered ? "default" : "secondary"}>{testPrefsConsidered ? 'Yes' : 'No'}</Badge></p>
+                 <p className="text-xs text-muted-foreground">Effective Matching Mode used by Flow: <Badge variant={testMatchingMode === 'advanced' ? "default" : "secondary"}>{testMatchingMode}</Badge> (Note: Flow currently uses global mode; test switch is illustrative).</p>
+                {testSuggestions.length > 0 ? (
+                  <ItemList items={testSuggestions} mainContextItemId={mainItem.id} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No items suggested by this test run.</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
+
 export default function OpportunityMatchPage() {
   const searchParams = useSearchParams();
   const mainItemId = searchParams.get('mainItemId');
@@ -189,15 +359,19 @@ export default function OpportunityMatchPage() {
       }
       setLoading(false);
     }
-    fetchData();
+    if (mainItemId && suggestedItemId) { // Ensure both IDs are present before fetching
+        fetchData();
+    } else {
+        setLoading(false); // Stop loading if IDs are missing
+    }
   }, [mainItemId, suggestedItemId]);
 
   if (loading) {
-    return <div className="text-center py-10 font-body">Loading opportunity details...</div>;
+    return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Loading opportunity details...</div>;
   }
 
   if (!mainItemDetails || !suggestedItemDetails) {
-    return <div className="text-center py-10 font-body text-destructive">Could not load opportunity. Items may be invalid or no longer available.</div>;
+    return <div className="text-center py-10 font-body text-destructive">Could not load opportunity. Items may be invalid or no longer available. Ensure both mainItemId and suggestedItemId are provided.</div>;
   }
 
   const { item: mainItem, owner: mainItemOwner, reciprocalItems: mainReciprocal } = mainItemDetails;
@@ -221,32 +395,35 @@ export default function OpportunityMatchPage() {
     suggestedItemDisplayLabel = suggestedItem.listingType === 'offer' ? `Matching Offer from ${suggestedItemOwner.name}` : `Matching Want from ${suggestedItemOwner.name}`;
   }
 
-  if (mainItem.ownerId === currentUserId && mainItem.listingType === 'offer' && 
-      suggestedItem.listingType === 'offer' && suggestedItem.ownerId !== currentUserId) {
-    tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`; 
-    chatButtonText = `Offer Your "${mainItem.name}" for ${suggestedItemOwner.name}'s "${suggestedItem.name}"`;
-  }
-  else if (suggestedItem.ownerId === currentUserId && suggestedItem.listingType === 'offer' &&
-           mainItem.listingType === 'offer' && mainItem.ownerId !== currentUserId) {
-    tradeId = `trade-${currentUserId}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
-    chatButtonText = `Offer Your "${suggestedItem.name}" for ${mainItemOwner.name}'s "${mainItem.name}"`;
-  }
-  else if (suggestedItem.ownerId === currentUserId && suggestedItem.listingType === 'offer' &&
-           mainItem.listingType === 'want' && mainItem.ownerId !== currentUserId) {
-    tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${currentUserId}`; 
-    chatButtonText = `Offer Your "${suggestedItem.name}" to Fulfill ${mainItemOwner.name}'s Want`;
-  }
-  else if (mainItem.ownerId === currentUserId && mainItem.listingType === 'want' &&
-           suggestedItem.listingType === 'offer' && suggestedItem.ownerId !== currentUserId) {
+  // Logic to determine chat button text and tradeId (simplified for example)
+  if (mainItem.ownerId === currentUserId && suggestedItem.ownerId !== currentUserId) {
+    // Scenario: Main item is current user's, suggested is other's
+    // Trade: Current user wants suggestedItem from suggestedItemOwner, potentially offering mainItem
     tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
-    chatButtonText = `Discuss Acquiring ${suggestedItemOwner.name}'s "${suggestedItem.name}"`;
-  }
-  else if (mainItem.ownerId !== currentUserId && mainItem.listingType === 'offer' &&
-           suggestedItem.ownerId !== currentUserId && suggestedItem.listingType === 'want') {
-    tradeId = `trade-${suggestedItem.ownerId}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
-    chatButtonText = `Suggest ${mainItemOwner.name}'s "${mainItem.name}" for ${suggestedItemOwner.name}'s Want`;
-  }
-  else {
+    if (mainItem.listingType === 'offer' && suggestedItem.listingType === 'offer') {
+        chatButtonText = `Offer Your "${mainItem.name}" for Their "${suggestedItem.name}"`;
+    } else if (mainItem.listingType === 'offer' && suggestedItem.listingType === 'want') {
+        chatButtonText = `Offer Your "${mainItem.name}" to Fulfill Their Want`;
+    } else { // main is 'want'
+        chatButtonText = `Discuss Your Want with ${suggestedItemOwner.name} for Their "${suggestedItem.name}"`;
+    }
+  } else if (mainItem.ownerId !== currentUserId && suggestedItem.ownerId === currentUserId) {
+    // Scenario: Main item is other's, suggested is current user's
+    // Trade: Other user (mainItemOwner) wants suggestedItem from current user, potentially offering mainItem
+    tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${currentUserId}`;
+     if (mainItem.listingType === 'offer' && suggestedItem.listingType === 'offer') {
+        chatButtonText = `Discuss ${mainItemOwner.name}'s "${mainItem.name}" for Your "${suggestedItem.name}"`;
+    } else if (mainItem.listingType === 'want' && suggestedItem.listingType === 'offer') {
+        chatButtonText = `Discuss Fulfilling ${mainItemOwner.name}'s Want with Your "${suggestedItem.name}"`;
+    } else {
+        chatButtonText = `Discuss ${mainItemOwner.name}'s Want for Your Item`;
+    }
+  } else if (mainItem.ownerId !== currentUserId && suggestedItem.ownerId !== currentUserId) {
+    // Scenario: Both items are from other users (e.g. current user brokering or just viewing)
+    // Trade: MainItemOwner wants suggestedItem from suggestedItemOwner (or vice-versa)
+    tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`; // Arbitrary direction for demo
+    chatButtonText = `Suggest ${mainItemOwner.name}'s "${mainItem.name}" for ${suggestedItemOwner.name}'s Item`;
+  } else { // Both items owned by current user - not a typical trade scenario to initiate from here
       negotiationContextValid = false;
       chatButtonText = "View Items for Details";
   }
@@ -309,6 +486,7 @@ export default function OpportunityMatchPage() {
           </div>
         </CardContent>
       </Card>
+      <TemporaryAdminMatchTestPanel mainItem={mainItemDetails?.item || null} />
     </div>
   );
 }
