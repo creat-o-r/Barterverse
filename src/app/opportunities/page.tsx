@@ -11,7 +11,7 @@ import type { Item, User, UserProfilePreferences } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Package, Star, PackageSearch, PackagePlus, Handshake, Settings, Loader2, AlertCircle, Link2 } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Settings, Loader2, AlertCircle, Link2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -19,7 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { suggestMatchingItems, type ItemMatchInput, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import type { AIMatchingMode } from '@/services/ai-config-service';
-import ItemList from '@/components/items/ItemList';
+import ItemList from '@/components/items/ItemList'; // Re-using for admin panel
 
 // Helper to get item and owner details
 async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; owner: User } | null> {
@@ -31,97 +31,26 @@ async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; own
   return { item, owner };
 }
 
-// Helper function to find reciprocal items
-function findReciprocalItems(
-  contextItem: Item,
-  otherUserId: string,
-  allItems: Item[]
-): Item[] {
-  const MAX_RECIPROCAL_ITEMS = 2;
-  const potentialReciprocals: Item[] = [];
-
-  if (contextItem.listingType === 'offer') {
-    potentialReciprocals.push(
-      ...allItems.filter(
-        (item) =>
-          item.ownerId === otherUserId &&
-          item.listingType === 'want' &&
-          item.category === contextItem.category &&
-          item.status === 'available' &&
-          item.id !== contextItem.id
-      )
-    );
-  } else { // contextItem.listingType === 'want'
-    potentialReciprocals.push(
-      ...allItems.filter(
-        (item) =>
-          item.ownerId === otherUserId &&
-          item.listingType === 'offer' &&
-          item.category === contextItem.category &&
-          item.status === 'available' &&
-          item.id !== contextItem.id
-      )
-    );
-  }
-  return potentialReciprocals.slice(0, MAX_RECIPROCAL_ITEMS);
-}
-
-// Reciprocal Item Display
-function ReciprocalItemDisplay({ items, contextUserName, itemPerspective }: { items: Item[], contextUserName: string, itemPerspective: "offer" | "want" }) {
-  if (!items || items.length === 0) {
-    return (
-      <div className="mt-3 pt-3 border-t border-dashed">
-        <p className="text-xs text-muted-foreground italic">
-          {contextUserName} has no specific {itemPerspective === 'offer' ? 'wants' : 'offers'} listed in this category right now.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 pt-3 border-t border-dashed">
-      <h4 className="text-xs font-semibold text-muted-foreground mb-1.5">
-        {contextUserName} also {itemPerspective === 'offer' ? 'wants' : 'offers'}:
-      </h4>
-      <div className="space-y-1">
-        {items.map(item => (
-          <Link key={item.id} href={`/items/${item.id}`} className="block group">
-            <Badge
-              variant="outline"
-              className="text-xs font-normal w-full justify-start hover:bg-accent hover:text-accent-foreground transition-colors"
-            >
-              {item.listingType === 'offer' ? <PackagePlus className="h-3 w-3 mr-1.5 text-green-600" /> : <PackageSearch className="h-3 w-3 mr-1.5 text-blue-600" />}
-              <span className="truncate group-hover:underline">{item.name}</span>
-            </Badge>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Main Item display component for this page
+// Simplified Item display component for this page
 function OpportunityItemCard({
     item,
     owner,
-    label,
-    reciprocalItems,
-    reciprocalContextUserName
 }: {
     item: Item;
     owner: User;
-    label: string;
-    reciprocalItems: Item[];
-    reciprocalContextUserName: string;
 }) {
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
-        <div className="flex items-center gap-2 mb-1">
-            {item.listingType === 'offer' ? <Gift className="h-5 w-5 text-green-600" /> : <Search className="h-5 w-5 text-blue-600" />}
-            <CardTitle className="font-headline text-xl line-clamp-2">{item.name}</CardTitle>
+        <div className="flex items-center justify-between">
+            <CardTitle className="font-headline text-xl line-clamp-2 flex items-center gap-2">
+                {item.listingType === 'offer' ? <Gift className="h-5 w-5 text-green-600" /> : <Search className="h-5 w-5 text-blue-600" />}
+                {item.name}
+            </CardTitle>
+            <Badge variant={item.listingType === 'offer' ? 'default' : 'secondary'} className="capitalize ml-2">
+                {item.listingType}
+            </Badge>
         </div>
-        <Badge variant="secondary" className="text-sm font-body py-1 px-1.5 inline-block self-start">{label}</Badge>
       </CardHeader>
       <CardContent className="flex-grow space-y-3">
         <div className="aspect-video relative w-full rounded-md overflow-hidden">
@@ -134,7 +63,7 @@ function OpportunityItemCard({
           />
         </div>
         <p className="text-sm text-muted-foreground line-clamp-3 font-body">{item.description}</p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pt-2 border-t border-dashed">
           <Avatar className="h-8 w-8">
             <AvatarImage src={owner.avatarUrl} alt={owner.name} data-ai-hint={owner.dataAiHint || "owner avatar"}/>
             <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
@@ -146,13 +75,8 @@ function OpportunityItemCard({
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex-col items-stretch gap-2 pt-4">
-        <ReciprocalItemDisplay
-            items={reciprocalItems}
-            contextUserName={reciprocalContextUserName}
-            itemPerspective={item.listingType}
-        />
-        <Button asChild variant="outline" size="sm" className="mt-3">
+      <CardFooter className="flex-col items-stretch gap-2 pt-4 border-t">
+        <Button asChild variant="outline" size="sm">
           <Link href={`/items/${item.id}`}><Eye className="mr-2 h-4 w-4" /> View Full Details</Link>
         </Button>
       </CardFooter>
@@ -169,9 +93,9 @@ function TemporaryAdminMatchTestPanel({ mainItem }: { mainItem: Item | null }) {
   const [testPrefsConsidered, setTestPrefsConsidered] = useState<boolean>(false);
   const [testLoading, setTestLoading] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
-  const [panelOpen, setPanelOpen] = useState(false); // Default to closed for better initial view
+  const [panelOpen, setPanelOpen] = useState(false);
 
-  const currentViewingUser = dummyUsers[0];
+  const currentViewingUser = dummyUsers[0]; // Simulate current user
 
   const handleRunTestSuggestions = async () => {
     if (!mainItem) {
@@ -238,10 +162,10 @@ function TemporaryAdminMatchTestPanel({ mainItem }: { mainItem: Item | null }) {
     }
   };
 
-  if (!mainItem) return null; // Should not happen if called correctly
+  if (!mainItem) return null;
 
   return (
-    <Collapsible open={panelOpen} onOpenChange={setPanelOpen} className="mt-4 border-t pt-4">
+    <Collapsible open={panelOpen} onOpenChange={setPanelOpen} className="mt-4 border-t pt-4 w-full">
         <CollapsibleTrigger asChild>
             <Button variant="outline" size="sm" className="w-full flex justify-between items-center text-left mb-2">
                 <span className="font-headline text-sm flex items-center gap-2 text-primary">
@@ -254,7 +178,7 @@ function TemporaryAdminMatchTestPanel({ mainItem }: { mainItem: Item | null }) {
         <CollapsibleContent>
           <div className="p-4 border rounded-md bg-muted/30 space-y-4">
             <CardDescription className="text-xs font-body mb-2">
-              Test the AI matching logic with different settings for this specific item. This panel's mode setting is illustrative; the flow uses global mode.
+              Test the AI matching logic with different settings for this specific item.
             </CardDescription>
             <div className="flex items-center space-x-2">
               <Switch
@@ -291,7 +215,7 @@ function TemporaryAdminMatchTestPanel({ mainItem }: { mainItem: Item | null }) {
                 <h4 className="font-headline text-md">Test Results:</h4>
                 {testReasoning && <p className="text-xs italic text-muted-foreground">Reasoning: {testReasoning}</p>}
                 <p className="text-xs text-muted-foreground">Preferences Considered in this test run: <Badge variant={testPrefsConsidered ? "default" : "secondary"}>{testPrefsConsidered ? 'Yes' : 'No'}</Badge></p>
-                 <p className="text-xs text-muted-foreground">Illustrative Matching Mode for this test: <Badge variant={testMatchingMode === 'advanced' ? "default" : "secondary"}>{testMatchingMode}</Badge></p>
+                <p className="text-xs text-muted-foreground">Illustrative Matching Mode for this test: <Badge variant={testMatchingMode === 'advanced' ? "default" : "secondary"}>{testMatchingMode}</Badge></p>
                 {testSuggestions.length > 0 ? (
                   <ItemList items={testSuggestions} mainContextItemId={mainItem.id} />
                 ) : (
@@ -311,30 +235,20 @@ export default function OpportunityMatchPage() {
   const mainItemId = searchParams.get('mainItemId');
   const suggestedItemId = searchParams.get('suggestedItemId');
 
-  const [mainItemDetails, setMainItemDetails] = useState<{ item: Item; owner: User; reciprocalItems: Item[] } | null>(null);
-  const [suggestedItemDetails, setSuggestedItemDetails] = useState<{ item: Item; owner: User; reciprocalItems: Item[] } | null>(null);
+  const [mainItemDetails, setMainItemDetails] = useState<{ item: Item; owner: User } | null>(null);
+  const [suggestedItemDetails, setSuggestedItemDetails] = useState<{ item: Item; owner: User } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const currentUserId = dummyUsers[0].id;
+  const currentUserId = dummyUsers[0].id; // Simulate current user
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const mainDetailsPromise = getItemAndOwner(mainItemId);
-      const suggestedDetailsPromise = getItemAndOwner(suggestedItemId);
+      const mainD = await getItemAndOwner(mainItemId);
+      const suggestedD = await getItemAndOwner(suggestedItemId);
 
-      const [mainD, suggestedD] = await Promise.all([mainDetailsPromise, suggestedDetailsPromise]);
-
-      if (mainD && suggestedD) {
-        const reciprocalForMain = findReciprocalItems(mainD.item, suggestedD.owner.id, dummyItems);
-        const reciprocalForSuggested = findReciprocalItems(suggestedD.item, mainD.owner.id, dummyItems);
-
-        setMainItemDetails({ ...mainD, reciprocalItems: reciprocalForMain });
-        setSuggestedItemDetails({ ...suggestD, reciprocalItems: reciprocalForSuggested });
-      } else {
-        setMainItemDetails(null);
-        setSuggestedItemDetails(null);
-      }
+      setMainItemDetails(mainD);
+      setSuggestedItemDetails(suggestedD);
       setLoading(false);
     }
     if (mainItemId && suggestedItemId) {
@@ -352,51 +266,33 @@ export default function OpportunityMatchPage() {
     return <div className="text-center py-10 font-body text-destructive">Could not load opportunity. Items may be invalid or no longer available. Ensure both mainItemId and suggestedItemId are provided.</div>;
   }
 
-  const { item: mainItem, owner: mainItemOwner, reciprocalItems: mainReciprocal } = mainItemDetails;
-  const { item: suggestedItem, owner: suggestedItemOwner, reciprocalItems: suggestedReciprocal } = suggestedItemDetails;
+  const { item: mainItem, owner: mainItemOwner } = mainItemDetails;
+  const { item: suggestedItem, owner: suggestedItemOwner } = suggestedItemDetails;
 
   let tradeId = '';
   let chatButtonText = 'Start Negotiation';
   let negotiationContextValid = true;
 
-  let mainItemDisplayLabel = "Context Item";
-  if (mainItem.ownerId === currentUserId) {
-    mainItemDisplayLabel = mainItem.listingType === 'offer' ? "Your Offer" : "Your Want";
-  } else {
-    mainItemDisplayLabel = mainItem.listingType === 'offer' ? `${mainItemOwner.name}'s Offer` : `${mainItemOwner.name}'s Want`;
-  }
-
-  let suggestedItemDisplayLabel = "Matching Item";
-   if (suggestedItem.ownerId === currentUserId) {
-    suggestedItemDisplayLabel = suggestedItem.listingType === 'offer' ? "Your Matching Offer" : "Your Matching Want";
-  } else {
-    suggestedItemDisplayLabel = suggestedItem.listingType === 'offer' ? `Matching Offer from ${suggestedItemOwner.name}` : `Matching Want from ${suggestedItemOwner.name}`;
-  }
-
+  // Logic to determine who is offering what to whom for chat context
+  // This assumes 'mainItem' is the item the current user owns or was viewing,
+  // and 'suggestedItem' is the match.
   if (mainItem.ownerId === currentUserId && suggestedItem.ownerId !== currentUserId) {
+    // Current user owns mainItem, is interested in suggestedItem from other user
     tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
-    if (mainItem.listingType === 'offer' && suggestedItem.listingType === 'offer') {
-        chatButtonText = `Offer Your "${mainItem.name}" for Their "${suggestedItem.name}"`;
-    } else if (mainItem.listingType === 'offer' && suggestedItem.listingType === 'want') {
-        chatButtonText = `Offer Your "${mainItem.name}" to Fulfill Their Want`;
-    } else {
-        chatButtonText = `Discuss Your Want with ${suggestedItemOwner.name} for Their "${suggestedItem.name}"`;
-    }
+    chatButtonText = `Negotiate Your "${mainItem.name}" for Their "${suggestedItem.name}"`;
   } else if (mainItem.ownerId !== currentUserId && suggestedItem.ownerId === currentUserId) {
+    // MainItem is owned by other, current user owns suggestedItem (this case is less likely from AI suggestions flow)
     tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${currentUserId}`;
-     if (mainItem.listingType === 'offer' && suggestedItem.listingType === 'offer') {
-        chatButtonText = `Discuss ${mainItemOwner.name}'s "${mainItem.name}" for Your "${suggestedItem.name}"`;
-    } else if (mainItem.listingType === 'want' && suggestedItem.listingType === 'offer') {
-        chatButtonText = `Discuss Fulfilling ${mainItemOwner.name}'s Want with Your "${suggestedItem.name}"`;
-    } else {
-        chatButtonText = `Discuss ${mainItemOwner.name}'s Want for Your Item`;
-    }
+    chatButtonText = `Negotiate Their "${mainItem.name}" for Your "${suggestedItem.name}"`;
   } else if (mainItem.ownerId !== currentUserId && suggestedItem.ownerId !== currentUserId) {
-    tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
-    chatButtonText = `Suggest ${mainItemOwner.name}'s "${mainItem.name}" for ${suggestedItemOwner.name}'s Item`;
-  } else {
+    // Both items owned by others, current user is a third party viewer
+    // This might be a "broker" scenario if we implement it. For now, just a generic chat.
+    tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`; // A bit arbitrary for 3rd party
+    chatButtonText = `Discuss ${mainItemOwner.name}'s Item & ${suggestedItemOwner.name}'s Item`;
+     // Potentially disable direct negotiation if user doesn't own either
+  } else { // Both items owned by current user - invalid scenario for a trade with another.
       negotiationContextValid = false;
-      chatButtonText = "View Items for Details";
+      chatButtonText = "View Items Separately";
   }
 
 
@@ -404,38 +300,31 @@ export default function OpportunityMatchPage() {
     <div className="max-w-5xl mx-auto space-y-8">
       <Card>
         <CardHeader className="text-center">
-          <Handshake className="mx-auto h-10 w-10 text-primary mb-2" />
+          <ArrowRightLeft className="mx-auto h-10 w-10 text-primary mb-2" />
           <CardTitle className="font-headline text-3xl">Trade Opportunity</CardTitle>
           <CardDescription className="font-body">
-            AI suggests a potential match. Review the items and their reciprocal interests.
+            AI suggests a potential match between these two items.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="hidden md:flex items-center justify-center my-2 md:my-4">
-              <ArrowRightLeft className="h-10 w-10 text-muted-foreground" />
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 items-start">
             {/* Main Item Card and its Admin Panel */}
-            <div className="flex flex-col">
+            <div className="flex flex-col items-center"> {/* Added flex flex-col items-center */}
               <OpportunityItemCard
                   item={mainItem}
                   owner={mainItemOwner}
-                  label={mainItemDisplayLabel}
-                  reciprocalItems={mainReciprocal}
-                  reciprocalContextUserName={suggestedItemOwner.name}
               />
-              {mainItem && <TemporaryAdminMatchTestPanel mainItem={mainItem} />}
+              {/* Admin panel is now here, associated with mainItem */}
+              <TemporaryAdminMatchTestPanel mainItem={mainItem} />
             </div>
 
             {/* Suggested Item Card */}
-            <OpportunityItemCard
-                item={suggestedItem}
-                owner={suggestedItemOwner}
-                label={suggestedItemDisplayLabel}
-                reciprocalItems={suggestedReciprocal}
-                reciprocalContextUserName={mainItemOwner.name}
-            />
+            <div className="flex flex-col items-center"> {/* Added flex flex-col items-center for consistency */}
+              <OpportunityItemCard
+                  item={suggestedItem}
+                  owner={suggestedItemOwner}
+              />
+            </div>
           </div>
           <Separator className="my-6 md:my-8" />
           <div className="text-center">
@@ -449,7 +338,7 @@ export default function OpportunityMatchPage() {
             ) : (
                 <div className="space-y-2">
                     <p className="text-muted-foreground font-body">
-                        This opportunity may involve items from multiple other users or a different trade dynamic.
+                        This opportunity may involve items from multiple other users or your own items.
                         Please visit the individual item pages to initiate contact or explore further.
                     </p>
                     <div className="flex gap-2 justify-center">
@@ -461,7 +350,7 @@ export default function OpportunityMatchPage() {
           </div>
         </CardContent>
       </Card>
-      {/* The global TestPanel was here, it is now moved inside the main item's card rendering logic. */}
     </div>
   );
 }
+
