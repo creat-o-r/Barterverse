@@ -36,8 +36,9 @@ const UserPreferencesSchema = z.object({
     notes: z.string().optional(),
   }).optional(),
   tradeTimingPreference: z.enum(['simultaneous', 'staged', 'flexible']).optional(),
-  interestedInThirdPartyFulfillment: z.boolean().optional(),
+  interestedInThirdPartyFulfillment: z.boolean().optional(), // Keep original boolean for data consistency
   minimumMatchRating: z.enum(['Low', 'Medium', 'High']).describe("User's global minimum match rating preference. This will always be set, defaulting to 'Low' if user hasn't specified one."),
+  fulfillmentPreferenceDisplay: z.string().describe("Display string for 3rd party fulfillment preference: 'Yes', 'No', or a comment indicating not set."),
 }).describe("The triggering user's trading preferences.");
 
 
@@ -52,7 +53,7 @@ const BaseItemMatchInputSchema = z.object({
 const ItemMatchFlowInputSchema = BaseItemMatchInputSchema;
 export type ItemMatchInput = z.infer<typeof ItemMatchFlowInputSchema>;
 
-// Input schema for the advanced prompt, including user preferences (minimumMatchRating is now always present)
+// Input schema for the advanced prompt, including user preferences
 const AdvancedItemMatchPromptInputSchema = BaseItemMatchInputSchema.extend({
   triggeringUserPreferences: UserPreferencesSchema,
 });
@@ -149,10 +150,8 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the followin
 {{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
-{{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else if triggeringUserPreferences.interestedInThirdPartyFulfillment === false}} - Open to 3rd Party Fulfillment: No{{else}}<!-- No explicit 3rd party fulfillment preference set -->{{/if}}
+ - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
-
-Consider these preferences when evaluating match quality and potential for reciprocal trades.
 
 Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: Description):
 {{#each availableItems}}
@@ -167,7 +166,7 @@ MINIMUM MATCH SCORE RULE:
 {{#if currentItem.minimumMatchRatingOverride}}
 The 'Current Item' has an OVERRIDE, REQUIRING suggestions to have a match score of at least '{{{currentItem.minimumMatchRatingOverride}}}'. Do NOT suggest any items you score lower than this.
 {{else}}
-The 'Current Item' uses the user's profile preference. The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level. You MUST NOT suggest items with a score lower than this.
+The 'Current Item' uses the user's profile preference. The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level. You MUST NOT suggest items with a match score lower than this.
 {{/if}}
 
 Prioritize:
@@ -244,13 +243,21 @@ const itemMatchFlow = ai.defineFlow(
       promptToUse = advancedItemMatchPrompt;
       const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
+      
+      let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
+      if (userProfile?.interestedInThirdPartyFulfillment === true) {
+        fulfillmentDisplayText = "Yes";
+      } else if (userProfile?.interestedInThirdPartyFulfillment === false) {
+        fulfillmentDisplayText = "No";
+      }
 
-      const userPrefsForPrompt: UserProfilePreferences = {
+      const userPrefsForPrompt: z.infer<typeof UserPreferencesSchema> = {
         motivations: userProfile?.motivations,
         locationPreference: userProfile?.locationPreference,
         tradeTimingPreference: userProfile?.tradeTimingPreference,
         interestedInThirdPartyFulfillment: userProfile?.interestedInThirdPartyFulfillment,
         minimumMatchRating: effectiveUserMinRating,
+        fulfillmentPreferenceDisplay: fulfillmentDisplayText,
       };
 
       finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
@@ -259,14 +266,15 @@ const itemMatchFlow = ai.defineFlow(
         const hasMeaningfulMotivations = !!(userProfile?.motivations && userProfile.motivations.length > 0);
         const hasMeaningfulLocationPref = !!(userProfile?.locationPreference && (userProfile.locationPreference.isSensitive || (userProfile.locationPreference.notes && userProfile.locationPreference.notes.trim() !== '')));
         const hasMeaningfulTimingPref = !!userProfile?.tradeTimingPreference;
-        const hasMeaningful3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
+        // Check if interestedInThirdPartyFulfillment is explicitly set (true or false), not just undefined
+        const hasExplicit3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
         const hasNonDefaultMinRating = !!(userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low');
 
         preferencesConsideredBeyondDefaultMinRating =
           hasMeaningfulMotivations ||
           hasMeaningfulLocationPref ||
           hasMeaningfulTimingPref ||
-          hasMeaningful3rdPartyPref ||
+          hasExplicit3rdPartyPref || // Use the explicit check here
           hasNonDefaultMinRating;
       } else {
         preferencesConsideredBeyondDefaultMinRating = false; // Global setting is off
