@@ -194,16 +194,14 @@ export default function MatchReportsPage() {
             <Button onClick={fetchReports} disabled={isLoadingReports} variant="outline" size="sm"><RefreshCw className={`mr-2 h-4 w-4 ${isLoadingReports ? 'animate-spin' : ''}`} />Refresh Logs</Button>
           </div>
         </CardHeader>
-        {/* Apply p-0 to CardContent and make it a flex container, add max-h */}
         <CardContent className="p-0 max-h-[70vh] flex flex-col">
           {isLoadingReports ? (
              <div className="p-6 text-center py-12 text-muted-foreground font-body flex items-center justify-center gap-2"><RefreshCw className="h-5 w-5 animate-spin" /> Loading suggestion logs...</div>
           ) : reports.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</div>
           ) : (
-            // This div will handle the scrolling for the table
-            <div className="overflow-auto flex-grow">
-              <Table className="min-w-full">
+            <div className="flex-1 min-h-0"> {/* This div takes available height and allows Table to scroll */}
+              <Table className="min-w-full h-full"> {/* Table takes full height of its parent and handles its own scroll */}
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="w-[180px]">Timestamp</TableHead>
@@ -252,3 +250,4 @@ export default function MatchReportsPage() {
     </div>
   );
 }
+
