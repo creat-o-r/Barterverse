@@ -105,7 +105,6 @@ export default function OpportunityMatchPage() {
         setMainItemDetails(mainD);
         setSuggestedItemDetails(suggestedD);
         
-        // Fetch reasoning for this specific opportunity
         setLoadingReasoning(true);
         try {
             const inputForReasoning: Parameters<typeof suggestMatchingItems>[0] = {
@@ -118,7 +117,7 @@ export default function OpportunityMatchPage() {
                     ownerId: mainD.item.ownerId,
                     listingType: mainD.item.listingType,
                 },
-                availableItems: [{ // Only the suggested item is "available" for this reasoning context
+                availableItems: [{ 
                     id: suggestedD.item.id,
                     name: suggestedD.item.name,
                     description: suggestedD.item.description,
@@ -198,18 +197,12 @@ export default function OpportunityMatchPage() {
   } else { 
     mainItemOpportunityLabel = `${mainItemOwner.name}'s ${mainItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
     suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s ${suggestedItem.listingType === 'offer' ? 'Matching Offer' : 'Matching Want'}`;
-    // For non-user-involved opportunities, generate a more generic discussion ID
-    // This specific tradeId format is for direct negotiation start.
-    // If neither item belongs to the current user, direct chat might not be the primary action from this page.
-    // However, for demo purposes, we can still create a link if needed, or guide user to item pages.
-    tradeId = `discuss-${mainItem.id}-with-${suggestedItem.id}`; // A generic ID
+    tradeId = `discuss-${mainItem.id}-with-${suggestedItem.id}`; 
     chatButtonText = `Discuss This Opportunity`;
-    // Potentially disable direct chat button or change its text if current user owns neither.
-    // For now, assume a discussion can be initiated.
   }
    if (mainItem.ownerId === currentUserId && suggestedItem.ownerId === currentUserId) {
-    negotiationContextValid = false; // User can't trade with themselves
-    chatButtonText = "View Items Separately"; // Or some other appropriate text
+    negotiationContextValid = false; 
+    chatButtonText = "View Items Separately"; 
   }
 
 
@@ -230,7 +223,7 @@ export default function OpportunityMatchPage() {
             </div>
            )}
            {!loadingReasoning && opportunityReasoning && (
-             <Card className="bg-muted/50 border-primary/30">
+             <Card className="bg-muted/50 border-primary/30 mb-6">
                 <CardHeader className="pb-2 pt-3">
                     <CardTitle className="font-headline text-base flex items-center gap-2"><FileText className="h-4 w-4 text-primary"/>AI's Rationale for this Match</CardTitle>
                 </CardHeader>
