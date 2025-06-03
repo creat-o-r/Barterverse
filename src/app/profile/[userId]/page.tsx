@@ -172,6 +172,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
   const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
   const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
   const tradedOrFulfilledItems = user.items.filter(item => item.status === 'traded');
+  const effectiveMinimumMatchRating = user.minimumMatchRating || 'Low';
 
   return (
     <div className="space-y-8">
@@ -210,14 +211,22 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
-          {user.minimumMatchRating && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Filter className="h-4 w-4 text-muted-foreground"/>Minimum Match Rating:</h4><Badge variant="outline" className="text-xs">{user.minimumMatchRating}</Badge></div>)}
+          <div>
+            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">
+              <Filter className="h-4 w-4 text-muted-foreground"/>Minimum Match Rating:
+            </h4>
+            <Badge variant="outline" className="text-xs capitalize">
+              {effectiveMinimumMatchRating}
+              {!user.minimumMatchRating && <span className="ml-1.5 opacity-70">(Default)</span>}
+            </Badge>
+          </div>
           <div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4><Badge variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"} className="text-xs">{user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}</Badge></div>
           {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
           {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Preference:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
           {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
           
           {!user.minimumMatchRating && (!user.motivations || user.motivations.length === 0) && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined && (
-            <p className="text-sm text-muted-foreground font-body">No specific preferences set yet.</p>
+            <p className="text-sm text-muted-foreground font-body">No specific preferences set yet (defaults will apply).</p>
           )}
         
           {isOwnProfile && allowAutoPreferenceInference && (
@@ -255,4 +264,3 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
-

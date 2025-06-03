@@ -35,8 +35,8 @@ const itemFormSchema = z.object({
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  minimumMatchRatingOverride: z.enum(['none', 'Low', 'Medium', 'High'])
-    .describe("Optional override for the minimum match rating for this specific item. 'none' means no override."),
+  minimumMatchRatingOverride: z.enum(['', 'Low', 'Medium', 'High']).optional()
+    .describe("Optional override for the minimum match rating for this specific item. Empty string means use profile default."),
   isGiftItForward: z.boolean().optional(),
 });
 
@@ -59,7 +59,7 @@ export default function NewItemPage() {
       category: '',
       imageUrl: '',
       listingType: 'offer',
-      minimumMatchRatingOverride: 'none', 
+      minimumMatchRatingOverride: '', 
       isGiftItForward: false,
     },
   });
@@ -169,7 +169,7 @@ export default function NewItemPage() {
         listingType: data.listingType,
         imageUrl: data.imageUrl || '', 
         ownerId: currentUserId,
-        minimumMatchRatingOverride: data.minimumMatchRatingOverride === 'none' ? undefined : data.minimumMatchRatingOverride as 'Low' | 'Medium' | 'High',
+        minimumMatchRatingOverride: data.minimumMatchRatingOverride === '' ? undefined : data.minimumMatchRatingOverride as 'Low' | 'Medium' | 'High',
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false, // Only 'offer' items can be gifts
       };
       const addedItem = addNewItemToDummyData(newItemData);
@@ -347,30 +347,30 @@ export default function NewItemPage() {
                   <FormItem>
                     <FormLabel className="font-headline flex items-center gap-2">
                       <Filter className="h-5 w-5 text-muted-foreground" />
-                      Minimum Match Rating (Optional Override)
+                      Minimum Match Rating (Optional Item Override)
                     </FormLabel>
                     <Select 
                         onValueChange={(value) => {
                             field.onChange(value);
-                            form.setValue('minimumMatchRatingOverride', value as 'none' | 'Low' | 'Medium' | 'High', {shouldDirty: true});
+                            form.setValue('minimumMatchRatingOverride', value as '' | 'Low' | 'Medium' | 'High', {shouldDirty: true});
                         }} 
                         value={field.value} 
                         disabled={isLoadingOverall}
                     >
                       <FormControl>
                         <SelectTrigger disabled={isLoadingOverall}>
-                          <SelectValue placeholder="None (use profile default)" />
+                          <SelectValue placeholder="Use profile default" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="none">None (use profile default)</SelectItem>
+                        <SelectItem value="">Use profile default</SelectItem>
                         <SelectItem value="Low">Low</SelectItem>
                         <SelectItem value="Medium">Medium</SelectItem>
                         <SelectItem value="High">High</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription className="font-body">
-                      Override your profile&apos;s default minimum match rating for this specific item.
+                      Optionally override your profile's default minimum match rating for this specific item.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -404,6 +404,7 @@ export default function NewItemPage() {
                   )}
                 />
               )}
+
 
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
                 {isLoadingOverall ? (
