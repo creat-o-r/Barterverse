@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getLoggedMatchSuggestions, type LoggedMatchSuggestion } from '@/services/match-report-service';
+import { getLoggedMatchSuggestions, getMatchSuggestionLogRawContent, type LoggedMatchSuggestion } from '@/services/match-report-service';
 import {
   getAIMatchingMode,
   setAIMatchingMode as setAIMatchingModeService,
@@ -12,11 +12,12 @@ import {
   getEnableAutomaticPreferenceInference,
   setEnableAutomaticPreferenceInference as setEnableAutomaticPreferenceInferenceService
 } from '@/services/ai-config-service';
-import { getFeedbackLogContent } from '@/services/feedback-service'; // Import new server action
+import { getFeedbackLogContent } from '@/services/feedback-service';
+import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service'; // New import
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -52,7 +53,9 @@ export default function MatchReportsPage() {
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
-  const [isCopyingLog, setIsCopyingLog] = useState(false);
+  const [isCopyingFeedbackLog, setIsCopyingFeedbackLog] = useState(false);
+  const [isCopyingMatchLog, setIsCopyingMatchLog] = useState(false);
+  const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
   const { toast } = useToast();
 
   const fetchReports = async () => {
@@ -134,26 +137,30 @@ export default function MatchReportsPage() {
     } finally { setIsUpdatingAutoPrefToggle(false); }
   };
 
-  const handleCopyFeedbackLog = async () => {
-    setIsCopyingLog(true);
+  const copyToClipboard = async (fetchContent: () => Promise<{ success: boolean; content?: string; error?: string }>, setIsCopyingState: (isCopying: boolean) => void, logName: string) => {
+    setIsCopyingState(true);
     try {
-      const result = await getFeedbackLogContent();
-      if (result.success && result.content) {
+      const result = await fetchContent();
+      if (result.success && result.content !== undefined) {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(result.content);
-          toast({ title: "Success", description: "Feedback log copied to clipboard!" });
+          toast({ title: "Success", description: `${logName} copied to clipboard!` });
         } else {
           toast({ title: "Clipboard Error", description: "Clipboard API not available. Could not copy.", variant: "destructive" });
         }
       } else {
-        throw new Error(result.error || "Failed to fetch feedback log content.");
+        throw new Error(result.error || `Failed to fetch ${logName} content.`);
       }
     } catch (error: any) {
-      toast({ title: "Copy Failed", description: error.message || "Could not copy feedback log.", variant: "destructive" });
+      toast({ title: "Copy Failed", description: error.message || `Could not copy ${logName}.`, variant: "destructive" });
     } finally {
-      setIsCopyingLog(false);
+      setIsCopyingState(false);
     }
   };
+
+  const handleCopyFeedbackLog = () => copyToClipboard(getFeedbackLogContent, setIsCopyingFeedbackLog, "Feedback User Report Log");
+  const handleCopyMatchLog = () => copyToClipboard(getMatchSuggestionLogRawContent, setIsCopyingMatchLog, "Raw Match Suggestion Log");
+  const handleCopyDiagnosticLog = () => copyToClipboard(getAIDiagnosticLogContent, setIsCopyingDiagnosticLog, "AI Diagnostic Log");
 
 
   return (
@@ -267,10 +274,18 @@ export default function MatchReportsPage() {
             </div>
           )}
         </CardContent>
-         <CardFooter className="border-t p-4">
-             <Button onClick={handleCopyFeedbackLog} disabled={isCopyingLog} variant="outline" size="sm">
-                <ClipboardCopy className={`mr-2 h-4 w-4 ${isCopyingLog ? 'animate-spin' : ''}`} />
-                {isCopyingLog ? "Copying..." : "Copy Feedback User Report Log to Clipboard"}
+         <CardFooter className="border-t p-4 flex flex-wrap gap-2">
+             <Button onClick={handleCopyFeedbackLog} disabled={isCopyingFeedbackLog} variant="outline" size="sm">
+                <ClipboardCopy className={`mr-2 h-4 w-4 ${isCopyingFeedbackLog ? 'animate-spin' : ''}`} />
+                {isCopyingFeedbackLog ? "Copying..." : "Copy Feedback Log"}
+            </Button>
+            <Button onClick={handleCopyMatchLog} disabled={isCopyingMatchLog} variant="outline" size="sm">
+                <ClipboardCopy className={`mr-2 h-4 w-4 ${isCopyingMatchLog ? 'animate-spin' : ''}`} />
+                {isCopyingMatchLog ? "Copying..." : "Copy Raw Match Log"}
+            </Button>
+            <Button onClick={handleCopyDiagnosticLog} disabled={isCopyingDiagnosticLog} variant="outline" size="sm">
+                <Bug className={`mr-2 h-4 w-4 ${isCopyingDiagnosticLog ? 'animate-spin' : ''}`} />
+                {isCopyingDiagnosticLog ? "Copying..." : "Copy AI Diagnostic Log"}
             </Button>
          </CardFooter>
       </Card>

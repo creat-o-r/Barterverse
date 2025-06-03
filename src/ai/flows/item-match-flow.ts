@@ -16,6 +16,7 @@ import { logMatchSuggestion } from '@/services/match-report-service';
 import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '@/services/ai-config-service';
 import { dummyUsers } from '@/lib/dummy-data'; // For fetching user preferences
 import type { UserProfilePreferences } from '@/types';
+import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 
 const ItemBriefSchema = z.object({
   id: z.string(),
@@ -336,10 +337,8 @@ const itemMatchFlow = ai.defineFlow(
           if ('code' in error && !('status' in errorDetails)) errorDetails.code = (error as any).code;
       }
       try {
-        // Log the full error object more reliably
         console.error(`Detailed error object in ${flowName} (${usedMatchingMode} mode):`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
-        // Fallback if the above stringify fails (e.g. circular refs not handled by this method)
         console.error(`Could not stringify full error object in ${flowName} (${usedMatchingMode} mode). Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
         console.error(`Original error object was:`, error);
       }
@@ -347,14 +346,14 @@ const itemMatchFlow = ai.defineFlow(
       let userMessage = `An unexpected error occurred while trying to get AI suggestions (${usedMatchingMode} mode). Please check server logs.`;
       const lowerErrorMessage = String(error.message || "").toLowerCase();
 
-      if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
+      if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
+        userMessage = `The AI matching service (${usedMatchingMode} mode) received a bad request. This might be due to problematic input data (Item ID: ${input.currentItem.id}) or an issue with the prompt structure. Please check server logs for details on the input.`;
+      } else if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) has reached its current usage limit. Please try again later.`;
       } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) is temporarily overloaded or unavailable. Please try again.`;
       } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
         userMessage = `Authentication error with the AI service (${usedMatchingMode} mode). Please check API key configuration.`;
-      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
-        userMessage = `The AI matching service (${usedMatchingMode} mode) received a bad request. This might be due to problematic input data or an issue with the prompt structure. Please check server logs for details on the input.`;
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) could not process the request due to content restrictions.`;
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
@@ -363,6 +362,21 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = `The AI service (${usedMatchingMode} mode) reported an internal error. Please try again later.`;
       }
 
+      logAIDiagnostic({
+        flowName: flowName,
+        triggeringUserId: input.triggeringUserId,
+        input: finalInputForPrompt,
+        error: {
+          name: errorDetails.name,
+          message: errorDetails.message,
+          stack: errorDetails.stack,
+          details: errorDetails.details,
+          status: errorDetails.status,
+          code: errorDetails.code,
+        },
+        userFacingMessage: userMessage,
+      }).catch(diagError => console.error("Error logging diagnostic for itemMatchFlow:", diagError));
+      
       console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${errorDetails.name || 'Error'}: ${errorDetails.message || 'No message available'}".`);
 
       const errorOutput: ItemMatchOutput = {

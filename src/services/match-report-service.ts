@@ -37,8 +37,14 @@ async function readLogs(): Promise<LoggedMatchSuggestion[]> {
     }));
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      await fs.writeFile(LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8'); 
-      return [];
+      // If file doesn't exist, create it with an empty array
+      try {
+        await fs.writeFile(LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+        return [];
+      } catch (writeError) {
+         console.error('[Match Report Service] Error creating log file:', writeError);
+         return []; // Return empty if creation fails
+      }
     }
     console.error('[Match Report Service] Error reading log file:', error);
     return []; 
@@ -74,4 +80,24 @@ export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'time
 export async function getLoggedMatchSuggestions(): Promise<LoggedMatchSuggestion[]> {
   const logs = await readLogs();
   return logs;
+}
+
+export async function getMatchSuggestionLogRawContent(): Promise<{ success: boolean; content?: string; error?: string }> {
+  try {
+    await fs.access(LOG_FILE_PATH);
+    const fileContent = await fs.readFile(LOG_FILE_PATH, 'utf-8');
+    if (fileContent.trim() === '') {
+      return { success: true, content: "[]" }; // Return empty array string if file is empty
+    }
+    return { success: true, content: fileContent };
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      return { success: true, content: "[]" }; // File doesn't exist, treat as empty log
+    }
+    console.error('[Match Report Service] Error reading raw match suggestion log content:', error);
+    if (error instanceof SyntaxError) {
+         return { success: false, error: 'Match suggestion log file is not valid JSON. Please check its content.' };
+    }
+    return { success: false, error: 'Could not read match suggestion log file.' };
+  }
 }

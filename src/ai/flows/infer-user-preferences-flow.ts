@@ -11,6 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference, UserProfilePreferences } from '@/types';
+import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 
 // Define Zod enums based on string literal types from src/types for consistency
 const UserMotivationEnum = z.enum(['help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds']);
@@ -163,28 +164,25 @@ const inferUserPreferencesFlow = ai.defineFlow(
     const flowName = 'inferUserPreferencesFlow';
     console.log(`[${flowName}] Called with input for userId: ${input.userId}`);
 
-    // Initialize default values for the return structure for robustness
     const defaultInferredPreferences: InferredUserPreferences = {
       locationPreference: { isSensitive: false } as UserProfileLocationPreference,
       tradeTimingPreference: 'flexible' as TradeTimingPreference,
       interestedInThirdPartyFulfillment: true,
       motivations: undefined,
     };
+    
+    const processedInput = {
+      ...input,
+      listedItems: input.listedItems?.map(item => ({
+        ...item,
+        description: item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : undefined,
+      })),
+    };
 
     try {
-      const processedInput = {
-        ...input,
-        listedItems: input.listedItems?.map(item => ({
-          ...item,
-          description: item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : undefined,
-        })),
-      };
       console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
-
       const {output} = await prompt(processedInput);
-      // console.log(`[${flowName}] Raw output received from prompt:`, JSON.stringify(output, null, 2));
 
-      // Initialize with defaults, to be overridden by valid AI output
       let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
       let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values may have been applied.";
@@ -207,7 +205,6 @@ const inferUserPreferencesFlow = ai.defineFlow(
             };
           } else {
             finalSuggestedPreferences.locationPreference = defaultInferredPreferences.locationPreference;
-            // Do not add error message if AI simply omits an optional field.
           }
 
           finalSuggestedPreferences.tradeTimingPreference = TradeTimingPreferenceEnum.safeParse(output.suggestedPreferences.tradeTimingPreference).success
@@ -270,14 +267,14 @@ const inferUserPreferencesFlow = ai.defineFlow(
       let userMessage = "An unexpected error occurred while trying to infer user preferences. Default preferences applied. Please check server logs for details.";
       const lowerErrorMessage = String(error.message || "").toLowerCase();
 
-      if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
+      if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
+        userMessage = `The preference inference service received a bad request. This might be due to problematic input data (User ID: ${input.userId}) or an issue with the prompt structure. Please check server logs for details on the input.`;
+      } else if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
         userMessage = "The preference inference service has reached its current usage limit.";
       } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = "The preference inference service is temporarily overloaded or unavailable.";
       } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
         userMessage = "Authentication error with the AI preference service. Please check API key configuration.";
-      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
-        userMessage = `The preference inference service received a bad request. This might be due to problematic input data (User ID: ${input.userId}) or an issue with the prompt structure. Please check server logs for details on the input.`;
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
         userMessage = "Could not infer preferences due to content restrictions or safety settings.";
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
@@ -290,6 +287,21 @@ const inferUserPreferencesFlow = ai.defineFlow(
             userMessage += ` (Details: ${error.message.substring(0,150)}${error.message.length > 150 ? "..." : ""})`;
         }
       }
+      
+      logAIDiagnostic({
+        flowName: flowName,
+        triggeringUserId: input.userId,
+        input: processedInput, // Log the input that was sent to the prompt
+        error: {
+          name: errorDetails.name,
+          message: errorDetails.message,
+          stack: errorDetails.stack,
+          details: errorDetails.details,
+          status: errorDetails.status,
+          code: errorDetails.code,
+        },
+        userFacingMessage: userMessage,
+      }).catch(diagError => console.error("Error logging diagnostic for inferUserPreferencesFlow:", diagError));
       
       console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${errorDetails.name || 'Error'}: ${errorDetails.message || 'No message available'}".`);
 
