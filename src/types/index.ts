@@ -16,6 +16,18 @@ export type Item = {
 export type UserMotivation = 'help-others' | 'maximize-trades' | 'convenience-focused' | 'community-building' | 'unique-finds';
 export type TradeTimingPreference = 'simultaneous' | 'staged' | 'flexible';
 
+export type UserProfileLocationPreference = {
+  isSensitive: boolean;
+  notes?: string; // e.g., "Prefers local pickup for large items"
+};
+
+export type UserProfilePreferences = {
+  motivations?: UserMotivation[];
+  locationPreference?: UserProfileLocationPreference;
+  tradeTimingPreference?: TradeTimingPreference;
+  interestedInThirdPartyFulfillment?: boolean; 
+};
+
 export type User = {
   id: string;
   name: string;
@@ -25,15 +37,7 @@ export type User = {
   tradesCompleted: number;
   bio?: string;
   items: Item[]; // Items listed by the user
-  interestedInThirdPartyFulfillment?: boolean; 
-  // Experimental LLM-aware preferences
-  motivations?: UserMotivation[];
-  locationPreference?: {
-    isSensitive: boolean;
-    notes?: string; // e.g., "Prefers local pickup for large items"
-  };
-  tradeTimingPreference?: TradeTimingPreference;
-};
+} & UserProfilePreferences; // Embed preferences directly
 
 export type TradeOffer = {
   id:string;
@@ -62,4 +66,25 @@ export type ChatMessage = {
   text: string;
   timestamp: Date;
   isAIMessage?: boolean;
+};
+
+// Specifically for the inferUserPreferencesFlow output.
+// This matches the structure of UserProfilePreferences but ensures all fields are optional
+// as returned by the AI before they are applied to a user.
+export type InferredUserPreferences = {
+  motivations?: UserMotivation[];
+  locationPreference?: {
+    isSensitive: boolean;
+    notes?: string;
+  };
+  tradeTimingPreference?: TradeTimingPreference;
+  interestedInThirdPartyFulfillment?: boolean;
+};
+
+export type InferUserPreferencesOutput = {
+  userId: string;
+  suggestedPreferences: InferredUserPreferences;
+  confidence: 'High' | 'Medium' | 'Low';
+  reasoning?: string;
+  errorMessage?: string;
 };
