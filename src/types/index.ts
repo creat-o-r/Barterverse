@@ -49,7 +49,7 @@ export type ItemDeliveryMethod =
   | 'flexible_meetup';
 
 export type UserLogisticsPreferences = {
-  defaultDeliveryMethod: ItemDeliveryMethod;
+  defaultDeliveryMethods: ItemDeliveryMethod[]; // Changed from single to array
   preferredStoredLocationId?: string;
 };
 
@@ -72,7 +72,7 @@ export type ItemLogistics = {
   locationType: ItemLogisticsLocationType;
   selectedUserStoredLocationId?: string;
   itemSpecificAddress?: string;
-  deliveryMethod: ItemDeliveryMethod;
+  deliveryMethods: ItemDeliveryMethod[]; // Changed from single to array
   notes?: string;
 };
 

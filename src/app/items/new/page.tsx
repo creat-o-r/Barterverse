@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter, HeartHandshake, MapPin, Truck, Edit2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
@@ -53,7 +53,7 @@ const itemFormSchema = z.object({
   
   selectedLocationIdentifier: z.string().min(1, { message: "Please select or specify an item location."}),
   itemSpecificAddress: z.string().optional(),
-  deliveryMethod: deliveryMethodEnum,
+  deliveryMethods: z.array(deliveryMethodEnum).min(1, { message: "Please select at least one delivery method." }),
   logisticsNotes: z.string().optional(),
 }).refine(data => {
   if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
@@ -68,7 +68,7 @@ const itemFormSchema = z.object({
 type ItemFormValues = z.infer<typeof itemFormSchema>;
 
 const deliveryMethodMapConcrete: Record<ItemDeliveryMethod, string> = {
-  pickup_only: "Local Pickup Only",
+  pickup_only: "Pickup", // Changed label
   ship_domestic: "Willing to Ship (Domestic)",
   ship_international: "Willing to Ship (International)",
   delivery_area: "Delivery Area (Specify in Notes)",
@@ -105,7 +105,7 @@ export default function NewItemPage() {
       isGiftItForward: false,
       selectedLocationIdentifier: ITEM_SPECIFIC_LOCATION_VALUE,
       itemSpecificAddress: '',
-      deliveryMethod: 'pickup_only',
+      deliveryMethods: ['pickup_only'], // Default to an array
       logisticsNotes: '',
     },
   });
@@ -122,13 +122,15 @@ export default function NewItemPage() {
         } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
             defaultSelectedLocationId = currentUser.locations[0].id;
         }
+        
+        const defaultDeliveryMethods = currentUser.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
 
         form.reset({
-            ...currentFormValues, // Preserve existing form state if user already typed something
+            ...currentFormValues,
             minimumMatchRatingOverride: currentFormValues.minimumMatchRatingOverride || currentUser.minimumMatchRating || 'Low',
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (currentFormValues.itemSpecificAddress || '') : '',
-            deliveryMethod: currentUser.logisticsPreferences?.defaultDeliveryMethod || 'pickup_only',
+            deliveryMethods: currentFormValues.deliveryMethods?.length ? currentFormValues.deliveryMethods : defaultDeliveryMethods,
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,7 +199,7 @@ export default function NewItemPage() {
           locationType: locationTypeForLogistics,
           selectedUserStoredLocationId: storedLocationIdForLogistics,
           itemSpecificAddress: specificAddressForLogistics,
-          deliveryMethod: data.deliveryMethod,
+          deliveryMethods: data.deliveryMethods,
           notes: data.logisticsNotes,
       };
 
@@ -227,6 +229,7 @@ export default function NewItemPage() {
         } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
             defaultSelectedLocationId = currentUser.locations[0].id;
         }
+        const defaultDeliveryMethods = currentUser.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
 
         form.reset({
             name: '', 
@@ -238,7 +241,7 @@ export default function NewItemPage() {
             isGiftItForward: false,
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: '',
-            deliveryMethod: currentUser.logisticsPreferences?.defaultDeliveryMethod || 'pickup_only',
+            deliveryMethods: defaultDeliveryMethods,
             logisticsNotes: '',
         });
       } else {
@@ -324,21 +327,48 @@ export default function NewItemPage() {
                     </FormItem>
                   )} />
                 )}
-
-                <FormField control={form.control} name="deliveryMethod" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
+                
+                <FormField
+                  control={form.control}
+                  name="deliveryMethods"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="mb-2">
+                        <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery Methods</FormLabel>
+                        <FormDescription className="font-body">Select all that apply. Initializes to your profile defaults.</FormDescription>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                         {Object.entries(deliveryMethodMapConcrete).map(([key, label]) => (
-                            <SelectItem key={key} value={key as ItemDeliveryMethod}>{label}</SelectItem>
+                          <FormItem key={key} className="flex flex-row items-center space-x-3 space-y-0 p-2 border rounded-md hover:bg-muted/50 transition-colors">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(key as ItemDeliveryMethod)}
+                                onCheckedChange={(checked) => {
+                                  const currentValues = field.value || [];
+                                  let newValues;
+                                  if (checked) {
+                                    newValues = [...currentValues, key as ItemDeliveryMethod];
+                                  } else {
+                                    newValues = currentValues.filter(value => value !== key);
+                                  }
+                                  // Ensure pickup_only is not duplicated if already there by other means
+                                  newValues = [...new Set(newValues)];
+                                  field.onChange(newValues);
+                                }}
+                                disabled={isLoadingOverall}
+                                id={`delivery-${key}`}
+                              />
+                            </FormControl>
+                            <FormLabel htmlFor={`delivery-${key}`} className="font-normal text-sm cursor-pointer flex-grow">
+                              {label}
+                            </FormLabel>
+                          </FormItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                  <FormField
                   control={form.control}

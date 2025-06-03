@@ -23,7 +23,7 @@ async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User
 }
 
 const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
-  pickup_only: "Local Pickup Only",
+  pickup_only: "Pickup", // Changed label
   ship_domestic: "Willing to Ship (Domestic)",
   ship_international: "Willing to Ship (International)",
   delivery_area: "Delivery Area (Details in Notes/Chat)",
@@ -58,8 +58,18 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
         <p className="text-sm text-foreground/90 font-body pl-5">{locationDisplay}</p>
       </div>
       <div>
-        <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Delivery:</h4>
-        <p className="text-sm text-foreground/90 font-body pl-5">{deliveryMethodDisplayMap[logistics.deliveryMethod] || "Not specified"}</p>
+        <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Delivery Methods:</h4>
+        {logistics.deliveryMethods && logistics.deliveryMethods.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 pl-5 mt-1">
+            {logistics.deliveryMethods.map(method => (
+              <Badge key={method} variant="outline" className="text-xs">
+                {deliveryMethodDisplayMap[method] || method}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-foreground/90 font-body pl-5">Not specified</p>
+        )}
       </div>
       
       {logistics.notes && (

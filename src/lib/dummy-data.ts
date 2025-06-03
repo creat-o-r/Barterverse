@@ -22,7 +22,7 @@ export const dummyUsers: User[] = [
       { id: 'user1_work', name: 'Office', address: '456 Business Rd, Anytown' },
     ],
     logisticsPreferences: {
-      defaultDeliveryMethod: 'ship_domestic',
+      defaultDeliveryMethods: ['ship_domestic', 'public_meetup'],
       preferredStoredLocationId: 'user1_home',
     },
   },
@@ -44,7 +44,7 @@ export const dummyUsers: User[] = [
       { id: 'user2_apt', name: 'Apartment', address: '789 Central Ave, Anytown', isDefault: true },
     ],
     logisticsPreferences: {
-      defaultDeliveryMethod: 'pickup_only',
+      defaultDeliveryMethods: ['pickup_only'],
       preferredStoredLocationId: 'user2_apt',
     },
   },
@@ -63,7 +63,7 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'staged' as TradeTimingPreference,
     minimumMatchRating: 'Low',
     logisticsPreferences: {
-      defaultDeliveryMethod: 'public_meetup', 
+      defaultDeliveryMethods: ['public_meetup', 'flexible_meetup'], 
     },
   },
   {
@@ -81,7 +81,7 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
     minimumMatchRating: 'High',
     logisticsPreferences: {
-      defaultDeliveryMethod: 'possible_delivery', 
+      defaultDeliveryMethods: ['possible_delivery', 'ship_international'], 
     }
   },
   {
@@ -99,7 +99,7 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
     minimumMatchRating: 'Medium',
     logisticsPreferences: {
-        defaultDeliveryMethod: 'flexible_meetup',
+        defaultDeliveryMethods: ['flexible_meetup', 'pickup_only'],
     }
   },
 ];
@@ -121,7 +121,7 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
-      deliveryMethod: 'ship_domestic',
+      deliveryMethods: ['ship_domestic', 'public_meetup'],
       notes: "Can also meet downtown on weekdays."
     }
   },
@@ -140,7 +140,7 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
-      deliveryMethod: 'pickup_only',
+      deliveryMethods: ['pickup_only'],
     }
   },
   {
@@ -158,7 +158,7 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
-      deliveryMethod: 'ship_domestic',
+      deliveryMethods: ['ship_domestic'],
     }
   },
   {
@@ -176,7 +176,7 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
-      deliveryMethod: 'pickup_only',
+      deliveryMethods: ['pickup_only'],
     }
   },
   {
@@ -194,7 +194,7 @@ export let dummyItems: Item[] = [
      logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Balcony Garden",
-      deliveryMethod: 'public_meetup', 
+      deliveryMethods: ['public_meetup', 'flexible_meetup'], 
     }
   },
   {
@@ -212,7 +212,7 @@ export let dummyItems: Item[] = [
      logistics: { 
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Workshop",
-      deliveryMethod: 'ship_domestic',
+      deliveryMethods: ['ship_domestic'],
     }
   },
   {
@@ -230,7 +230,7 @@ export let dummyItems: Item[] = [
     logistics: { 
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
-      deliveryMethod: 'ship_domestic', 
+      deliveryMethods: ['ship_domestic', 'public_meetup'], 
     }
   },
   {
@@ -247,7 +247,7 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
-      deliveryMethod: 'pickup_only', 
+      deliveryMethods: ['pickup_only', 'ship_domestic'], 
     }
   },
   {
@@ -265,7 +265,7 @@ export let dummyItems: Item[] = [
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Diana's Boutique",
-        deliveryMethod: 'possible_delivery', 
+        deliveryMethods: ['possible_delivery', 'ship_international'], 
     }
   },
   {
@@ -282,7 +282,7 @@ export let dummyItems: Item[] = [
     logistics: {
         locationType: 'item_specific_location', 
         itemSpecificAddress: 'Diana Doodad Wants This Shipped To: 12Collector Lane',
-        deliveryMethod: 'ship_international',
+        deliveryMethods: ['ship_international'],
     }
   },
   {
@@ -300,7 +300,7 @@ export let dummyItems: Item[] = [
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Garage",
-        deliveryMethod: 'flexible_meetup',
+        deliveryMethods: ['flexible_meetup', 'pickup_only'],
     }
   },
   {
@@ -318,7 +318,7 @@ export let dummyItems: Item[] = [
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Home Gym",
-        deliveryMethod: 'public_meetup',
+        deliveryMethods: ['public_meetup', 'pickup_only'],
     }
   },
   {
@@ -336,7 +336,7 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_work',
-      deliveryMethod: 'ship_domestic',
+      deliveryMethods: ['ship_domestic', 'pickup_only'],
     }
   },
   {
@@ -353,7 +353,7 @@ export let dummyItems: Item[] = [
     logistics: {
         locationType: 'item_specific_location', 
         itemSpecificAddress: "Charlie Swapper wants this delivered locally if possible.",
-        deliveryMethod: 'delivery_area',
+        deliveryMethods: ['delivery_area', 'public_meetup'],
     }
   }
 ];
@@ -414,11 +414,11 @@ export function addNewItemToDummyData(
         locationType: itemData.logistics.locationType,
         selectedUserStoredLocationId: itemData.logistics.locationType === 'profile_stored_location' ? itemData.logistics.selectedUserStoredLocationId : undefined,
         itemSpecificAddress: itemData.logistics.locationType === 'item_specific_location' ? itemData.logistics.itemSpecificAddress : undefined,
-        deliveryMethod: itemData.logistics.deliveryMethod,
+        deliveryMethods: itemData.logistics.deliveryMethods, // Expecting array now
         notes: itemData.logistics.notes,
     };
   } else {
-    // Fallback - should ideally not be hit if form sends full logistics
+    // Fallback logic if form somehow doesn't send full logistics
     let defaultLocType: 'profile_stored_location' | 'item_specific_location' = 'item_specific_location';
     let defaultStoredId: string | undefined = undefined;
     if (owner.logisticsPreferences?.preferredStoredLocationId && owner.locations?.find(l => l.id === owner.logisticsPreferences?.preferredStoredLocationId)) {
@@ -433,7 +433,7 @@ export function addNewItemToDummyData(
         locationType: defaultLocType,
         selectedUserStoredLocationId: defaultStoredId,
         itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
-        deliveryMethod: owner.logisticsPreferences?.defaultDeliveryMethod || 'pickup_only',
+        deliveryMethods: owner.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'], // Use default array
         notes: '',
     };
   }
@@ -461,4 +461,3 @@ export function addNewItemToDummyData(
   console.log('[DummyData] Total items now:', dummyItems.length);
   return newItem;
 }
-

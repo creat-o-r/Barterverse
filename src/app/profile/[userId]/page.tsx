@@ -27,6 +27,11 @@ async function getUserProfile(userId: string): Promise<User | null> {
   if (user.minimumMatchRating === undefined) {
     user.minimumMatchRating = 'Low';
   }
+  if (user.logisticsPreferences && !user.logisticsPreferences.defaultDeliveryMethods) {
+    // @ts-ignore
+    user.logisticsPreferences.defaultDeliveryMethods = [user.logisticsPreferences.defaultDeliveryMethod || 'pickup_only'];
+  }
+
 
   const userItemsFromGlobal = dummyItems.filter(item => item.ownerId === user.id);
   return JSON.parse(JSON.stringify({...user, items: userItemsFromGlobal}));
@@ -108,8 +113,8 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
     );
   }
 
-  const deliveryMethodMap: Record<ItemDeliveryMethod, string> = {
-    pickup_only: "Local Pickup Only",
+  const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
+    pickup_only: "Pickup",
     ship_domestic: "Willing to Ship (Domestic)",
     ship_international: "Willing to Ship (International)",
     delivery_area: "Delivery Area",
@@ -124,15 +129,19 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
 
   return (
     <CardContent className="space-y-4 pt-2">
-      {logisticsPreferences?.defaultDeliveryMethod && (
-        <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
-          <div className="flex items-center gap-2">
+      {logisticsPreferences?.defaultDeliveryMethods && logisticsPreferences.defaultDeliveryMethods.length > 0 && (
+        <div className="p-3 border rounded-lg bg-background shadow-sm">
+          <div className="flex items-center gap-2 mb-1.5">
             <Truck className="h-5 w-5 text-muted-foreground" />
-            <span className="font-headline text-md">Delivery</span>
+            <span className="font-headline text-md">Delivery Methods</span>
           </div>
-          <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto">
-            {deliveryMethodMap[logisticsPreferences.defaultDeliveryMethod] || logisticsPreferences.defaultDeliveryMethod}
-          </Button>
+          <div className="flex flex-wrap gap-1.5">
+            {logisticsPreferences.defaultDeliveryMethods.map(method => (
+              <Badge key={method} variant="outline" className="text-xs cursor-default">
+                {deliveryMethodDisplayMap[method] || method}
+              </Badge>
+            ))}
+          </div>
         </div>
       )}
        <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
