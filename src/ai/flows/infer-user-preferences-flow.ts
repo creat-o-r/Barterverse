@@ -19,7 +19,7 @@ const TradeTimingPreferenceEnum = z.enum(['simultaneous', 'staged', 'flexible'])
 const InferUserPreferencesInputSchema = z.object({
   userId: z.string().describe('The ID of the user whose preferences are being inferred.'),
   activitySummary: z.string().describe(
-    'A textual summary of the user\'s recent activity. This could include descriptions of items they listed (offers/wants), snippets from their chats, or summaries of trades they\'ve completed. Example: "Listed: \'Vintage Sci-Fi Collection (offer)\', \'Wanted: Rare Board Game\'. Chat: \'I\'m happy to ship if needed.\', \'Quick and easy trade preferred.\'"'
+    'A textual summary of the user\'s recent activity. This could include descriptions of items they listed (offers/wants), snippets from their chats, summaries of trades they\'ve completed, and notes on their engagement style or navigation patterns. Example: "Listed: \'Vintage Sci-Fi Collection (offer)\', \'Wanted: Rare Board Game\'. Chat: \'I\'m happy to ship if needed.\', \'Quick and easy trade preferred.\' Engagement: Spends time in \'Collectibles\' category."'
   ),
 });
 export type InferUserPreferencesInput = z.infer<typeof InferUserPreferencesInputSchema>;
@@ -55,15 +55,15 @@ User ID: {{{userId}}}
 Activity Summary:
 {{{activitySummary}}}
 
-Analyze the activity summary and infer the following preferences:
+Analyze the activity summary, including listed items, current profile settings, simulated interaction notes, and chat snippets, to infer the following preferences:
 1.  **Motivations**: What seems to drive this user to trade? Choose one or two from: 'help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds'.
     -   'help-others': Phrases like "happy to help", "if you need it".
-    -   'maximize-trades': Focus on value, getting good deals, extensive negotiation.
+    -   'maximize-trades': Focus on value, getting good deals, extensive negotiation. Mentions of item condition or value in chat.
     -   'convenience-focused': Phrases like "quick and easy", "prefer pickup", mentions of simplicity.
-    -   'community-building': Mentions of meeting people, local community, friendly interactions.
-    -   'unique-finds': Looking for rare, specific, or collectible items.
+    -   'community-building': Mentions of meeting people, local community, friendly interactions in chat.
+    -   'unique-finds': Looking for rare, specific, or collectible items. Focus on specific item attributes.
 2.  **Location Preference**:
-    -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades? If yes, true. Otherwise, false.
+    -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades in their items, notes, or chat snippets? If yes, true. Otherwise, false.
     -   notes (string, optional): If sensitive, capture any specific notes like "prefers local pickup" or "willing to ship small items".
 3.  **Trade Timing Preference**: Choose from: 'simultaneous' (prefers to swap items at the same time), 'staged' (open to one person sending first, then the other), 'flexible' (seems open to either or doesn't specify).
     -   'simultaneous': May mention "in-person swap", "meet up".
@@ -73,6 +73,7 @@ Analyze the activity summary and infer the following preferences:
 
 Based on your analysis, provide the inferred preferences. Also, state your confidence level (High, Medium, Low) in these inferences and a brief reasoning.
 If the activity summary is too vague to make reasonable inferences for some fields, you can omit those optional fields in the 'suggestedPreferences' object or use sensible defaults (e.g. locationPreference.isSensitive = false, tradeTimingPreference = 'flexible').
+Consider all parts of the activity summary, including explicit listings, stated preferences, and simulated behavioral notes or chat snippets.
 `,
 });
 

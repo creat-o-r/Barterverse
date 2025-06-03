@@ -50,25 +50,54 @@ const generateMockActivitySummaryForUser = (user: User | null): string => {
   summary += "\nContext from Current Profile Settings (for AI refinement):\n";
   if (user.motivations && user.motivations.length > 0) {
     summary += `- Currently expressed motivations: ${user.motivations.map(m => motivationTextMap[m] || m).join(', ')}.\n`;
+  } else {
+    summary += `- No explicit motivations set in profile.\n`;
   }
   if (user.locationPreference) {
     summary += `- Current location preference: ${user.locationPreference.isSensitive ? 'Sensitive' : 'Flexible'}. ${user.locationPreference.notes ? `Details: "${user.locationPreference.notes}"` : ''}\n`;
+  } else {
+    summary += `- No explicit location preference set.\n`;
   }
   if (user.tradeTimingPreference) {
     summary += `- Current preferred trade timing: ${tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}.\n`;
+  } else {
+    summary += `- No explicit trade timing preference set.\n`;
   }
   if (user.interestedInThirdPartyFulfillment !== undefined) {
     summary += `- Current interest in 3rd party fulfillment: ${user.interestedInThirdPartyFulfillment ? 'Yes' : 'No'}.\n`;
-  }
-  if (!user.motivations?.length && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined) {
-    summary += "- User has not specified detailed trading preferences yet. AI should analyze overall activity.\n";
   } else {
-    summary += "- User has some explicit preferences set; AI can use these as a baseline for refinement.\n"
+    summary += `- Interest in 3rd party fulfillment not specified.\n`;
   }
   
+  summary += "\nSimulated Interaction Notes & Engagement Style (for AI analysis):\n";
   if (user.tradesCompleted > 5) {
-     summary += "- User has a history of completed trades, suggesting engagement.\n";
+     summary += `- User has an established history of ${user.tradesCompleted} completed trades, suggesting active engagement and experience.\n`;
+  } else {
+     summary += `- User has ${user.tradesCompleted} completed trades. Still building their trading history.\n`;
   }
+  if (user.motivations?.includes('community-building')) {
+    summary += `- Simulated Chat Snippet: "Thanks for the trade! Always great to connect with fellow collectors." (Positive, community-oriented)\n`;
+  }
+  if (user.motivations?.includes('convenience-focused')) {
+    summary += `- Simulated Chat Snippet: "Quick and easy trade, just how I like it. Appreciate it!" (Efficiency-focused)\n`;
+    summary += `- Hypothetical Behavior: User might prefer items with clear descriptions and fewer negotiation rounds.\n`;
+  }
+  if (user.motivations?.includes('unique-finds') && wants.length > 0) {
+    summary += `- Hypothetical Behavior: User likely spends more time searching for specific 'want' items than browsing general offers.\n`;
+  }
+  if (offers.length === 0 && wants.length > 0) {
+    summary += `- Engagement Pattern: Primarily lists 'want' items, suggesting they are often in a seeking mode.\n`;
+  } else if (offers.length > wants.length && offers.length > 2) {
+     summary += `- Engagement Pattern: Primarily lists 'offer' items, suggesting they are often looking to trade out items they possess.\n`;
+  }
+  summary += `- Simulated General Chat: "I'm open to offers, let me know what you have in mind." (Open to negotiation)\n`;
+
+  if (!user.motivations?.length && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined) {
+    summary += "- User has not specified detailed trading preferences yet. AI should analyze overall activity and simulated interactions carefully.\n";
+  } else {
+    summary += "- User has some explicit preferences set; AI can use these as a baseline for refinement alongside simulated interactions.\n"
+  }
+  
   summary += "- User is actively seeking to update/refine their preferences via AI.\n";
   return summary.trim();
 };
@@ -82,7 +111,7 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
 );
 
 export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
-  const params = use(paramsProp); 
+  const resolvedParams = use(paramsProp); 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [allowAutoPreferenceInference, setAllowAutoPreferenceInference] = useState(false);
@@ -92,12 +121,12 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
   const { toast } = useToast();
 
   const currentViewingUserId = dummyUsers[0].id; 
-  const isOwnProfile = params.userId === 'me' || params.userId === currentViewingUserId;
+  const isOwnProfile = resolvedParams.userId === 'me' || resolvedParams.userId === currentViewingUserId;
 
   useEffect(() => {
-    async function loadUserProfile() {
+    async function loadUserProfileAndSettings() {
       setLoading(true);
-      const profile = await getUserProfile(params.userId);
+      const profile = await getUserProfile(resolvedParams.userId);
       setUser(profile);
       if (isOwnProfile) {
         const allowInference = await getEnableAutomaticPreferenceInference();
@@ -108,11 +137,11 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       }
       setLoading(false);
     }
-    if (params.userId) {
-        loadUserProfile();
+    if (resolvedParams.userId) {
+        loadUserProfileAndSettings();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.userId, isOwnProfile]); 
+  }, [resolvedParams.userId, isOwnProfile]); 
 
   const handleLearnPreferences = async () => {
     if (!user) return;
@@ -129,7 +158,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       } else {
         const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences);
         if (updateSuccess) {
-          const updatedProfile = await getUserProfile(user.id); // Re-fetch to get updated user from "dummy DB"
+          const updatedProfile = await getUserProfile(user.id); 
           setUser(updatedProfile); 
           toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
         } else {
@@ -196,7 +225,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
           {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Preference:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
           {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
-          {(!user.motivations || user.motivations.length === 0) && !user.locationPreference && !user.tradeTimingPreference && (<p className="text-sm text-muted-foreground font-body">No specific preferences set yet.</p>)}
+          {(!user.motivations || user.motivations.length === 0) && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined && (<p className="text-sm text-muted-foreground font-body">No specific preferences set yet.</p>)}
         
           {isOwnProfile && allowAutoPreferenceInference && (
             <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4">
@@ -210,7 +239,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
                     <div className="p-3 bg-muted/30 rounded-md border">
                     <h4 className="font-headline text-xs mb-1.5 flex items-center gap-1.5">
                         <FileText className="h-4 w-4 text-muted-foreground"/>
-                        Activity Summary for AI
+                        Activity Summary Input for AI
                     </h4>
                     <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
                         {activitySummaryForAI || "No activity summary generated yet."}
@@ -233,4 +262,3 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
-

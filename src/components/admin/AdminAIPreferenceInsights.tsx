@@ -51,7 +51,7 @@ const generateActivitySummaryForUser = (user?: User): string => {
     });
   }
 
-  summary += "\nDerived Behavioral Notes (from current profile settings & activity):\n";
+  summary += "\nDerived Behavioral Notes & Current Preferences (for AI analysis):\n";
   if (user.motivations && user.motivations.length > 0) {
     summary += `- Current motivations suggest focus on: ${user.motivations.map(m => motivationTextMap[m] || m).join(', ')}.\n`;
   }
@@ -65,16 +65,43 @@ const generateActivitySummaryForUser = (user?: User): string => {
     summary += `- Openness to 3rd party fulfillment: ${user.interestedInThirdPartyFulfillment ? 'Yes' : 'No'}.\n`;
   }
 
-  if (user.tradesCompleted > 10) {
-    summary += "- User has a notable number of completed trades, indicating experience.\n";
+  summary += "\nSimulated Interaction Notes & Engagement Style:\n";
+  if (user.tradesCompleted > 5) {
+    summary += `- User is an active trader with ${user.tradesCompleted} completed trades, suggesting good engagement and experience.\n`;
   } else if (user.tradesCompleted < 2 && offers.length + wants.length < 3) {
-    summary += "- User is relatively new or has limited recent activity for deep preference analysis beyond listed items.\n";
+    summary += "- User is relatively new or has limited recent activity. Preferences may be less defined.\n";
   }
 
-  if (!user.motivations?.length && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined) {
-    summary += "- No explicit preferences set in profile; AI should infer primarily from item listings and general trading patterns if available.\n";
+  if (user.motivations?.includes('community-building')) {
+    summary += `- Simulated Chat: "Great trading with you, always nice to connect with others in the community!" (Positive, community-focused)\n`;
+    summary += `- Engagement: Likely to leave reviews and interact respectfully.\n`;
+  }
+  if (user.motivations?.includes('maximize-trades')) {
+     summary += `- Simulated Chat: "Could you add a bit more to your offer? I'm looking for a slightly higher value." (Negotiation-focused)\n`;
+     summary += `- Engagement: Appears to negotiate carefully and consider item values, may be discerning.\n`;
+  }
+  if (user.motivations?.includes('convenience-focused') || user.locationPreference?.notes?.toLowerCase().includes('pickup')) {
+      summary += `- Simulated Chat: "Is local pickup possible? That would be easiest for me." (Logistics-focused)\n`;
+      summary += `- Engagement: Likely prefers straightforward and quick interactions. May pass on complex trades.\n`;
+  } else if (user.motivations?.includes('unique-finds')) {
+      summary += `- Simulated Chat: "Does it have the original packaging? I'm looking for one in mint condition." (Detail-oriented for specific items)\n`;
+      summary += `- Engagement: May spend more time researching specific items and less on general browsing.\n`;
   } else {
-     summary += "- User has some explicit preferences set, which should be weighted in the analysis.\n"
+      summary += `- Simulated Chat: "Happy to discuss shipping options for the right trade." (Flexible)\n`;
+  }
+
+  if (user.items.filter(i => i.listingType === 'want').length > 2) {
+    summary += `- Engagement: Actively lists 'want' items, indicating specific needs and clear search intent.\n`;
+  }
+
+  const offeredCategories = [...new Set(offers.map(o => o.category))];
+  if (offeredCategories.length > 0) {
+    summary += `- Hypothetical Browsing: Likely spends considerable time browsing items in categories like: ${offeredCategories.join(', ')}.\n`;
+  }
+  if (!user.motivations?.length && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined) {
+    summary += "- Profile lacks explicit preferences; AI should infer primarily from item listings and simulated behavioral notes.\n";
+  } else {
+     summary += "- User has some explicit preferences set, which should be weighted in the analysis along with simulated behaviors.\n"
   }
   
   return summary.trim();
@@ -110,7 +137,7 @@ export default function AdminAIPreferenceInsights() {
       setCurrentInsights(null);
       setInsightsError(null);
       
-      const currentActivitySummary = generateActivitySummaryForUser(selectedUser); // Regenerate fresh summary
+      const currentActivitySummary = generateActivitySummaryForUser(selectedUser); 
       setActivitySummaryForAI(currentActivitySummary);
 
 
@@ -219,7 +246,7 @@ export default function AdminAIPreferenceInsights() {
           Live AI Preference Inference (Admin View)
         </CardTitle>
         <CardDescription className="font-body">
-          Select a user to see AI-inferred trading preferences based on their (dynamically generated) activity summary.
+          Select a user to see AI-inferred trading preferences based on their (dynamically generated) activity summary, including simulated engagement patterns.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -256,7 +283,7 @@ export default function AdminAIPreferenceInsights() {
             <Collapsible open={showSampleActivity} onOpenChange={setShowSampleActivity}>
             <div className="space-y-2">
                 <p className="text-sm font-body text-muted-foreground">
-                The AI infers preferences by analyzing an activity summary like the one below, generated from the user's items and current profile settings.
+                The AI infers preferences by analyzing an activity summary like the one below, generated from the user's items, current profile settings, and simulated interactions.
                 </p>
                 <CollapsibleTrigger asChild>
                 <Button variant="outline" size="sm" className="w-full flex justify-between items-center text-left">
