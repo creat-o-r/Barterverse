@@ -11,7 +11,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, UserCircle, Repeat, Link2, ArrowRightLeft, Info, Eye, Gift, Search, Package, Star } from 'lucide-react';
+import { MessageSquare, Repeat, Link2, ArrowRightLeft, Info, Eye, Gift, Search, Package, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
@@ -30,13 +30,11 @@ function OpportunityItemDisplay({ item, owner, label }: { item: Item; owner: Use
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
-        <div className="flex justify-between items-start">
-          <CardTitle className="font-headline text-xl flex items-center gap-2">
-            {item.listingType === 'offer' ? <Gift className="h-6 w-6 text-green-600" /> : <Search className="h-6 w-6 text-blue-600" />}
-            {label}
-          </CardTitle>
-        </div>
-        <CardDescription className="font-body">{item.name}</CardDescription>
+        <CardTitle className="font-headline text-xl flex items-center gap-2 mb-1">
+          {item.listingType === 'offer' ? <Gift className="h-6 w-6 text-green-600" /> : <Search className="h-6 w-6 text-blue-600" />}
+          {item.name}
+        </CardTitle>
+        <Badge variant="secondary" className="text-sm font-body py-1 px-1.5 inline-block self-start">{label}</Badge>
       </CardHeader>
       <CardContent className="flex-grow space-y-3">
         <div className="aspect-video relative w-full rounded-md overflow-hidden">
@@ -115,10 +113,15 @@ export default function OpportunityMatchPage() {
   if (mainItem.ownerId === currentUserId) {
     mainItemDisplayLabel = mainItem.listingType === 'offer' ? "Your Offer" : "Your Want";
   } else {
-    mainItemDisplayLabel = mainItem.listingType === 'offer' ? "Their Offer" : "Their Want";
+    mainItemDisplayLabel = mainItem.listingType === 'offer' ? `${mainItemOwner.name}'s Offer` : `${mainItemOwner.name}'s Want`;
   }
 
-  let suggestedItemDisplayLabel = suggestedItem.listingType === 'offer' ? "Matching Offer" : "Matching Want";
+  let suggestedItemDisplayLabel = "Matching Item";
+   if (suggestedItem.ownerId === currentUserId) {
+    suggestedItemDisplayLabel = suggestedItem.listingType === 'offer' ? "Your Matching Offer" : "Your Matching Want";
+  } else {
+    suggestedItemDisplayLabel = suggestedItem.listingType === 'offer' ? `Matching Offer from ${suggestedItemOwner.name}` : `Matching Want from ${suggestedItemOwner.name}`;
+  }
 
 
   // --- Trade ID and Chat Button Text Logic ---
@@ -137,7 +140,8 @@ export default function OpportunityMatchPage() {
   // Scenario 3: Current user was viewing mainItem (a want by someone else), and AI suggested one of current user's own items (suggestedItem, an offer) to fulfill that want.
   else if (suggestedItem.ownerId === currentUserId && suggestedItem.listingType === 'offer' &&
            mainItem.listingType === 'want' && mainItem.ownerId !== currentUserId) {
-    tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${currentUserId}`; // mainItemOwner wants suggestedItem (from current user)
+    // tradeId should reflect that mainItemOwner wants an item from currentUserId
+    tradeId = `trade-${mainItem.ownerId}-wants-${suggestedItem.id}-from-${currentUserId}`; 
     chatButtonText = `Offer Your "${suggestedItem.name}" to Fulfill ${mainItemOwner.name}'s Want`;
   }
   // Scenario 4: Current user listed mainItem (their want), and AI suggested suggestedItem (an offer from someone else) to fulfill it.
@@ -147,11 +151,11 @@ export default function OpportunityMatchPage() {
     chatButtonText = `Discuss Acquiring ${suggestedItemOwner.name}'s "${suggestedItem.name}" for Your Want`;
   }
   // Scenario 5: Viewing someone else's item (mainItem, offer), AI suggests a want from another user (suggestedItem, want) that could be fulfilled by mainItem.
-  // This is a 3rd party scenario. User should contact mainItem.owner.
+  // This is a 3rd party scenario. User might contact mainItem.owner or suggestedItem.owner.
   else if (mainItem.ownerId !== currentUserId && mainItem.listingType === 'offer' &&
            suggestedItem.ownerId !== currentUserId && suggestedItem.listingType === 'want') {
     negotiationContextValid = false;
-    chatButtonText = "View Items to Explore Options";
+    chatButtonText = "View Items to Explore Options"; // Generic as direct negotiation isn't for current user
   }
   // Default/fallback (e.g., two 'wants', or other complex cases not directly actionable by current user via one button)
   else {
@@ -207,3 +211,4 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
+
