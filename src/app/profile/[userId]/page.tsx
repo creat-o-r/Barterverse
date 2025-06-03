@@ -4,7 +4,7 @@
 import { use, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
-import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType } from '@/types';
+import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,8 +21,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 async function getUserProfile(userId: string): Promise<User | null> {
   const actualUserId = userId === 'me' ? dummyUsers[0].id : userId;
-  const user = dummyUsers.find((u) => u.id === actualUserId);
+  let user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
+  
+  // Ensure minimumMatchRating has a default of 'Low' if somehow undefined
+  if (user.minimumMatchRating === undefined) {
+    user.minimumMatchRating = 'Low';
+  }
+
   // Ensure items are fresh for each fetch, in case new items were added globally
   const userItemsFromGlobal = dummyItems.filter(item => item.ownerId === user.id);
   return JSON.parse(JSON.stringify({...user, items: userItemsFromGlobal})); // Deep copy
@@ -45,12 +51,12 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
       listingType: item.listingType,
     }));
 
-  const currentPrefs: UserProfilePreferencesType | undefined = {
+  const currentPrefs: UserProfilePreferencesType = { // User type ensures minimumMatchRating is present
     motivations: user.motivations,
     locationPreference: user.locationPreference,
     tradeTimingPreference: user.tradeTimingPreference,
     interestedInThirdPartyFulfillment: user.interestedInThirdPartyFulfillment,
-    minimumMatchRating: user.minimumMatchRating,
+    minimumMatchRating: user.minimumMatchRating, // Will always be 'Low', 'Medium', or 'High'
   };
   
   const engagementNotes: string[] = [];
@@ -63,7 +69,6 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
     engagementNotes.push("Primarily lists 'offer' items, actively looking to trade away possessions.");
   }
   
-  // Simulated chat snippets based on potential motivations
   const simulatedChatSnippets: string[] = [];
   if (user.motivations?.includes('convenience-focused')) simulatedChatSnippets.push("Is local pickup an option? That'd be easiest.");
   if (user.motivations?.includes('maximize-trades')) simulatedChatSnippets.push("What's the condition like? I'm looking for items in very good shape.");
@@ -76,7 +81,7 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
   return {
     userId: user.id,
     listedItems: userListedItems,
-    currentPreferences: Object.keys(currentPrefs).length > 0 ? currentPrefs : undefined,
+    currentPreferences: currentPrefs, // Pass the full currentPrefs object
     simulatedChatSnippets,
     engagementNotes,
     tradesCompleted: user.tradesCompleted,
@@ -142,11 +147,11 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       if (result.errorMessage || !result.suggestedPreferences) {
         toast({ title: "AI Preference Learning Error", description: result.errorMessage || "Could not infer preferences.", variant: "destructive" });
       } else {
-        const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences);
+        // Type assertion for updateUserPreferencesInDummyData
+        const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences as InferredUserPreferences);
         if (updateSuccess) {
           const updatedProfile = await getUserProfile(user.id); 
           setUser(updatedProfile); 
-          // Update the displayed activity input as well after profile update, as currentPreferences might change
           if(updatedProfile) setActivityInputForAI(preparePreferenceInferenceInput(updatedProfile));
 
           toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
@@ -172,7 +177,9 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
   const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
   const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
   const tradedOrFulfilledItems = user.items.filter(item => item.status === 'traded');
-  const effectiveMinimumMatchRating = user.minimumMatchRating || 'Low';
+  
+  // minimumMatchRating is now guaranteed to be set on the user object
+  const effectiveMinimumMatchRating = user.minimumMatchRating;
 
   return (
     <div className="space-y-8">
@@ -217,7 +224,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
             </h4>
             <Badge variant="outline" className="text-xs capitalize">
               {effectiveMinimumMatchRating}
-              {!user.minimumMatchRating && <span className="ml-1.5 opacity-70">(Default)</span>}
             </Badge>
           </div>
           <div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4><Badge variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"} className="text-xs">{user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}</Badge></div>
@@ -225,10 +231,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Preference:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
           {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
           
-          {!user.minimumMatchRating && (!user.motivations || user.motivations.length === 0) && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined && (
-            <p className="text-sm text-muted-foreground font-body">No specific preferences set yet (defaults will apply).</p>
-          )}
-        
           {isOwnProfile && allowAutoPreferenceInference && (
             <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4">
                  <CollapsibleTrigger asChild>

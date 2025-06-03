@@ -37,7 +37,7 @@ const UserPreferencesSchema = z.object({
   }).optional(),
   tradeTimingPreference: z.enum(['simultaneous', 'staged', 'flexible']).optional(),
   interestedInThirdPartyFulfillment: z.boolean().optional(),
-  minimumMatchRating: z.enum(['Low', 'Medium', 'High']).optional().describe("User's global minimum match rating preference. This will be 'Low' if user hasn't set one."),
+  minimumMatchRating: z.enum(['Low', 'Medium', 'High']).describe("User's global minimum match rating preference. This will always be set, defaulting to 'Low' if user hasn't specified one."), // Now required, defaults to 'Low' at data level
 }).describe("The triggering user's trading preferences.");
 
 
@@ -52,9 +52,9 @@ const BaseItemMatchInputSchema = z.object({
 const ItemMatchFlowInputSchema = BaseItemMatchInputSchema;
 export type ItemMatchInput = z.infer<typeof ItemMatchFlowInputSchema>;
 
-// Input schema for the advanced prompt, including optional user preferences
+// Input schema for the advanced prompt, including user preferences (minimumMatchRating is now always present)
 const AdvancedItemMatchPromptInputSchema = BaseItemMatchInputSchema.extend({
-  triggeringUserPreferences: UserPreferencesSchema.optional(),
+  triggeringUserPreferences: UserPreferencesSchema, // Now required because minimumMatchRating is always present
 });
 
 const SuggestedItemWithScoreSchema = z.object({
@@ -80,7 +80,7 @@ const ItemMatchOutputSchema = z.object({
   suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores and ownerIds. Can be empty if no good matches are found or if they don't meet minimum rating criteria."),
   reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
   usedMatchingMode: z.enum(['simple', 'advanced']).describe("The matching mode that was used."),
-  preferencesConsidered: z.boolean().describe("Whether user profile preferences were considered.")
+  preferencesConsidered: z.boolean().describe("Whether user profile preferences were considered beyond the default minimum match rating.")
 });
 export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 
@@ -88,7 +88,7 @@ export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 // SIMPLE PROMPT (existing)
 const simpleItemMatchPrompt = ai.definePrompt({
   name: 'simpleItemMatchPrompt',
-  input: {schema: BaseItemMatchInputSchema}, // Simple prompt does not use full user preferences yet
+  input: {schema: BaseItemMatchInputSchema}, 
   output: {schema: PromptOutputSchema},
   prompt: `You are an AI assistant helping users find items to trade on a barter platform.
 Given a 'Current Item' and a list of 'Available Items' from other users, identify items from the 'Available Items' list that could be a good trade. Focus on general relevance, category similarity, and keyword matches in descriptions.
@@ -106,7 +106,7 @@ Minimum Acceptable Match Score for THIS ITEM: '{{{currentItem.minimumMatchRating
 
 Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: Description):
 {{#each availableItems}}
-- {{id}} :: {{name}} :: {{category}} :: {{ownerId}} :: {{listingType}} :: {{description}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{{description}}}
 {{/each}}
 
 For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
@@ -115,7 +115,7 @@ For each item you identify as a match, assign a qualitative match score: "High",
 - "Low": Possible but less direct relevance, different categories with niche appeal.
 
 {{#if currentItem.minimumMatchRatingOverride}}
-IMPORTANT: The 'Current Item' has a specific minimum match rating requirement of '{{{currentItem.minimumMatchRatingOverride}}}'. When suggesting matches, your assigned score for any suggested item MUST be '{{{currentItem.minimumMatchRatingOverride}}}' or higher (e.g., if min is 'Medium', you can suggest 'Medium' or 'High', but not 'Low').
+IMPORTANT: The 'Current Item' has a specific minimum match rating requirement of '{{{currentItem.minimumMatchRatingOverride}}}'. When suggesting matches, your assigned score for any suggested item MUST be '{{{currentItem.minimumMatchRatingOverride}}}' or higher (e.g., if min is 'Medium', you can suggest 'Medium' or 'High', but not 'Low'). If no item override is specified, use general relevance.
 {{/if}}
 
 Do not suggest:
@@ -145,23 +145,18 @@ Listed As: {{{currentItem.listingType}}} (by user {{{currentItem.ownerId}}})
 This Item's Specific Minimum Match Requirement: '{{{currentItem.minimumMatchRatingOverride}}}' (Overrides user's global preference for this item).
 {{/if}}
 
-{{#if triggeringUserPreferences}}
 The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the following preferences:
 {{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
 {{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else}} - Open to 3rd Party Fulfillment: No{{/if}}
-{{#if triggeringUserPreferences.minimumMatchRating}}
- - User's Effective Minimum Match Preference (defaults to 'Low' if not set): '{{{triggeringUserPreferences.minimumMatchRating}}}'
-{{/if}}
+ - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
+
 Consider these preferences when evaluating match quality and potential for reciprocal trades.
-{{else}}
-No specific preferences provided for the triggering user (ID: {{{triggeringUserId}}}). Focus on general item compatibility and mutual benefit. The user's effective minimum match preference is 'Low'.
-{{/if}}
 
 Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: Description):
 {{#each availableItems}}
-- {{id}} :: {{name}} :: {{category}} :: {{ownerId}} :: {{listingType}} :: {{description}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{{description}}}
 {{/each}}
 
 Analyze the "Current Item" against the "Available Items" to find potential trades. A good match involves RECIPROCAL interest or clear fulfillment of needs.
@@ -172,7 +167,7 @@ MINIMUM MATCH SCORE RULE:
 {{#if currentItem.minimumMatchRatingOverride}}
 The 'Current Item' has an OVERRIDE, REQUIRING suggestions to have a match score of at least '{{{currentItem.minimumMatchRatingOverride}}}'. Do NOT suggest any items you score lower than this.
 {{else}}
-The 'Current Item' uses the user's profile preference. The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level.
+The 'Current Item' uses the user's profile preference. The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level. You MUST NOT suggest items with a score lower than this.
 {{/if}}
 
 Prioritize:
@@ -206,7 +201,7 @@ const itemMatchFlow = ai.defineFlow(
   },
   async (input: ItemMatchInput): Promise<ItemMatchOutput> => {
     const flowName = 'itemMatchFlow';
-    let preferencesConsidered = false;
+    let preferencesConsideredBeyondDefaultMinRating = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
     let finalInputForPrompt: any = { ...input }; 
 
@@ -247,47 +242,36 @@ const itemMatchFlow = ai.defineFlow(
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
+      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      // User profile minimumMatchRating is now required and defaults to 'Low' at data level.
+      const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
+
+      const userPrefsForPrompt: UserProfilePreferences = {
+        motivations: userProfile?.motivations,
+        locationPreference: userProfile?.locationPreference,
+        tradeTimingPreference: userProfile?.tradeTimingPreference,
+        interestedInThirdPartyFulfillment: userProfile?.interestedInThirdPartyFulfillment,
+        minimumMatchRating: effectiveUserMinRating, // Always present
+      };
+      
+      finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
+
       if (usePrefsInMatchingGlobal) {
-        const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
-        const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = (userProfile?.minimumMatchRating) || 'Low';
-
-        if (userProfile) {
-          const userPrefsForPrompt: UserProfilePreferences = {
-            motivations: userProfile.motivations,
-            locationPreference: userProfile.locationPreference,
-            tradeTimingPreference: userProfile.tradeTimingPreference,
-            interestedInThirdPartyFulfillment: userProfile.interestedInThirdPartyFulfillment,
-            minimumMatchRating: effectiveUserMinRating,
-          };
-          // Check if any meaningful preference is set beyond the potentially defaulted minimumMatchRating
-          const hasMeaningfulPrefs = 
-            userProfile.motivations || 
-            userProfile.locationPreference || 
-            userProfile.tradeTimingPreference || 
-            userProfile.interestedInThirdPartyFulfillment !== undefined ||
-            userProfile.minimumMatchRating !== undefined; // if user explicitly set Low, it's meaningful
-
-          if (hasMeaningfulPrefs) {
-             finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
-             preferencesConsidered = true;
-          } else {
-             // Only the defaulted min rating is present or no profile at all
-             finalInputForPrompt.triggeringUserPreferences = { minimumMatchRating: effectiveUserMinRating };
-             preferencesConsidered = true; 
-          }
-        } else {
-            finalInputForPrompt.triggeringUserPreferences = { minimumMatchRating: 'Low' }; // Default if no user profile
-            preferencesConsidered = true;
-        }
-      } else { // Advanced mode but global pref usage is off
-         finalInputForPrompt.triggeringUserPreferences = { minimumMatchRating: 'Low' }; // Still provide default minimum
-         preferencesConsidered = false; // Explicitly false as only default min rating is sent
+        // Check if any meaningful preference beyond the default minimum rating was considered
+        const hasOtherMeaningfulPrefs = 
+          userProfile?.motivations || 
+          userProfile?.locationPreference || 
+          userProfile?.tradeTimingPreference || 
+          userProfile?.interestedInThirdPartyFulfillment !== undefined ||
+          (userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low'); // Considered if not the absolute default
+        preferencesConsideredBeyondDefaultMinRating = hasOtherMeaningfulPrefs;
+      } else {
+        preferencesConsideredBeyondDefaultMinRating = false; // Global setting is off
       }
+
     } else { // Simple mode
       usedMatchingMode = 'simple';
-      // Simple prompt does not receive triggeringUserPreferences currently.
-      // Item override is handled directly in its prompt.
-      // No global user preference impact on simple mode by default, unless changed.
+      preferencesConsideredBeyondDefaultMinRating = false;
     }
 
     try {
@@ -306,7 +290,7 @@ const itemMatchFlow = ai.defineFlow(
               suggestedMatches: [],
               reasoning: errorReasoning,
               usedMatchingMode,
-              preferencesConsidered,
+              preferencesConsidered: preferencesConsideredBeyondDefaultMinRating,
           };
           logMatchSuggestion({ 
             triggeringUserId: input.triggeringUserId,
@@ -315,7 +299,7 @@ const itemMatchFlow = ai.defineFlow(
             suggestedMatches: errorOutput.suggestedMatches,
             reasoning: errorOutput.reasoning,
             usedMatchingMode,
-            preferencesConsidered,
+            preferencesConsidered: errorOutput.preferencesConsidered,
           }).catch(logError => console.error(`${flowName} - Error logging (null output scenario):`, logError));
           return errorOutput;
       }
@@ -337,7 +321,7 @@ const itemMatchFlow = ai.defineFlow(
         suggestedMatches: augmentedMatches,
         reasoning: finalReasoning,
         usedMatchingMode,
-        preferencesConsidered,
+        preferencesConsidered: preferencesConsideredBeyondDefaultMinRating,
       };
 
       logMatchSuggestion({ 
@@ -347,7 +331,7 @@ const itemMatchFlow = ai.defineFlow(
         suggestedMatches: validatedOutput.suggestedMatches,
         reasoning: validatedOutput.reasoning,
         usedMatchingMode,
-        preferencesConsidered,
+        preferencesConsidered: validatedOutput.preferencesConsidered,
       }).catch(logError => console.error(`${flowName} - Error logging (successful output):`, logError));
       return validatedOutput;
 
@@ -419,7 +403,7 @@ const itemMatchFlow = ai.defineFlow(
         suggestedMatches: [],
         reasoning: userMessage,
         usedMatchingMode,
-        preferencesConsidered,
+        preferencesConsidered: preferencesConsideredBeyondDefaultMinRating,
       };
       logMatchSuggestion({ 
         triggeringUserId: input.triggeringUserId,
@@ -428,7 +412,7 @@ const itemMatchFlow = ai.defineFlow(
         suggestedMatches: errorOutput.suggestedMatches,
         reasoning: errorOutput.reasoning,
         usedMatchingMode,
-        preferencesConsidered,
+        preferencesConsidered: errorOutput.preferencesConsidered,
       }).catch(logError => console.error(`${flowName} - Error logging (error output):`, logError));
       return errorOutput;
     }

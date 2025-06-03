@@ -35,7 +35,7 @@ const UserCurrentPreferencesSchema = z.object({
   }).optional().describe("The user's explicit preference regarding location for trades."),
   tradeTimingPreference: TradeTimingPreferenceEnum.optional().describe("The user's explicit preferred trade timing."),
   interestedInThirdPartyFulfillment: z.boolean().optional().describe("Whether the user has explicitly stated they are open to 3rd party fulfillments."),
-  minimumMatchRating: MinimumMatchRatingEnum.optional().describe("User's explicitly stated minimum match rating preference (Low, Medium, High)."),
+  minimumMatchRating: MinimumMatchRatingEnum.describe("User's explicitly stated minimum match rating preference ('Low', 'Medium', 'High'). This field is required on the User type, defaulting to 'Low' if not set."), // Changed from optional
 }).describe("The user's currently set explicit preferences, if available.");
 
 
@@ -59,8 +59,8 @@ const AIPromptOutputSchema = z.object({
     }).optional(),
     tradeTimingPreference: TradeTimingPreferenceEnum.optional(),
     interestedInThirdPartyFulfillment: z.boolean().optional(),
-    minimumMatchRating: MinimumMatchRatingEnum.optional().describe("Suggested minimum match rating preference ('Low', 'Medium', 'High')."),
-  }).describe("The AI's suggested preferences. This field is REQUIRED and MUST be an object, even if empty like {}."),
+    minimumMatchRating: MinimumMatchRatingEnum.describe("Suggested minimum match rating preference ('Low', 'Medium', 'High'). This field is REQUIRED. Default to 'Low' if unsure."), // Now required
+  }).describe("The AI's suggested preferences. This field is REQUIRED and MUST be an object."),
   confidence: z.enum(['High', 'Medium', 'Low']).describe("Confidence level in the inferred preferences. This field is REQUIRED."),
   reasoning: z.string().optional().describe("Brief reasoning for the inferred preferences. This field is optional."),
 });
@@ -76,7 +76,7 @@ const InferUserPreferencesOutputSchema = z.object({
     }).optional(),
     tradeTimingPreference: TradeTimingPreferenceEnum.optional(),
     interestedInThirdPartyFulfillment: z.boolean().optional(),
-    minimumMatchRating: MinimumMatchRatingEnum.optional(),
+    minimumMatchRating: MinimumMatchRatingEnum, // Now required
   }),
   confidence: z.enum(['High', 'Medium', 'Low']),
   reasoning: z.string().optional(),
@@ -108,14 +108,14 @@ User has no items currently listed for analysis.
 {{/if}}
 
 {{#if currentPreferences}}
-User's Current Explicit Preferences (to consider and refine):
+User's Current Explicit Preferences (to consider and refine, 'minimumMatchRating' defaults to 'Low' if not explicitly set):
 {{#if currentPreferences.motivations}} - Motivations: {{#each currentPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if currentPreferences.locationPreference}} - Location: {{#if currentPreferences.locationPreference.isSensitive}}Sensitive (Notes: {{#if currentPreferences.locationPreference.notes}}"{{currentPreferences.locationPreference.notes}}"{{else}}Not specified{{/if}}){{else}}Flexible{{/if}}{{/if}}
 {{#if currentPreferences.tradeTimingPreference}} - Timing: {{{currentPreferences.tradeTimingPreference}}}{{/if}}
 {{#if currentPreferences.interestedInThirdPartyFulfillment}} - 3rd Party Fulfillment: Open{{else}} - 3rd Party Fulfillment: Prefers Direct{{/if}}
-{{#if currentPreferences.minimumMatchRating}} - Minimum Match Rating: {{{currentPreferences.minimumMatchRating}}}{{/if}}
+ - Minimum Match Rating: {{{currentPreferences.minimumMatchRating}}}
 {{else}}
-User has not specified explicit preferences. Infer based on other data.
+User has not specified explicit preferences. Assume 'minimumMatchRating' is 'Low'. Infer other preferences based on data.
 {{/if}}
 
 {{#if simulatedChatSnippets}}
@@ -134,24 +134,24 @@ Engagement Notes:
 
 Analyze ALL the provided data to infer the following preferences.
 The output object MUST contain:
-1.  A 'suggestedPreferences' object. This field is REQUIRED and MUST be an object, even if it's empty like {}.
-    -   Inside 'suggestedPreferences', you should aim to include:
+1.  A 'suggestedPreferences' object. This field is REQUIRED and MUST be an object.
+    -   Inside 'suggestedPreferences', you MUST include:
+        -   'minimumMatchRating' (string: 'Low', 'Medium', or 'High'). This field is REQUIRED.
+            -   Infer 'High' if user has many high-value 'want' items, lists valuable 'offer' items with specific conditions, uses picky language in chat (e.g., "only looking for pristine condition"), or has explicit high preference.
+            -   Infer 'Low' if user lists many common 'offer' items, accepts a wide variety of trades, seems very open/flexible in chat, or no strong signals suggest otherwise.
+            -   Default to 'Low' if signals are mixed or very sparse, unless current preference is explicitly Medium/High.
         -   'motivations' (array of strings, optional): What seems to drive this user to trade? Choose one or two from: 'help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds'.
         -   'locationPreference' (object, optional):
             -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades?
             -   notes (string, optional): If sensitive, capture any specific notes.
         -   'tradeTimingPreference' (string, optional): Choose from: 'simultaneous', 'staged', 'flexible'. Default to 'flexible' if unsure.
         -   'interestedInThirdPartyFulfillment' (boolean, optional): Does the user seem open to complex scenarios? Default to true if unsure and no explicit preference against.
-        -   'minimumMatchRating' (string, optional): Choose from 'Low', 'Medium', 'High'.
-            -   Infer 'High' if user has many high-value 'want' items, lists valuable 'offer' items with specific conditions, uses picky language in chat (e.g., "only looking for pristine condition"), or has explicit high preference.
-            -   Infer 'Low' if user lists many common 'offer' items, accepts a wide variety of trades, or seems very open/flexible in chat.
-            -   Default to 'Medium' or omit if signals are mixed, or user has an explicit 'Medium' or no preference.
-    -   If data is too vague for a specific preference, omit that field. If completely unsure, 'suggestedPreferences' can be an empty object \\\`{}\\\`.
+    -   If data is too vague for a specific preference (other than minimumMatchRating), omit that field.
 2.  A 'confidence' field (string: 'High', 'Medium', or 'Low'). This field is REQUIRED.
 3.  A 'reasoning' field (string, optional, max 2 sentences). This field is optional.
 
 Weight explicit preferences heavily if provided, but refine them if other activity strongly contradicts or adds nuance.
-Your JSON output must be a single object with top-level keys 'suggestedPreferences', 'confidence', and optionally 'reasoning'.
+Your JSON output must be a single object with top-level keys 'suggestedPreferences', 'confidence', and optionally 'reasoning'. The 'minimumMatchRating' field within 'suggestedPreferences' is mandatory.
 `,
 });
 
@@ -170,7 +170,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
       tradeTimingPreference: 'flexible' as TradeTimingPreference,
       interestedInThirdPartyFulfillment: true,
       motivations: undefined,
-      minimumMatchRating: undefined, // Default is no preference
+      minimumMatchRating: 'Low', // Default is Low, and it's required
     };
     
     const processedInput = {
@@ -179,6 +179,10 @@ const inferUserPreferencesFlow = ai.defineFlow(
         ...item,
         description: item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : undefined,
       })),
+      // Ensure currentPreferences includes a minimumMatchRating, defaulting to 'Low' if not present in input
+      currentPreferences: input.currentPreferences 
+        ? { ...input.currentPreferences, minimumMatchRating: input.currentPreferences.minimumMatchRating || 'Low' } 
+        : { minimumMatchRating: 'Low' } 
     };
 
     try {
@@ -194,6 +198,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
         console.warn(`${flowName}: Prompt returned a null or undefined output object.`);
         baseReasoning = "AI failed to generate a response for preference inference. The model may be temporarily unavailable or did not provide data.";
         errorMessage = "The AI assistant did not return a valid response object. This might be due to a model issue or temporary service problem.";
+        finalSuggestedPreferences.minimumMatchRating = 'Low'; // Ensure required field has a default
       } else {
         if (output.suggestedPreferences && typeof output.suggestedPreferences === 'object') {
           finalSuggestedPreferences.motivations = Array.isArray(output.suggestedPreferences.motivations) 
@@ -219,14 +224,20 @@ const inferUserPreferencesFlow = ai.defineFlow(
             finalSuggestedPreferences.interestedInThirdPartyFulfillment = defaultInferredPreferences.interestedInThirdPartyFulfillment;
           }
 
-          finalSuggestedPreferences.minimumMatchRating = MinimumMatchRatingEnum.safeParse(output.suggestedPreferences.minimumMatchRating).success
-            ? output.suggestedPreferences.minimumMatchRating
-            : defaultInferredPreferences.minimumMatchRating;
+          // minimumMatchRating is now required
+          if (MinimumMatchRatingEnum.safeParse(output.suggestedPreferences.minimumMatchRating).success) {
+            finalSuggestedPreferences.minimumMatchRating = output.suggestedPreferences.minimumMatchRating;
+          } else {
+            console.warn(`${flowName}: Prompt output had missing or invalid 'minimumMatchRating'. Defaulting to 'Low'. Received:`, output.suggestedPreferences.minimumMatchRating);
+            finalSuggestedPreferences.minimumMatchRating = 'Low';
+            errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for minimumMatchRating was missing or invalid; defaulted to 'Low'.";
+          }
 
         } else {
           console.warn(`${flowName}: Prompt output was missing 'suggestedPreferences' or it was not an object. Output received:`, JSON.stringify(output, null, 2));
           errorMessage = (errorMessage ? errorMessage + " " : "") + "The AI's response for preferences was malformed or incomplete. Default preferences have been applied.";
           baseReasoning = "AI response for preferences was malformed or missing. Using default values.";
+          finalSuggestedPreferences.minimumMatchRating = 'Low'; // Ensure required field
         }
 
         if (output.confidence && ['High', 'Medium', 'Low'].includes(output.confidence)) {
@@ -317,7 +328,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
       return {
         userId: input.userId,
-        suggestedPreferences: { ...defaultInferredPreferences }, 
+        suggestedPreferences: { ...defaultInferredPreferences, minimumMatchRating: 'Low' }, // Ensure required field
         confidence: 'Low',
         reasoning: "Failed to infer preferences due to a system error. Default preferences applied. Please check server logs for detailed error information.",
         errorMessage: userMessage
@@ -325,7 +336,3 @@ const inferUserPreferencesFlow = ai.defineFlow(
     }
   }
 );
-
-    
-
-    

@@ -1,6 +1,6 @@
 
 import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences } from '@/types';
-import type { InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow'; // Import the type for clarity
+import type { InferUserPreferencesOutput, InferredUserPreferences } from '@/types'; // Adjusted import
 
 export const dummyUsers: User[] = [
   {
@@ -16,7 +16,7 @@ export const dummyUsers: User[] = [
     motivations: ['unique-finds', 'community-building'] as UserMotivation[],
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
-    minimumMatchRating: 'Medium', // Alice prefers at least Medium matches
+    minimumMatchRating: 'Medium', 
   },
   {
     id: 'user2',
@@ -31,7 +31,7 @@ export const dummyUsers: User[] = [
     motivations: ['maximize-trades'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Prefers trades within the city for larger items.' },
     tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
-    minimumMatchRating: 'Low', // Bob is open to Low matches globally
+    minimumMatchRating: 'Low', 
   },
   {
     id: 'user3',
@@ -46,7 +46,7 @@ export const dummyUsers: User[] = [
     motivations: ['help-others', 'convenience-focused'] as UserMotivation[],
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'staged' as TradeTimingPreference,
-    // No global minimumMatchRating, will accept any if item doesn't override
+    minimumMatchRating: 'Low', // Defaulted to Low as it was undefined
   },
   {
     id: 'user4',
@@ -61,7 +61,7 @@ export const dummyUsers: User[] = [
     motivations: ['unique-finds'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Willing to ship smaller items.' },
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
-    minimumMatchRating: 'High', // Diana is very picky
+    minimumMatchRating: 'High', 
   },
   {
     id: 'user5',
@@ -120,7 +120,6 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'offer',
-    // No override, will use Alice's global 'Medium'
     isGiftItForward: true,
   },
   {
@@ -173,7 +172,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'want',
-    minimumMatchRatingOverride: 'Medium', // Wants for this must be at least medium
+    minimumMatchRatingOverride: 'Medium', 
   },
   {
     id: 'item8',
@@ -280,7 +279,7 @@ dummyItems.forEach(item => {
 // Function to update user preferences in the dummyUsers array (in-memory)
 export function updateUserPreferencesInDummyData(
   userId: string,
-  newPreferences: InferUserPreferencesOutput['suggestedPreferences']
+  newPreferences: InferredUserPreferences // Using the more specific InferredUserPreferences type
 ): boolean {
   const userIndex = dummyUsers.findIndex(u => u.id === userId);
   if (userIndex === -1) {
@@ -290,7 +289,6 @@ export function updateUserPreferencesInDummyData(
 
   const userToUpdate = dummyUsers[userIndex];
 
-  // Update fields if they exist in newPreferences
   if (newPreferences.motivations !== undefined) {
     userToUpdate.motivations = newPreferences.motivations;
   }
@@ -303,12 +301,10 @@ export function updateUserPreferencesInDummyData(
   if (newPreferences.interestedInThirdPartyFulfillment !== undefined) {
     userToUpdate.interestedInThirdPartyFulfillment = newPreferences.interestedInThirdPartyFulfillment;
   }
-  if (newPreferences.minimumMatchRating !== undefined) { // Added for new preference
-    userToUpdate.minimumMatchRating = newPreferences.minimumMatchRating;
-  }
+  // minimumMatchRating is now required in InferredUserPreferences
+  userToUpdate.minimumMatchRating = newPreferences.minimumMatchRating;
   
   dummyUsers[userIndex] = userToUpdate;
-  // console.log(`[DummyData] Updated preferences for user ${userId}:`, newPreferences);
   return true;
 }
 
@@ -319,7 +315,6 @@ export function addNewItemToDummyData(
   const owner = dummyUsers.find(user => user.id === itemData.ownerId);
   if (!owner) {
     console.error(`[DummyData] Owner with ID ${itemData.ownerId} not found. Cannot add item.`);
-    // In a real app, you might throw an error or handle this differently
     throw new Error(`Owner not found for ID: ${itemData.ownerId}`);
   }
 
@@ -327,16 +322,14 @@ export function addNewItemToDummyData(
     ...itemData,
     id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     ownerName: owner.name,
-    status: 'available', // Default status for new items
-    // Basic dataAiHint generation from name
+    status: 'available', 
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`,
-    isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false, // Only offers can be gifts
+    isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false, 
   };
 
   dummyItems.push(newItem);
   
-  // Also add to the owner's item list
   const userIndex = dummyUsers.findIndex(u => u.id === itemData.ownerId);
   if (userIndex !== -1) {
     dummyUsers[userIndex].items.push(newItem);

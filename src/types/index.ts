@@ -28,7 +28,7 @@ export type UserProfilePreferences = {
   locationPreference?: UserProfileLocationPreference;
   tradeTimingPreference?: TradeTimingPreference;
   interestedInThirdPartyFulfillment?: boolean;
-  minimumMatchRating?: 'Low' | 'Medium' | 'High';
+  minimumMatchRating: 'Low' | 'Medium' | 'High'; // Now required
 };
 
 export type User = {
@@ -72,8 +72,6 @@ export type ChatMessage = {
 };
 
 // Specifically for the inferUserPreferencesFlow output.
-// This matches the structure of UserProfilePreferences but ensures all fields are optional
-// as returned by the AI before they are applied to a user.
 export type InferredUserPreferences = {
   motivations?: UserMotivation[];
   locationPreference?: {
@@ -82,7 +80,7 @@ export type InferredUserPreferences = {
   };
   tradeTimingPreference?: TradeTimingPreference;
   interestedInThirdPartyFulfillment?: boolean;
-  minimumMatchRating?: 'Low' | 'Medium' | 'High';
+  minimumMatchRating: 'Low' | 'Medium' | 'High'; // Now required
 };
 
 export type InferUserPreferencesOutput = {
