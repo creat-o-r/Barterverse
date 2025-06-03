@@ -168,15 +168,18 @@ Analyze the "Current Item" against the "Available Items" to find potential trade
 
 Prioritize:
 1.  Direct Fulfillment:
-    *   If Current Item is 'offer': Find 'want' items from Available Items that Current Item directly satisfies.
-    *   If Current Item is 'want': Find 'offer' items from Available Items that directly satisfy Current Item's want.
-2.  Strong Complementary Offers: If Current Item is 'offer', find 'offer' items from Available Items that would make a compelling direct swap (similar category, value, utility, or strong thematic link).
+    *   If 'currentItem' is 'offer': Find 'want' items from 'availableItems' that 'currentItem' directly satisfies.
+    *   If 'currentItem' is 'want': Find 'offer' items from 'availableItems' that directly satisfy 'currentItem''s want.
+2.  Strong Complementary Offers: If 'currentItem' is 'offer', find 'offer' items from 'availableItems' that would make a compelling direct swap.
 
 Assign a match score ("High", "Medium", "Low") based on:
 - "High":
-    -   Excellent reciprocal value: Clear 'offer' fulfilling a specific 'want', or vice-versa.
-    -   Two 'offer' items that are extremely complementary, in high demand, or a perfect thematic fit.
-    -   Strong alignment with triggeringUser's preferences if provided (e.g., a 'unique-find' motivation perfectly met).
+    -   Excellent direct fulfillment: 'currentItem' (Offer) clearly satisfies an 'availableItem' (Want), OR 'currentItem' (Want) is clearly satisfied by an 'availableItem' (Offer).
+        This forms one strong leg of a trade.
+        *Consider it an even stronger "High" match if*: The owner of this 'availableItem' (User B) also has other 'Offer' items listed in 'Available Items' that seem highly relevant to you (the 'triggeringUser', User A), based on your 'currentItem''s category/description or your explicit 'triggeringUserPreferences'. This suggests a potential for a full reciprocal trade where User B's offer might fulfill one of your other (unstated) wants. If you see this potential, briefly note it in your reasoning.
+    -   Highly complementary 'offer'-'offer' swap: 'currentItem' (Offer) and 'availableItem' (Offer, from User B) are a natural pair (e.g., same category, similar perceived value, strong thematic link).
+        *Consider it an even stronger "High" match if*: The descriptions or categories suggest strong mutual interest (e.g., your 'currentItem' description hints at needing something like User B's 'availableItem', or vice-versa). This also suggests a potential for a full reciprocal trade. If you see this, briefly note it in your reasoning.
+    -   Strong alignment of the 'availableItem' with 'triggeringUser''s explicit preferences (e.g., a 'unique-find' motivation perfectly met).
 - "Medium":
     -   Good potential for mutual benefit. One item generally addresses the type/category of the other.
     -   Two 'offer' items that are related and could make a fair trade.
@@ -191,10 +194,10 @@ Do NOT suggest:
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
 Return a list of 'suggestedMatches' (itemId, matchScore).
-If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach or key finds.
+If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach or key finds, especially if you identified potential for a fuller reciprocal trade.
 If NO suitable matches are found, return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why no strong reciprocal matches were identified (e.g., "Could not find direct want fulfillments or highly complementary offers for '[Current Item Name]' from the available items. Users might need to browse more broadly.").
 Aim for quality over quantity, but try to find at least one or two "Low" matches if nothing better is available, rather than nothing.
-`,
+  `,
 });
 
 
@@ -208,12 +211,13 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     let preferencesConsidered = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
-    let finalInputForPrompt: any = { ...input };
+    let finalInputForPrompt: any = { ...input }; // Copy input to avoid modifying the original
 
     const currentMatchingMode = await getAIMatchingMode();
     const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
     let usedMatchingMode: 'simple' | 'advanced' = currentMatchingMode;
 
+    // Filter out the current item and items by the same owner from availableItems
     const itemsToConsider = input.availableItems.filter(item =>
         item.id !== input.currentItem.id && item.ownerId !== input.currentItem.ownerId
     );
@@ -238,19 +242,22 @@ const itemMatchFlow = ai.defineFlow(
         return output;
     }
 
-    finalInputForPrompt.availableItems = itemsToConsider;
+    finalInputForPrompt.availableItems = itemsToConsider; // Use the filtered list
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
       if (usePrefsInMatchingGlobal) {
+        // Attempt to fetch user preferences for the triggeringUserId
         const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
         if (userProfile) {
+          // Construct preferences object based on User type
           const userPrefs: UserProfilePreferences = {
             motivations: userProfile.motivations,
             locationPreference: userProfile.locationPreference,
             tradeTimingPreference: userProfile.tradeTimingPreference,
             interestedInThirdPartyFulfillment: userProfile.interestedInThirdPartyFulfillment,
           };
+          // Check if any preference is actually set before adding to prompt input
           if (Object.values(userPrefs).some(val => val !== undefined && (!Array.isArray(val) || val.length > 0))) {
              finalInputForPrompt.triggeringUserPreferences = userPrefs;
              preferencesConsidered = true;
@@ -258,15 +265,16 @@ const itemMatchFlow = ai.defineFlow(
         }
       }
     } else {
-      usedMatchingMode = 'simple';
+      usedMatchingMode = 'simple'; // Ensure usedMatchingMode reflects simple mode if not advanced
     }
 
     try {
       console.log(`[${flowName}] (${usedMatchingMode} mode) Calling prompt with input:`, JSON.stringify(finalInputForPrompt, null, 2));
       const { output: promptOutput } = await promptToUse(finalInputForPrompt);
 
+      // Define default reasoning based on context
       let defaultReasoning = `AI (${usedMatchingMode} mode) did not find strong matches for "${input.currentItem.name}" based on the current criteria. Users might explore other items or categories.`;
-      if (itemsToConsider.length < 3) {
+      if (itemsToConsider.length < 3) { // If very few items were available to match against
           defaultReasoning = `AI (${usedMatchingMode} mode) had limited options to find strong matches for "${input.currentItem.name}". More items from other users might yield better suggestions.`;
       }
 
@@ -291,15 +299,18 @@ const itemMatchFlow = ai.defineFlow(
           return errorOutput;
       }
 
+      // Augment suggestedMatches with ownerId from the original availableItems list
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
           ...aiSuggestion,
-          ownerId: originalItem?.ownerId || 'unknown_owner',
+          ownerId: originalItem?.ownerId || 'unknown_owner', // Add ownerId
         };
-      }).filter(match => match.ownerId !== 'unknown_owner');
+      }).filter(match => match.ownerId !== 'unknown_owner'); // Filter out any where ownerId couldn't be found (should not happen)
 
-      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning)
+
+      // Determine final reasoning: use AI's if provided and sensible, otherwise use default
+      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning) // No matches AND no AI reasoning
                                ? defaultReasoning
                                : promptOutput.reasoning || (augmentedMatches.length > 0 ? `Found some potential matches for "${input.currentItem.name}".` : defaultReasoning);
 
@@ -322,37 +333,39 @@ const itemMatchFlow = ai.defineFlow(
       return validatedOutput;
 
     } catch (error: any) {
-      console.error(`${flowName} (${usedMatchingMode} mode) - Caught Error Name: ${error.name || 'N/A'}, Message: ${error.message || 'N/A'}`);
-
+      // Enhanced error logging
       const errorDetails: Record<string, any> = {
         name: error.name,
         message: error.message,
-        stack: error.stack?.substring(0, 500),
-        cause: error.cause,
+        stack: error.stack?.substring(0, 500), // Truncate stack for brevity
+        cause: error.cause, // Include cause if available
       };
       if (typeof error === 'object' && error !== null) {
+          // Check for Genkit specific properties
           if ('isGenkitError' in error) errorDetails.isGenkitError = (error as any).isGenkitError;
-          if ('details' in error) errorDetails.details = (error as any).details;
-          if ('status' in error) errorDetails.status = (error as any).status;
+          if ('details' in error) errorDetails.details = (error as any).details; // Often contains structured error info from Genkit/Google AI
+          if ('status' in error) errorDetails.status = (error as any).status; // HTTP status if it's an API error
+          // For gRPC style codes that might come via details or other properties
           if ('code' in error && !('status' in errorDetails)) errorDetails.code = (error as any).code;
       }
       try {
-        console.error(`Detailed error object in ${flowName} (${usedMatchingMode} mode):`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.error(`[${flowName}] (${usedMatchingMode} mode) Detailed error object:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
-        console.error(`Could not stringify full error object in ${flowName} (${usedMatchingMode} mode). Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
-        console.error(`Original error object was:`, error);
+        console.error(`[${flowName}] (${usedMatchingMode} mode) Could not stringify full error object. Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
+        console.error(`[${flowName}] (${usedMatchingMode} mode) Original error object was:`, error);
       }
 
       let userMessage = `An unexpected error occurred while trying to get AI suggestions (${usedMatchingMode} mode). Please check server logs.`;
       const lowerErrorMessage = String(error.message || "").toLowerCase();
+      const errorName = String(error.name || "").toLowerCase();
 
-      if (lowerErrorMessage.includes('parse error on line')) {
-        userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue with the request structure (likely template formatting). (Item ID: ${input.currentItem.id}). Please check server logs.`;
-      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
+      if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars')) {
+        userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue with its request structure (likely template formatting for item ID: ${input.currentItem.id}). Please check server logs for details.`;
+      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT from gRPC/Google AI */) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) received a bad request. This might be due to problematic input data (Item ID: ${input.currentItem.id}) or an issue with the prompt structure. Please check server logs for details on the input.`;
-      } else if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
+      } else if (errorDetails.status === 429 || errorDetails.code === 8 /* RESOURCE_EXHAUSTED */ || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) has reached its current usage limit. Please try again later.`;
-      } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
+      } else if (errorDetails.status === 503 || errorDetails.code === 14 /* UNAVAILABLE */ || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) is temporarily overloaded or unavailable. Please try again.`;
       } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
         userMessage = `Authentication error with the AI service (${usedMatchingMode} mode). Please check API key configuration.`;
@@ -362,15 +375,20 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = `The AI's response (${usedMatchingMode} mode) was not in the expected format. This may indicate a problem with the AI model's output.`;
       } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
         userMessage = `The AI service (${usedMatchingMode} mode) reported an internal error. Please try again later.`;
-      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status) {
+      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status ) {
+        // Catch-all for other Genkit/Google AI errors that have structured details
         userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue interpreting the request structure. This is often due to template formatting. Please check server logs.`;
+        // Append specific model message if it's not too generic
+        if (error.message && !lowerErrorMessage.includes('unexpected') && !lowerErrorMessage.includes('internal') && !lowerErrorMessage.includes('unknown') && !lowerErrorMessage.includes('parse error')) {
+            userMessage += ` (Details: ${error.message.substring(0,150)}${error.message.length > 150 ? "..." : ""})`;
+        }
       }
 
 
       logAIDiagnostic({ // Not awaited
         flowName: flowName,
         triggeringUserId: input.triggeringUserId,
-        input: finalInputForPrompt,
+        input: finalInputForPrompt, // Log the actual input sent to the prompt
         error: {
           name: errorDetails.name,
           message: errorDetails.message,
@@ -382,7 +400,7 @@ const itemMatchFlow = ai.defineFlow(
         userFacingMessage: userMessage,
       }).catch(diagError => console.error("Error logging diagnostic for itemMatchFlow:", diagError));
       
-      console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${errorDetails.name || 'Error'}: ${errorDetails.message || 'No message available'}".`);
+      console.error(`[${flowName}] (${usedMatchingMode} mode) is returning an error to the client. User-facing message: "${userMessage}". Original error: "${errorDetails.name || 'Error'}: ${errorDetails.message || 'No message available'}".`);
 
       const errorOutput: ItemMatchOutput = {
         suggestedMatches: [],
@@ -410,3 +428,4 @@ export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemM
 
 
     
+
