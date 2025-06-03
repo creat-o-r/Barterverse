@@ -226,7 +226,7 @@ const itemMatchFlow = ai.defineFlow(
             usedMatchingMode: usedMatchingMode,
             preferencesConsidered: false,
         };
-        logMatchSuggestion({
+        logMatchSuggestion({ // Not awaited
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
@@ -279,7 +279,7 @@ const itemMatchFlow = ai.defineFlow(
               usedMatchingMode,
               preferencesConsidered,
           };
-          logMatchSuggestion({
+          logMatchSuggestion({ // Not awaited
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
@@ -310,7 +310,7 @@ const itemMatchFlow = ai.defineFlow(
         preferencesConsidered,
       };
 
-      logMatchSuggestion({
+      logMatchSuggestion({ // Not awaited
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
@@ -346,7 +346,9 @@ const itemMatchFlow = ai.defineFlow(
       let userMessage = `An unexpected error occurred while trying to get AI suggestions (${usedMatchingMode} mode). Please check server logs.`;
       const lowerErrorMessage = String(error.message || "").toLowerCase();
 
-      if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
+      if (lowerErrorMessage.includes('parse error on line')) {
+        userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue with the request structure (likely template formatting). (Item ID: ${input.currentItem.id}). Please check server logs.`;
+      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) received a bad request. This might be due to problematic input data (Item ID: ${input.currentItem.id}) or an issue with the prompt structure. Please check server logs for details on the input.`;
       } else if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) has reached its current usage limit. Please try again later.`;
@@ -360,13 +362,12 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = `The AI's response (${usedMatchingMode} mode) was not in the expected format. This may indicate a problem with the AI model's output.`;
       } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
         userMessage = `The AI service (${usedMatchingMode} mode) reported an internal error. Please try again later.`;
-      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status || error.name === 'Error' && lowerErrorMessage.includes('parse error')) {
-        // Added check for Handlebars parse error
+      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue interpreting the request structure. This is often due to template formatting. Please check server logs.`;
       }
 
 
-      logAIDiagnostic({
+      logAIDiagnostic({ // Not awaited
         flowName: flowName,
         triggeringUserId: input.triggeringUserId,
         input: finalInputForPrompt,
@@ -389,7 +390,7 @@ const itemMatchFlow = ai.defineFlow(
         usedMatchingMode,
         preferencesConsidered,
       };
-      logMatchSuggestion({
+      logMatchSuggestion({ // Not awaited
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
@@ -407,3 +408,5 @@ export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemM
   return itemMatchFlow(input);
 }
 
+
+    

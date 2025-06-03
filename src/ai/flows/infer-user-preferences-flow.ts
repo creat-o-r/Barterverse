@@ -267,7 +267,9 @@ const inferUserPreferencesFlow = ai.defineFlow(
       let userMessage = "An unexpected error occurred while trying to infer user preferences. Default preferences applied. Please check server logs for details.";
       const lowerErrorMessage = String(error.message || "").toLowerCase();
 
-      if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
+      if (lowerErrorMessage.includes('parse error on line')) {
+        userMessage = `The AI preference inference service encountered an issue with the request structure (likely template formatting). Default preferences applied. (User ID: ${input.userId}).`;
+      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
         userMessage = `The preference inference service received a bad request. This might be due to problematic input data (User ID: ${input.userId}) or an issue with the prompt structure. Please check server logs for details on the input.`;
       } else if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
         userMessage = "The preference inference service has reached its current usage limit.";
@@ -281,8 +283,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
         userMessage = "The AI's response for preferences was not in the expected format. This might indicate a schema validation issue with the AI model's output.";
       } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
         userMessage = "The AI preference service reported an internal error. Please try again later.";
-      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status || (error.name === 'Error' && lowerErrorMessage.includes('parse error'))) {
-        // Added check for Handlebars parse error
+      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status ) {
         userMessage = "The AI model encountered an issue processing the request for preference inference. This might be due to template formatting. Default preferences applied. Please check server logs for specific details.";
         if (error.message && !lowerErrorMessage.includes('unexpected') && !lowerErrorMessage.includes('internal') && !lowerErrorMessage.includes('unknown') && !lowerErrorMessage.includes('parse error')) {
             userMessage += ` (Details: ${error.message.substring(0,150)}${error.message.length > 150 ? "..." : ""})`;
@@ -292,7 +293,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
       logAIDiagnostic({
         flowName: flowName,
         triggeringUserId: input.userId,
-        input: processedInput, // Log the input that was sent to the prompt
+        input: processedInput, 
         error: {
           name: errorDetails.name,
           message: errorDetails.message,
@@ -316,5 +317,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
     }
   }
 );
+
+    
 
     
