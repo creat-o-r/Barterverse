@@ -207,7 +207,7 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     let preferencesConsidered = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
-    let finalInputForPrompt: any = { ...input }; 
+    let finalInputForPrompt: any = { ...input };
 
     const currentMatchingMode = await getAIMatchingMode();
     const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
@@ -222,10 +222,9 @@ const itemMatchFlow = ai.defineFlow(
         const output: ItemMatchOutput = {
             suggestedMatches: [],
             reasoning: reasoning,
-            usedMatchingMode: usedMatchingMode, 
-            preferencesConsidered: false, 
+            usedMatchingMode: usedMatchingMode,
+            preferencesConsidered: false,
         };
-        // No need to await logMatchSuggestion if it's just logging and not critical path
         logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
@@ -234,11 +233,11 @@ const itemMatchFlow = ai.defineFlow(
             reasoning: output.reasoning,
             usedMatchingMode: output.usedMatchingMode,
             preferencesConsidered: output.preferencesConsidered,
-        }).catch(logError => console.error(`${flowName} - Error logging no items available:`, logError));
+        }).catch(logError => console.error(`${flowName} - Error logging (no items available):`, logError));
         return output;
     }
 
-    finalInputForPrompt.availableItems = itemsToConsider; 
+    finalInputForPrompt.availableItems = itemsToConsider;
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
@@ -258,10 +257,11 @@ const itemMatchFlow = ai.defineFlow(
         }
       }
     } else {
-      usedMatchingMode = 'simple'; 
+      usedMatchingMode = 'simple';
     }
 
     try {
+      console.log(`[${flowName}] (${usedMatchingMode} mode) Calling prompt with input:`, JSON.stringify(finalInputForPrompt, null, 2));
       const { output: promptOutput } = await promptToUse(finalInputForPrompt);
 
       let defaultReasoning = `AI (${usedMatchingMode} mode) did not find strong matches for "${input.currentItem.name}" based on the current criteria. Users might explore other items or categories.`;
@@ -286,20 +286,20 @@ const itemMatchFlow = ai.defineFlow(
             reasoning: errorOutput.reasoning,
             usedMatchingMode,
             preferencesConsidered,
-          }).catch(logError => console.error(`${flowName} - Error logging null output scenario:`, logError));
+          }).catch(logError => console.error(`${flowName} - Error logging (null output scenario):`, logError));
           return errorOutput;
       }
-      
+
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
           ...aiSuggestion,
           ownerId: originalItem?.ownerId || 'unknown_owner',
         };
-      }).filter(match => match.ownerId !== 'unknown_owner'); 
+      }).filter(match => match.ownerId !== 'unknown_owner');
 
-      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning) 
-                               ? defaultReasoning 
+      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning)
+                               ? defaultReasoning
                                : promptOutput.reasoning || (augmentedMatches.length > 0 ? `Found some potential matches for "${input.currentItem.name}".` : defaultReasoning);
 
       const validatedOutput: ItemMatchOutput = {
@@ -317,28 +317,31 @@ const itemMatchFlow = ai.defineFlow(
         reasoning: validatedOutput.reasoning,
         usedMatchingMode,
         preferencesConsidered,
-      }).catch(logError => console.error(`${flowName} - Error logging successful output:`, logError));
+      }).catch(logError => console.error(`${flowName} - Error logging (successful output):`, logError));
       return validatedOutput;
 
     } catch (error: any) {
       console.error(`${flowName} (${usedMatchingMode} mode) - Caught Error Name: ${error.name || 'N/A'}, Message: ${error.message || 'N/A'}`);
-      
+
       const errorDetails: Record<string, any> = {
         name: error.name,
         message: error.message,
-        stack: error.stack?.substring(0, 500), 
-        cause: error.cause, 
+        stack: error.stack?.substring(0, 500),
+        cause: error.cause,
       };
       if (typeof error === 'object' && error !== null) {
           if ('isGenkitError' in error) errorDetails.isGenkitError = (error as any).isGenkitError;
           if ('details' in error) errorDetails.details = (error as any).details;
-          if ('status' in error) errorDetails.status = (error as any).status; 
-          if ('code' in error && !('status' in errorDetails)) errorDetails.code = (error as any).code; 
+          if ('status' in error) errorDetails.status = (error as any).status;
+          if ('code' in error && !('status' in errorDetails)) errorDetails.code = (error as any).code;
       }
       try {
-        console.error(`Detailed error object in ${flowName} (${usedMatchingMode} mode):`, JSON.stringify(errorDetails, null, 2));
+        // Log the full error object more reliably
+        console.error(`Detailed error object in ${flowName} (${usedMatchingMode} mode):`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
-        console.error(`Could not stringify detailed error object in ${flowName} (${usedMatchingMode} mode). Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
+        // Fallback if the above stringify fails (e.g. circular refs not handled by this method)
+        console.error(`Could not stringify full error object in ${flowName} (${usedMatchingMode} mode). Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
+        console.error(`Original error object was:`, error);
       }
 
       let userMessage = `An unexpected error occurred while trying to get AI suggestions (${usedMatchingMode} mode). Please check server logs.`;
@@ -350,6 +353,8 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = `The AI matching service (${usedMatchingMode} mode) is temporarily overloaded or unavailable. Please try again.`;
       } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
         userMessage = `Authentication error with the AI service (${usedMatchingMode} mode). Please check API key configuration.`;
+      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
+        userMessage = `The AI matching service (${usedMatchingMode} mode) received a bad request. This might be due to problematic input data or an issue with the prompt structure. Please check server logs for details on the input.`;
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) could not process the request due to content restrictions.`;
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
@@ -357,7 +362,7 @@ const itemMatchFlow = ai.defineFlow(
       } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
         userMessage = `The AI service (${usedMatchingMode} mode) reported an internal error. Please try again later.`;
       }
-      
+
       console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${errorDetails.name || 'Error'}: ${errorDetails.message || 'No message available'}".`);
 
       const errorOutput: ItemMatchOutput = {
@@ -374,8 +379,7 @@ const itemMatchFlow = ai.defineFlow(
         reasoning: errorOutput.reasoning,
         usedMatchingMode,
         preferencesConsidered,
-        // You could add an 'error' field to LoggedMatchSuggestion if you want to log the specific error too
-      }).catch(logError => console.error(`${flowName} - Error logging error output:`, logError));
+      }).catch(logError => console.error(`${flowName} - Error logging (error output):`, logError));
       return errorOutput;
     }
   }
@@ -384,3 +388,4 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
+
