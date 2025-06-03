@@ -295,35 +295,6 @@ export default function NewItemPage() {
                 )}
               />
               
-              {listingType === 'offer' && (
-                <FormField
-                  control={form.control}
-                  name="isGiftItForward"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={isLoadingOverall}
-                          id="isGiftItForward"
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2">
-                          <HeartHandshake className="h-5 w-5 text-pink-500" />
-                          Gift It Forward
-                        </FormLabel>
-                        <FormDescription className="font-body">
-                          Check this if you&apos;re offering this item freely, without expecting a direct trade in return.
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              )}
-
-
               <FormField
                 control={form.control}
                 name="category"
@@ -405,6 +376,34 @@ export default function NewItemPage() {
                   </FormItem>
                 )}
               />
+              
+              {listingType === 'offer' && (
+                <FormField
+                  control={form.control}
+                  name="isGiftItForward"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isLoadingOverall}
+                          id="isGiftItForward"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2">
+                          <HeartHandshake className="h-5 w-5 text-pink-500" />
+                          Gift It Forward
+                        </FormLabel>
+                        <FormDescription className="font-body">
+                          Check this if you&apos;re offering this item freely, without expecting a direct trade in return.
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
                 {isLoadingOverall ? (
@@ -413,7 +412,7 @@ export default function NewItemPage() {
                     {isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting Category...' : 'Inferring Type...')}
                   </>
                 ) : (
-                  `Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`
+                  `Post ${form.getValues('listingType') === 'offer' ? 'Post Offer' : 'Post Want'} Listing`
                 )}
               </Button>
             </form>
