@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import ItemList from '@/components/items/ItemList';
 import SearchBar from '@/components/items/SearchBar';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item } from '@/types'; // UserProfilePreferences removed as it's not used here anymore
+import type { Item } from '@/types';
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
@@ -15,12 +15,12 @@ import { Badge } from '@/components/ui/badge';
 
 interface UserItemSuggestion {
   userItem: Item;
-  suggestedMatches: Item[]; 
+  suggestedMatches: (Item & { matchScore: string })[]; 
   reasoning: string | null;
   isLoading: boolean;
   error: string | null;
-  // preferencesConsidered removed
-  matchScores?: { itemId: string, score: string }[];
+  preferencesConsidered: boolean; // To show if AI used user prefs
+  usedMatchingMode: 'simple' | 'advanced' | undefined;
 }
 
 export default function HomePage() {
@@ -49,6 +49,8 @@ export default function HomePage() {
           reasoning: "List an 'offer' item to see personalized AI matches and potential trades here!",
           isLoading: false,
           error: null,
+          preferencesConsidered: false,
+          usedMatchingMode: undefined,
         }]);
         setOverallLoading(false);
         return;
@@ -60,13 +62,11 @@ export default function HomePage() {
         reasoning: null,
         isLoading: true,
         error: null,
-        matchScores: [],
+        preferencesConsidered: false,
+        usedMatchingMode: undefined,
       }));
       setUserItemSuggestions(initialSuggestions);
       setOverallLoading(false); 
-
-      // User preferences are no longer passed to the simplified flow
-      // const currentUserPreferences: UserProfilePreferences = { ... };
 
       const suggestionPromises = userOfferItems.map(async (userItem, index) => {
         const otherItemsForMatching = dummyItems.filter(
@@ -87,7 +87,9 @@ export default function HomePage() {
             data: {
               suggestedMatches: [],
               reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
-            } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning'>, // Match simplified output type
+              preferencesConsidered: false,
+              usedMatchingMode: 'simple',
+            } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning' | 'preferencesConsidered' | 'usedMatchingMode'>,
           };
         }
         
@@ -103,7 +105,6 @@ export default function HomePage() {
               listingType: userItem.listingType,
             },
             availableItems: otherItemsForMatching,
-            // triggeringUserPreferences: currentUserPreferences, // REMOVED
           });
           return { index, success: true, data: result };
         } catch (error) {
@@ -124,19 +125,19 @@ export default function HomePage() {
           if (settledResult.status === 'fulfilled') {
             const { index, success, data, error: promiseError } = settledResult.value;
             if (success && data) {
-              const plainItems = (data.suggestedMatches || []).map(match => {
-                return dummyItems.find(dItem => dItem.id === match.itemId);
-              }).filter(Boolean) as Item[];
-              
-              const scores = (data.suggestedMatches || []).map(match => ({itemId: match.itemId, score: match.matchScore}));
+              const itemsWithScores = (data.suggestedMatches || []).map(match => {
+                const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
+                return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+              }).filter(Boolean) as (Item & { matchScore: string })[];
 
               newSuggestions[index] = {
                 ...newSuggestions[index],
-                suggestedMatches: plainItems,
-                reasoning: data.reasoning || (plainItems.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
+                suggestedMatches: itemsWithScores,
+                reasoning: data.reasoning || (itemsWithScores.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
                 isLoading: false,
                 error: null,
-                matchScores: scores,
+                preferencesConsidered: data.preferencesConsidered || false,
+                usedMatchingMode: data.usedMatchingMode,
               };
             } else {
               newSuggestions[index] = {
@@ -223,14 +224,17 @@ export default function HomePage() {
           <section key={itemSuggestion.userItem.id || idx}>
             <Card className={itemSuggestion.error ? "border-destructive" : (itemSuggestion.suggestedMatches.length === 0 && !itemSuggestion.isLoading ? "border-border border-dashed" : "border-border")}>
               <CardHeader>
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start flex-wrap gap-2">
                     <CardTitle className={`font-headline text-2xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
                     {itemSuggestion.isLoading ? <Loader2 className="h-6 w-6 text-primary animate-spin" /> : (itemSuggestion.error ? <AlertCircle className="h-6 w-6 text-destructive" /> : <Sparkles className={`h-6 w-6 ${itemSuggestion.suggestedMatches.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />)}
                     {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.name}...` : 
                     itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` : 
                     `AI Matches for your ${itemSuggestion.userItem.name}`}
                     </CardTitle>
-                    {/* Removed preferencesConsidered badge as it's always false now */}
+                    <div className="flex items-center gap-2 text-xs">
+                        {itemSuggestion.usedMatchingMode && <Badge variant="outline" className="capitalize">Mode: {itemSuggestion.usedMatchingMode}</Badge>}
+                        <Badge variant={itemSuggestion.preferencesConsidered ? 'default' : 'secondary'}>Prefs: {itemSuggestion.preferencesConsidered ? 'On' : 'Off'}</Badge>
+                    </div>
                 </div>
                 {!itemSuggestion.isLoading && itemSuggestion.reasoning && !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 && (
                   <p className="text-sm text-muted-foreground mt-1 font-body">{itemSuggestion.reasoning}</p>
@@ -257,7 +261,7 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 ? (
-                  <ItemList items={itemSuggestion.suggestedMatches} />
+                  <ItemList items={itemSuggestion.suggestedMatches} mainContextItemId={itemSuggestion.userItem.id} />
                 ) : !itemSuggestion.error && (
                   <p className="text-muted-foreground font-body text-center py-4">{itemSuggestion.reasoning || "No specific AI suggestions found for this item at the moment."}</p>
                 )}

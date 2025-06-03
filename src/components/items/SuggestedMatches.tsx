@@ -2,24 +2,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Item } from '@/types'; // UserProfilePreferences removed
+import type { Item } from '@/types';
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
-// Badge removed as preferencesConsidered badge is removed
+import { Badge } from '@/components/ui/badge';
 
 interface SuggestedMatchesProps {
   currentItem: Item;
 }
 
 export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps) {
-  const [suggestedItems, setSuggestedItems] = useState<Item[]>([]);
+  const [suggestedItems, setSuggestedItems] = useState<(Item & { matchScore: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
-  // preferencesWereConsidered state removed
+  const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
+  const [matchModeUsed, setMatchModeUsed] = useState<'simple' | 'advanced' | undefined>(undefined);
 
   useEffect(() => {
     async function fetchSuggestions() {
@@ -27,7 +28,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setFetchError(null);
       setAiReasoning(null);
       setSuggestedItems([]); 
-      // setPreferencesWereConsidered(false); // Removed
+      setPreferencesWereConsidered(false);
+      setMatchModeUsed(undefined);
 
       if (!currentItem?.id) {
           setLoading(false);
@@ -38,9 +40,6 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       }
       
       const viewingUser = dummyUsers[0]; 
-
-      // viewingUserPreferences removed as it's not passed to the simplified flow
-      // const viewingUserPreferences: UserProfilePreferences = { ... };
 
       try {
         const otherAvailableItems = dummyItems.filter(
@@ -60,6 +59,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             setAiReasoning(noItemsReasoning);
             setSuggestedItems([]);
             setLoading(false);
+            setMatchModeUsed('simple'); // Default if no items to match
             return;
         }
 
@@ -74,18 +74,19 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             listingType: currentItem.listingType,
           },
           availableItems: otherAvailableItems,
-          // triggeringUserPreferences: viewingUserPreferences, // REMOVED
         };
 
         const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
         
-        // setPreferencesWereConsidered(result.preferencesConsidered || false); // Removed
+        setPreferencesWereConsidered(result.preferencesConsidered || false);
+        setMatchModeUsed(result.usedMatchingMode);
 
-        const plainMatchedItems = (result.suggestedMatches || []).map(match => {
-          return dummyItems.find(dItem => dItem.id === match.itemId);
-        }).filter(Boolean) as Item[];
+        const itemsWithScores = (result.suggestedMatches || []).map(match => {
+          const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
+          return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+        }).filter(Boolean) as (Item & { matchScore: string })[];
 
-        setSuggestedItems(plainMatchedItems);
+        setSuggestedItems(itemsWithScores);
         setAiReasoning(result.reasoning || null);
         
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
@@ -97,7 +98,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             result.reasoning.toLowerCase().includes('no other items available')
         );
 
-        if (plainMatchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
+        if (itemsWithScores.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
              setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
         } else if (result.reasoning && reasoningIsErrorOrSystemMessage) {
             setFetchError(result.reasoning);
@@ -171,12 +172,15 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
      return (
       <Card className="border-border border-dashed">
         <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start flex-wrap gap-2">
             <CardTitle className="font-headline text-xl flex items-center gap-2">
               <Sparkles className="h-6 w-6 text-muted-foreground" />
               {cardTitleText}
             </CardTitle>
-            {/* Removed preferencesWereConsidered badge */}
+            <div className="flex items-center gap-2 text-xs">
+              {matchModeUsed && <Badge variant="outline" className="capitalize">Mode: {matchModeUsed}</Badge>}
+              <Badge variant={preferencesWereConsidered ? 'default' : 'secondary'}>Prefs: {preferencesWereConsidered ? 'On' : 'Off'}</Badge>
+            </div>
           </div>
           {aiReasoning && (
             <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>
@@ -194,19 +198,22 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
   return (
       <Card>
       <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-start flex-wrap gap-2">
             <CardTitle className="font-headline text-xl flex items-center gap-2">
                 <Sparkles className="h-6 w-6 text-primary" />
                 {cardTitleText}
             </CardTitle>
-             {/* Removed preferencesWereConsidered badge */}
+            <div className="flex items-center gap-2 text-xs">
+                {matchModeUsed && <Badge variant="outline" className="capitalize">Mode: {matchModeUsed}</Badge>}
+                <Badge variant={preferencesWereConsidered ? 'default' : 'secondary'}>Prefs: {preferencesWereConsidered ? 'On' : 'Off'}</Badge>
+            </div>
           </div>
            {aiReasoning && (
               <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>
            )}
       </CardHeader>
       <CardContent>
-          <ItemList items={suggestedItems} />
+          <ItemList items={suggestedItems} mainContextItemId={currentItem.id} />
       </CardContent>
       </Card>
   );
