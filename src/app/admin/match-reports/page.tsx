@@ -194,54 +194,53 @@ export default function MatchReportsPage() {
             <Button onClick={fetchReports} disabled={isLoadingReports} variant="outline" size="sm"><RefreshCw className={`mr-2 h-4 w-4 ${isLoadingReports ? 'animate-spin' : ''}`} />Refresh Logs</Button>
           </div>
         </CardHeader>
-        <CardContent className="max-h-[70vh] overflow-y-auto">
+        <CardContent className="max-h-[70vh] overflow-auto"> {/* Changed to overflow-auto for both axes */}
           {isLoadingReports ? (
              <div className="text-center py-12 text-muted-foreground font-body flex items-center justify-center gap-2"><RefreshCw className="h-5 w-5 animate-spin" /> Loading suggestion logs...</div>
           ) : reports.length === 0 ? (
             <p className="text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-full">
-                <TableHeader className="sticky top-0 bg-card z-10">
-                  <TableRow>
-                    <TableHead className="w-[180px]">Timestamp</TableHead>
-                    <TableHead className="min-w-[120px]">For User ID</TableHead>
-                    <TableHead className="min-w-[200px]">Current Item</TableHead>
-                    <TableHead className="min-w-[120px]">Matching Mode</TableHead>
-                    <TableHead className="min-w-[100px]">Prefs Used</TableHead>
-                    <TableHead className="min-w-[400px]">Suggested Items (ID, (Owner ID), Score)</TableHead>
-                    <TableHead className="min-w-[300px]">Reasoning</TableHead>
+            // Removed the extra <div className="overflow-x-auto"> wrapper
+            <Table className="min-w-full"> {/* The Table component has its own internal overflow-auto div */}
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="w-[180px]">Timestamp</TableHead>
+                  <TableHead className="min-w-[120px]">For User ID</TableHead>
+                  <TableHead className="min-w-[200px]">Current Item</TableHead>
+                  <TableHead className="min-w-[120px]">Matching Mode</TableHead>
+                  <TableHead className="min-w-[100px]">Prefs Used</TableHead>
+                  <TableHead className="min-w-[400px]">Suggested Items (ID, (Owner ID), Score)</TableHead>
+                  <TableHead className="min-w-[300px]">Reasoning</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reports.map((report, index) => (
+                  <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
+                    <TableCell className="font-mono text-xs">{new Date(report.timestamp).toLocaleString()}</TableCell>
+                    <TableCell className="text-sm">{report.triggeringUserId}</TableCell>
+                    <TableCell>
+                        <div className="font-semibold">{report.currentItemName}</div>
+                        <div className="text-xs text-muted-foreground"><Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">View Item <LinkIcon className="h-3 w-3" /></Link></div>
+                    </TableCell>
+                    <TableCell className="text-xs capitalize">{report.usedMatchingMode ? (<Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>{report.usedMatchingMode}</Badge>): (<Badge variant="outline">N/A</Badge>)}</TableCell>
+                    <TableCell>{report.preferencesConsidered !== undefined ? (<Badge variant={report.preferencesConsidered ? 'default' : 'outline'} className="text-[10px] py-0.5 px-1.5">{report.preferencesConsidered ? 'Yes' : 'No'}</Badge>) : (<Badge variant="outline" className="text-[10px] py-0.5 px-1.5">N/A</Badge>)}</TableCell>
+                    <TableCell>
+                      {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                          {report.suggestedMatches.map(match => (
+                            <div key={match.itemId} className="flex items-center gap-2 text-xs">
+                              <Badge className={`py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}>{getMatchScoreIcon(match.matchScore)}{match.matchScore || 'N/A'}</Badge>
+                              <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">{match.itemId} <LinkIcon className="h-3 w-3" /></Link>
+                              <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">({match.ownerId} <UserIconLucide className="h-3 w-3" />)</Link>
+                            </div>))}
+                        </div>
+                      ) : (<span className="text-xs text-muted-foreground">None</span>)}
+                    </TableCell>
+                    <TableCell className="text-xs font-body text-muted-foreground break-words whitespace-pre-wrap">{report.reasoning || <span className="italic">N/A</span>}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reports.map((report, index) => (
-                    <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
-                      <TableCell className="font-mono text-xs">{new Date(report.timestamp).toLocaleString()}</TableCell>
-                      <TableCell className="text-sm">{report.triggeringUserId}</TableCell>
-                      <TableCell>
-                          <div className="font-semibold">{report.currentItemName}</div>
-                          <div className="text-xs text-muted-foreground"><Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">View Item <LinkIcon className="h-3 w-3" /></Link></div>
-                      </TableCell>
-                      <TableCell className="text-xs capitalize">{report.usedMatchingMode ? (<Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>{report.usedMatchingMode}</Badge>): (<Badge variant="outline">N/A</Badge>)}</TableCell>
-                      <TableCell>{report.preferencesConsidered !== undefined ? (<Badge variant={report.preferencesConsidered ? 'default' : 'outline'} className="text-[10px] py-0.5 px-1.5">{report.preferencesConsidered ? 'Yes' : 'No'}</Badge>) : (<Badge variant="outline" className="text-[10px] py-0.5 px-1.5">N/A</Badge>)}</TableCell>
-                      <TableCell>
-                        {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
-                          <div className="flex flex-col gap-1.5">
-                            {report.suggestedMatches.map(match => (
-                              <div key={match.itemId} className="flex items-center gap-2 text-xs">
-                                <Badge className={`py-0.5 px-2 flex items-center ${getMatchScoreColor(match.matchScore)}`}>{getMatchScoreIcon(match.matchScore)}{match.matchScore || 'N/A'}</Badge>
-                                <Link href={`/items/${match.itemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">{match.itemId} <LinkIcon className="h-3 w-3" /></Link>
-                                <Link href={`/profile/${match.ownerId}`} className="text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-0.5">({match.ownerId} <UserIconLucide className="h-3 w-3" />)</Link>
-                              </div>))}
-                          </div>
-                        ) : (<span className="text-xs text-muted-foreground">None</span>)}
-                      </TableCell>
-                      <TableCell className="text-xs font-body text-muted-foreground break-words whitespace-pre-wrap">{report.reasoning || <span className="italic">N/A</span>}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
