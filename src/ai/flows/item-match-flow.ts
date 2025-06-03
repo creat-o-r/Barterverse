@@ -76,9 +76,23 @@ Available Items (format: ID :: Name :: Category :: OwnerID :: Description):
 {{/each}}
 
 For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
-"High" indicates a strong potential match based on similarity.
-"Medium" indicates a good potential match.
-"Low" indicates a possible, but less compelling, match.
+- "High":
+    -   Strong direct relevance.
+    -   Item categories are very similar or highly complementary.
+    -   Key terms in name/description show a clear overlap or direct fulfillment of a need.
+    -   If Current Item is 'offer' and Available Item is 'want': Available Item's want description is well-matched by Current Item's offer.
+    -   If Current Item is 'want' and Available Item is 'offer': Available Item's offer directly addresses Current Item's want description.
+    -   If both are 'offer' or both are 'want': Highly desirable items within the same niche or for similar purposes.
+- "Medium":
+    -   Good general relevance.
+    -   Categories are related or could appeal to similar users.
+    -   Some overlap in keywords or purpose, or one item broadly fits the type of the other.
+    -   A plausible trade scenario even if not a perfect keyword match.
+- "Low":
+    -   Possible, but less direct, relevance.
+    -   Categories might be different but could have niche appeal or indirect connection.
+    -   Loose association by theme or potential utility not immediately obvious from keywords.
+    -   Could be interesting for users with broad interests or unstated needs.
 
 Do not suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
