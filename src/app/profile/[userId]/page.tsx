@@ -4,7 +4,7 @@
 import { use, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
-import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, UserLogisticsPreferences, UserStoredLocation, ItemLogisticsShippingOption } from '@/types';
+import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, UserLogisticsPreferences, UserStoredLocation, ItemDeliveryMethod } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,12 +108,14 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
     );
   }
 
-  const shippingOptionMap: Record<ItemLogisticsShippingOption, string> = {
+  const deliveryMethodMap: Record<ItemDeliveryMethod, string> = {
     pickup_only: "Local Pickup Only",
     ship_domestic: "Willing to Ship (Domestic)",
     ship_international: "Willing to Ship (International)",
     delivery_area: "Delivery Area",
     possible_delivery: "Possible Delivery",
+    public_meetup: "Public Meetup",
+    flexible_meetup: "Flexible Meetup",
   };
 
   const preferredLocation = logisticsPreferences?.preferredStoredLocationId && locations
@@ -122,14 +124,14 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
 
   return (
     <CardContent className="space-y-4 pt-2">
-      {logisticsPreferences?.defaultShippingOption && (
+      {logisticsPreferences?.defaultDeliveryMethod && (
         <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
           <div className="flex items-center gap-2">
             <Truck className="h-5 w-5 text-muted-foreground" />
             <span className="font-headline text-md">Delivery</span>
           </div>
           <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto">
-            {shippingOptionMap[logisticsPreferences.defaultShippingOption] || logisticsPreferences.defaultShippingOption}
+            {deliveryMethodMap[logisticsPreferences.defaultDeliveryMethod] || logisticsPreferences.defaultDeliveryMethod}
           </Button>
         </div>
       )}
@@ -350,3 +352,4 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
+

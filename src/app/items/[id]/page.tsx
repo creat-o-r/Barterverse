@@ -3,11 +3,11 @@ import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User, ItemLogistics, UserStoredLocation, ItemLogisticsShippingOption } from '@/types';
+import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter, HeartHandshake, MapPin, Truck, Users2, Edit2 } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter, HeartHandshake, MapPin, Truck, Edit2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
@@ -22,12 +22,14 @@ async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User
   return { item, owner };
 }
 
-const shippingOptionDisplayMap: Record<ItemLogisticsShippingOption, string> = {
+const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
   pickup_only: "Local Pickup Only",
   ship_domestic: "Willing to Ship (Domestic)",
   ship_international: "Willing to Ship (International)",
   delivery_area: "Delivery Area (Details in Notes/Chat)",
   possible_delivery: "Possible Delivery (Discuss)",
+  public_meetup: "Public Meetup",
+  flexible_meetup: "Flexible Meetup",
 };
 
 function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, owner: User }) {
@@ -42,7 +44,6 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
     locationDisplay = logistics.itemSpecificAddress;
   } else { 
-    // Fallback if item logistics are incomplete, check owner's preferred default
     const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
     const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
     if (defaultLoc) {
@@ -58,7 +59,7 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
       </div>
       <div>
         <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Delivery:</h4>
-        <p className="text-sm text-foreground/90 font-body pl-5">{shippingOptionDisplayMap[logistics.shippingOption] || "Not specified"}</p>
+        <p className="text-sm text-foreground/90 font-body pl-5">{deliveryMethodDisplayMap[logistics.deliveryMethod] || "Not specified"}</p>
       </div>
       
       {logistics.notes && (
@@ -297,3 +298,4 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
     </Suspense>
   );
 }
+

@@ -39,9 +39,17 @@ export type UserStoredLocation = {
   isDefault?: boolean;
 };
 
+export type ItemDeliveryMethod = 
+  | 'pickup_only' 
+  | 'ship_domestic' 
+  | 'ship_international' 
+  | 'delivery_area' 
+  | 'possible_delivery'
+  | 'public_meetup'
+  | 'flexible_meetup';
+
 export type UserLogisticsPreferences = {
-  defaultShippingOption: ItemLogisticsShippingOption;
-  // defaultMeetupOption: ItemLogisticsMeetupOption; // Removed
+  defaultDeliveryMethod: ItemDeliveryMethod;
   preferredStoredLocationId?: string;
 };
 
@@ -59,15 +67,12 @@ export type User = {
 } & UserProfilePreferences;
 
 export type ItemLogisticsLocationType = 'profile_stored_location' | 'item_specific_location';
-export type ItemLogisticsShippingOption = 'pickup_only' | 'ship_domestic' | 'ship_international' | 'delivery_area' | 'possible_delivery';
-// export type ItemLogisticsMeetupOption = 'public_meetup' | 'flexible'; // Removed
 
 export type ItemLogistics = {
   locationType: ItemLogisticsLocationType;
   selectedUserStoredLocationId?: string;
   itemSpecificAddress?: string;
-  shippingOption: ItemLogisticsShippingOption;
-  // meetupOption: ItemLogisticsMeetupOption; // Removed
+  deliveryMethod: ItemDeliveryMethod;
   notes?: string;
 };
 
@@ -118,3 +123,4 @@ export type InferUserPreferencesOutput = {
   reasoning?: string;
   errorMessage?: string;
 };
+

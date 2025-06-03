@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter, HeartHandshake, MapPin, Truck, Users2, Edit2 } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter, HeartHandshake, MapPin, Truck, Edit2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
@@ -26,11 +26,21 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data';
-import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemLogisticsShippingOption, ItemLogistics } from '@/types';
+import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
+
+const deliveryMethodEnum = z.enum([
+  'pickup_only', 
+  'ship_domestic', 
+  'ship_international', 
+  'delivery_area', 
+  'possible_delivery',
+  'public_meetup',
+  'flexible_meetup'
+]);
 
 const itemFormSchema = z.object({
   name: z.string().min(3, { message: 'Item name must be at least 3 characters.' }),
@@ -43,10 +53,7 @@ const itemFormSchema = z.object({
   
   selectedLocationIdentifier: z.string().min(1, { message: "Please select or specify an item location."}),
   itemSpecificAddress: z.string().optional(),
-  shippingOption: z.custom<ItemLogisticsShippingOption>(
-    (val) => ['pickup_only', 'ship_domestic', 'ship_international', 'delivery_area', 'possible_delivery'].includes(val as string),
-    { message: "Invalid delivery option." }
-  ),
+  deliveryMethod: deliveryMethodEnum,
   logisticsNotes: z.string().optional(),
 }).refine(data => {
   if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
@@ -60,12 +67,14 @@ const itemFormSchema = z.object({
 
 type ItemFormValues = z.infer<typeof itemFormSchema>;
 
-const shippingOptionMapConcrete: Record<ItemLogisticsShippingOption, string> = {
+const deliveryMethodMapConcrete: Record<ItemDeliveryMethod, string> = {
   pickup_only: "Local Pickup Only",
   ship_domestic: "Willing to Ship (Domestic)",
   ship_international: "Willing to Ship (International)",
   delivery_area: "Delivery Area (Specify in Notes)",
   possible_delivery: "Possible Delivery (Discuss)",
+  public_meetup: "Public Meetup",
+  flexible_meetup: "Flexible Meetup",
 };
 
 
@@ -96,21 +105,14 @@ export default function NewItemPage() {
       isGiftItForward: false,
       selectedLocationIdentifier: ITEM_SPECIFIC_LOCATION_VALUE,
       itemSpecificAddress: '',
-      shippingOption: 'pickup_only',
+      deliveryMethod: 'pickup_only',
       logisticsNotes: '',
     },
   });
   
  useEffect(() => {
     if (currentUser && form.reset) {
-        const name = form.getValues('name');
-        const description = form.getValues('description');
-        const category = form.getValues('category');
-        const imageUrl = form.getValues('imageUrl');
-        const listingType = form.getValues('listingType');
-        const isGiftItForward = form.getValues('isGiftItForward');
-        const logisticsNotes = form.getValues('logisticsNotes');
-        // Preserve existing form state for non-logistics fields if they exist
+        const currentFormValues = form.getValues();
         
         let defaultSelectedLocationId: string = ITEM_SPECIFIC_LOCATION_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
@@ -118,28 +120,19 @@ export default function NewItemPage() {
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
             defaultSelectedLocationId = preferredStoredLocId;
         } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
-            // Fallback to first stored location if preferred is not set or invalid
             defaultSelectedLocationId = currentUser.locations[0].id;
         }
-        // If no stored locations or preferred, it remains ITEM_SPECIFIC_LOCATION_VALUE
 
         form.reset({
-            name: name || '',
-            description: description || '',
-            category: category || '',
-            imageUrl: imageUrl || '',
-            listingType: listingType || 'offer',
-            minimumMatchRatingOverride: form.getValues('minimumMatchRatingOverride') || currentUser.minimumMatchRating || 'Low',
-            isGiftItForward: isGiftItForward || false,
-            
+            ...currentFormValues, // Preserve existing form state if user already typed something
+            minimumMatchRatingOverride: currentFormValues.minimumMatchRatingOverride || currentUser.minimumMatchRating || 'Low',
             selectedLocationIdentifier: defaultSelectedLocationId,
-            itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (form.getValues('itemSpecificAddress') || '') : '',
-            shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'pickup_only',
-            logisticsNotes: logisticsNotes || '',
+            itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (currentFormValues.itemSpecificAddress || '') : '',
+            deliveryMethod: currentUser.logisticsPreferences?.defaultDeliveryMethod || 'pickup_only',
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, form.reset]); // Added form.reset dependency
+  }, [currentUser, form.reset]); 
 
   const listingTypeWatch = form.watch('listingType');
   const selectedLocationIdentifierWatch = form.watch('selectedLocationIdentifier');
@@ -204,7 +197,7 @@ export default function NewItemPage() {
           locationType: locationTypeForLogistics,
           selectedUserStoredLocationId: storedLocationIdForLogistics,
           itemSpecificAddress: specificAddressForLogistics,
-          shippingOption: data.shippingOption,
+          deliveryMethod: data.deliveryMethod,
           notes: data.logisticsNotes,
       };
 
@@ -245,7 +238,7 @@ export default function NewItemPage() {
             isGiftItForward: false,
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: '',
-            shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'pickup_only',
+            deliveryMethod: currentUser.logisticsPreferences?.defaultDeliveryMethod || 'pickup_only',
             logisticsNotes: '',
         });
       } else {
@@ -332,14 +325,14 @@ export default function NewItemPage() {
                   )} />
                 )}
 
-                <FormField control={form.control} name="shippingOption" render={({ field }) => (
+                <FormField control={form.control} name="deliveryMethod" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {Object.entries(shippingOptionMapConcrete).map(([key, label]) => (
-                            <SelectItem key={key} value={key as ItemLogisticsShippingOption}>{label}</SelectItem>
+                        {Object.entries(deliveryMethodMapConcrete).map(([key, label]) => (
+                            <SelectItem key={key} value={key as ItemDeliveryMethod}>{label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
