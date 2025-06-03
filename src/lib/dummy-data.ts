@@ -24,6 +24,7 @@ export const dummyUsers: User[] = [
     logisticsPreferences: {
       defaultDeliveryMethods: ['willing_to_ship', 'public_meetup'],
       preferredStoredLocationId: 'user1_home',
+      openToChainDelivery: true, // Added preference
     },
   },
   {
@@ -46,6 +47,7 @@ export const dummyUsers: User[] = [
     logisticsPreferences: {
       defaultDeliveryMethods: ['pickup_only'],
       preferredStoredLocationId: 'user2_apt',
+      openToChainDelivery: false, // Added preference
     },
   },
   {
@@ -64,6 +66,7 @@ export const dummyUsers: User[] = [
     minimumMatchRating: 'Low',
     logisticsPreferences: {
       defaultDeliveryMethods: ['public_meetup', 'flexible_meetup'], 
+      // openToChainDelivery left undefined for this user
     },
   },
   {
@@ -82,6 +85,7 @@ export const dummyUsers: User[] = [
     minimumMatchRating: 'High',
     logisticsPreferences: {
       defaultDeliveryMethods: ['possible_delivery', 'willing_to_ship'], 
+      openToChainDelivery: true, // Added preference
     }
   },
   {
@@ -100,6 +104,7 @@ export const dummyUsers: User[] = [
     minimumMatchRating: 'Medium',
     logisticsPreferences: {
         defaultDeliveryMethods: ['flexible_meetup', 'pickup_only'],
+        openToChainDelivery: false, // Added preference
     }
   },
 ];
@@ -460,4 +465,3 @@ export function addNewItemToDummyData(
   console.log('[DummyData] Total items now:', dummyItems.length);
   return newItem;
 }
-

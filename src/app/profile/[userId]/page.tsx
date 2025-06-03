@@ -128,12 +128,12 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
 
   return (
     <CardContent className="space-y-4 pt-2">
-      {logisticsPreferences?.defaultDeliveryMethods && logisticsPreferences.defaultDeliveryMethods.length > 0 && (
-        <div className="p-3 border rounded-lg bg-background shadow-sm">
-          <div className="flex items-center gap-2 mb-1.5">
+      <div className="p-3 border rounded-lg bg-background shadow-sm space-y-2">
+        <div className="flex items-center gap-2">
             <Truck className="h-5 w-5 text-muted-foreground" />
             <span className="font-headline text-md">Delivery Methods</span>
-          </div>
+        </div>
+        {logisticsPreferences?.defaultDeliveryMethods && logisticsPreferences.defaultDeliveryMethods.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {logisticsPreferences.defaultDeliveryMethods.map(method => (
               <Badge key={method} variant="outline" className="text-xs cursor-default">
@@ -141,8 +141,11 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
               </Badge>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+             <p className="text-xs text-muted-foreground font-body">No default delivery methods set.</p>
+        )}
+      </div>
+
        <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
             <div className="flex items-center gap-2">
                 {preferredLocation ? (
@@ -159,6 +162,19 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
                 (logisticsPreferences?.preferredStoredLocationId ? `ID: ${logisticsPreferences.preferredStoredLocationId}` : 'Not set')}
             </Button>
         </div>
+        
+      {logisticsPreferences?.openToChainDelivery !== undefined && (
+        <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
+           <div className="flex items-center gap-2">
+              <Network className="h-5 w-5 text-muted-foreground" />
+              <span className="font-headline text-md">Chain Delivery</span>
+           </div>
+            <Badge variant={logisticsPreferences.openToChainDelivery ? "default" : "secondary"} className="text-xs">
+                {logisticsPreferences.openToChainDelivery ? "Yes" : "No"}
+            </Badge>
+        </div>
+      )}
+
 
       {isOwnProfile && (
         <Button variant="outline" size="sm" className="mt-4 w-full md:w-auto" disabled>
@@ -360,4 +376,3 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
-

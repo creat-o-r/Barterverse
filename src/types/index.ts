@@ -50,6 +50,7 @@ export type ItemDeliveryMethod =
 export type UserLogisticsPreferences = {
   defaultDeliveryMethods: ItemDeliveryMethod[];
   preferredStoredLocationId?: string;
+  openToChainDelivery?: boolean; // Added new preference
 };
 
 export type User = {
@@ -122,4 +123,3 @@ export type InferUserPreferencesOutput = {
   reasoning?: string;
   errorMessage?: string;
 };
-
