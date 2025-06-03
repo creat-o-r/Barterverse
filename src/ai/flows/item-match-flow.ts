@@ -25,7 +25,7 @@ const ItemBriefSchema = z.object({
   category: z.string(),
   ownerId: z.string(),
   listingType: z.enum(['offer', 'want']),
-  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional().describe("Item-specific minimum match rating requirement."),
+  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional().describe("Item-specific minimum match rating requirement. This is optional and might not be present for all items."),
 });
 
 // Schema for user preferences to be passed to the advanced prompt
@@ -46,7 +46,7 @@ const UserPreferencesSchema = z.object({
 const BaseItemMatchInputSchema = z.object({
   triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
   currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches. It may have its own 'minimumMatchRatingOverride'."),
-  availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform."),
+  availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform. Each may also have its own 'minimumMatchRatingOverride'."),
 });
 
 // Input schema for the flow, which will conditionally add preferences
@@ -105,9 +105,9 @@ Listing Type: {{{currentItem.listingType}}}
 Minimum Acceptable Match Score for THIS ITEM: '{{{currentItem.minimumMatchRatingOverride}}}' (You MUST NOT suggest items with a score lower than this for the 'Current Item').
 {{/if}}
 
-Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: Description):
+Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: Description):
 {{#each availableItems}}
-- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{{description}}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{{description}}}
 {{/each}}
 
 For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
@@ -153,9 +153,9 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the followin
  - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
 
-Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: Description):
+Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: Description):
 {{#each availableItems}}
-- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{{description}}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{{description}}}
 {{/each}}
 
 Analyze the "Current Item" against the "Available Items" to find potential trades. A good match involves RECIPROCAL interest or clear fulfillment of needs.
@@ -233,7 +233,7 @@ const itemMatchFlow = ai.defineFlow(
     }
 
     finalInputForPrompt.availableItems = itemsToConsider;
-    finalInputForPrompt.currentItem = {
+    finalInputForPrompt.currentItem = { // Ensure currentItem in prompt input also gets its override
         ...input.currentItem,
         minimumMatchRatingOverride: input.currentItem.minimumMatchRatingOverride,
     };
@@ -243,7 +243,7 @@ const itemMatchFlow = ai.defineFlow(
       promptToUse = advancedItemMatchPrompt;
       const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
-      
+
       let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
       if (userProfile?.interestedInThirdPartyFulfillment === true) {
         fulfillmentDisplayText = "Yes";
@@ -266,7 +266,6 @@ const itemMatchFlow = ai.defineFlow(
         const hasMeaningfulMotivations = !!(userProfile?.motivations && userProfile.motivations.length > 0);
         const hasMeaningfulLocationPref = !!(userProfile?.locationPreference && (userProfile.locationPreference.isSensitive || (userProfile.locationPreference.notes && userProfile.locationPreference.notes.trim() !== '')));
         const hasMeaningfulTimingPref = !!userProfile?.tradeTimingPreference;
-        // Check if interestedInThirdPartyFulfillment is explicitly set (true or false), not just undefined
         const hasExplicit3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
         const hasNonDefaultMinRating = !!(userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low');
 
@@ -274,13 +273,13 @@ const itemMatchFlow = ai.defineFlow(
           hasMeaningfulMotivations ||
           hasMeaningfulLocationPref ||
           hasMeaningfulTimingPref ||
-          hasExplicit3rdPartyPref || // Use the explicit check here
+          hasExplicit3rdPartyPref ||
           hasNonDefaultMinRating;
       } else {
-        preferencesConsideredBeyondDefaultMinRating = false; // Global setting is off
+        preferencesConsideredBeyondDefaultMinRating = false;
       }
 
-    } else { // Simple mode
+    } else {
       usedMatchingMode = 'simple';
       preferencesConsideredBeyondDefaultMinRating = false;
     }

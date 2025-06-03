@@ -15,11 +15,10 @@ import { Badge } from '@/components/ui/badge';
 
 interface UserItemSuggestion {
   userItem: Item;
-  suggestedMatches: (Item & { matchScore: string })[]; 
-  // reasoning: string | null; // Reasoning will be shown on opportunity page
+  suggestedMatches: (Item & { matchScore: string })[];
   isLoading: boolean;
   error: string | null;
-  preferencesConsidered: boolean; 
+  preferencesConsidered: boolean;
   usedMatchingMode: 'simple' | 'advanced' | undefined;
 }
 
@@ -28,7 +27,7 @@ export default function HomePage() {
   const [overallLoading, setOverallLoading] = useState(true);
   const { toast } = useToast();
 
-  const allAvailableOrPendingItemsFromOtherUsers = dummyItems.filter(item => 
+  const allAvailableOrPendingItemsFromOtherUsers = dummyItems.filter(item =>
     (item.status === 'available' || item.status === 'pending') && item.ownerId !== dummyUsers[0].id // Simulate current user is dummyUsers[0]
   );
 
@@ -46,7 +45,6 @@ export default function HomePage() {
         setUserItemSuggestions([{
           userItem: { id: 'no-offers', name: 'No Offers Found', description: "You haven't listed any 'offer' items yet.", imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' },
           suggestedMatches: [],
-          // reasoning: "List an 'offer' item to see personalized AI matches and potential trades here!",
           isLoading: false,
           error: null,
           preferencesConsidered: false,
@@ -59,14 +57,13 @@ export default function HomePage() {
       const initialSuggestions = userOfferItems.map(item => ({
         userItem: item,
         suggestedMatches: [],
-        // reasoning: null,
         isLoading: true,
         error: null,
         preferencesConsidered: false,
         usedMatchingMode: undefined,
       }));
       setUserItemSuggestions(initialSuggestions);
-      setOverallLoading(false); 
+      setOverallLoading(false);
 
       const suggestionPromises = userOfferItems.map(async (userItem, index) => {
         const otherItemsForMatching = dummyItems.filter(
@@ -78,6 +75,7 @@ export default function HomePage() {
           category: item.category,
           ownerId: item.ownerId,
           listingType: item.listingType,
+          minimumMatchRatingOverride: item.minimumMatchRatingOverride, // Added this field
         }));
 
         if (otherItemsForMatching.length === 0) {
@@ -86,13 +84,13 @@ export default function HomePage() {
             success: true,
             data: {
               suggestedMatches: [],
-              reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`, // Reasoning kept for internal logic, not display here
+              reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
               preferencesConsidered: false,
               usedMatchingMode: 'simple',
             } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning' | 'preferencesConsidered' | 'usedMatchingMode'>,
           };
         }
-        
+
         try {
           const result: ItemMatchOutput = await suggestMatchingItems({
             triggeringUserId: currentUser.id,
@@ -103,6 +101,7 @@ export default function HomePage() {
               category: userItem.category,
               ownerId: userItem.ownerId,
               listingType: userItem.listingType,
+              minimumMatchRatingOverride: userItem.minimumMatchRatingOverride, // Added this field
             },
             availableItems: otherItemsForMatching,
           });
@@ -133,7 +132,6 @@ export default function HomePage() {
               newSuggestions[index] = {
                 ...newSuggestions[index],
                 suggestedMatches: itemsWithScores,
-                // reasoning: data.reasoning || (itemsWithScores.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
                 isLoading: false,
                 error: null,
                 preferencesConsidered: data.preferencesConsidered || false,
@@ -146,7 +144,7 @@ export default function HomePage() {
                 error: promiseError || "Failed to process suggestions for this item.",
               };
             }
-          } 
+          }
         });
         return newSuggestions;
       });
@@ -176,7 +174,7 @@ export default function HomePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {[...Array(1)].map((_, i) => ( 
+              {[...Array(1)].map((_, i) => (
                 <div key={i} className="p-4 border rounded-md bg-muted/30">
                   <div className="h-6 bg-muted-foreground/20 rounded animate-pulse w-1/2 mb-4"></div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -229,8 +227,8 @@ export default function HomePage() {
                 <div className="flex justify-between items-start flex-wrap gap-2">
                     <CardTitle className={`font-headline text-2xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
                     {itemSuggestion.isLoading ? <Loader2 className="h-6 w-6 text-primary animate-spin" /> : (itemSuggestion.error ? <AlertCircle className="h-6 w-6 text-destructive" /> : <Sparkles className={`h-6 w-6 ${itemSuggestion.suggestedMatches.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />)}
-                    {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.name}...` : 
-                    itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` : 
+                    {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.name}...` :
+                    itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` :
                     `AI Matches for your ${itemSuggestion.userItem.name}`}
                     </CardTitle>
                     <div className="flex items-center gap-2 text-xs">
@@ -245,7 +243,7 @@ export default function HomePage() {
               <CardContent>
                 {itemSuggestion.isLoading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {[...Array(3)].map((_, i) => ( 
+                    {[...Array(3)].map((_, i) => (
                       <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50">
                         <div className="aspect-[4/3] bg-muted animate-pulse"></div>
                         <CardContent className="p-4 flex-grow space-y-2">
@@ -271,7 +269,7 @@ export default function HomePage() {
           </section>
         ))
       )}
-      
+
       <SearchBar
         onSearch={(query) => console.log('Searching for:', query)}
         onFilterToggle={() => console.log('Toggle filters')}
