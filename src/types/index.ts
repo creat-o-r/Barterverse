@@ -9,10 +9,11 @@ export type Item = {
   ownerId: string;
   ownerName: string;
   status: 'available' | 'traded' | 'pending';
-  listingType: 'offer' | 'want'; // New field
-  isThirdPartyFulfillment?: boolean; // Flag for UI hint
+  listingType: 'offer' | 'want';
+  isThirdPartyFulfillment?: boolean;
   minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High';
-  isGiftItForward?: boolean; // New field for "Gift It Forward" items
+  isGiftItForward?: boolean;
+  logistics?: ItemLogistics; // New field
 };
 
 export type UserMotivation = 'help-others' | 'maximize-trades' | 'convenience-focused' | 'community-building' | 'unique-finds';
@@ -20,7 +21,7 @@ export type TradeTimingPreference = 'simultaneous' | 'staged' | 'flexible';
 
 export type UserProfileLocationPreference = {
   isSensitive: boolean;
-  notes?: string; // e.g., "Prefers local pickup for large items"
+  notes?: string;
 };
 
 export type UserProfilePreferences = {
@@ -28,26 +29,54 @@ export type UserProfilePreferences = {
   locationPreference?: UserProfileLocationPreference;
   tradeTimingPreference?: TradeTimingPreference;
   interestedInThirdPartyFulfillment?: boolean;
-  minimumMatchRating: 'Low' | 'Medium' | 'High'; // Now required
+  minimumMatchRating: 'Low' | 'Medium' | 'High';
+};
+
+export type UserStoredLocation = {
+  id: string;
+  name: string; // e.g., "Home", "Office"
+  address?: string; // Simple address string for now
+  isDefault?: boolean;
+};
+
+export type UserLogisticsPreferences = {
+  defaultShippingOption: 'pickup_only' | 'ship_domestic' | 'ship_international';
+  defaultMeetupOption: 'public_meetup' | 'flexible';
+  preferredStoredLocationId?: string; // ID of a UserStoredLocation to use as default
 };
 
 export type User = {
   id: string;
   name: string;
   avatarUrl: string;
-  dataAiHint?: string; // Added for placeholder image hints
-  rating: number; // Average rating
+  dataAiHint?: string;
+  rating: number;
   tradesCompleted: number;
   bio?: string;
-  items: Item[]; // Items listed by the user
-} & UserProfilePreferences; // Embed preferences directly
+  items: Item[];
+  locations?: UserStoredLocation[]; // New field
+  logisticsPreferences?: UserLogisticsPreferences; // New field
+} & UserProfilePreferences;
+
+export type ItemLogisticsLocationType = 'profile_default_location' | 'profile_stored_location' | 'item_specific_location';
+export type ItemLogisticsShippingOption = 'profile_default_shipping' | 'pickup_only' | 'ship_domestic' | 'ship_international';
+export type ItemLogisticsMeetupOption = 'profile_default_meetup' | 'public_meetup' | 'flexible';
+
+export type ItemLogistics = {
+  locationType: ItemLogisticsLocationType;
+  selectedUserStoredLocationId?: string; // if locationType is 'profile_stored_location'
+  itemSpecificAddress?: string; // if locationType is 'item_specific_location'
+  shippingOption: ItemLogisticsShippingOption;
+  meetupOption: ItemLogisticsMeetupOption;
+  notes?: string; // Optional notes for logistics
+};
 
 export type TradeOffer = {
   id:string;
   offeringUserId: string;
   receivingUserId: string;
   offeredItemId: string;
-  requestedItemId: string; // Can be one specific item or a general request
+  requestedItemId: string;
   status: 'pending' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
@@ -65,13 +94,12 @@ export type Rating = {
 
 export type ChatMessage = {
   id: string;
-  senderId: string; // 'user' or 'llm' or actual userId
+  senderId: string;
   text: string;
   timestamp: Date;
   isAIMessage?: boolean;
 };
 
-// Specifically for the inferUserPreferencesFlow output.
 export type InferredUserPreferences = {
   motivations?: UserMotivation[];
   locationPreference?: {
@@ -80,7 +108,7 @@ export type InferredUserPreferences = {
   };
   tradeTimingPreference?: TradeTimingPreference;
   interestedInThirdPartyFulfillment?: boolean;
-  minimumMatchRating: 'Low' | 'Medium' | 'High'; // Now required
+  minimumMatchRating: 'Low' | 'Medium' | 'High';
 };
 
 export type InferUserPreferencesOutput = {
@@ -90,4 +118,3 @@ export type InferUserPreferencesOutput = {
   reasoning?: string;
   errorMessage?: string;
 };
-

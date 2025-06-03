@@ -3,11 +3,11 @@ import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User } from '@/types';
+import type { Item, User, ItemLogistics, UserStoredLocation } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter, HeartHandshake } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter, HeartHandshake, MapPin, Truck, Users2, Edit2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
@@ -15,30 +15,79 @@ import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdmi
 import { Separator } from '@/components/ui/separator';
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
-  // console.log(`[ItemDetailsDisplay] getItemDetails called for ID: ${itemId}`);
-  // Simulate network delay if needed for testing suspense
-  // await new Promise(resolve => setTimeout(resolve, 500)); 
   const item = dummyItems.find((i) => i.id === itemId);
-  if (!item) {
-    console.error(`[ItemDetailsDisplay] getItemDetails: Item not found for ID: ${itemId}`);
-    return null;
-  }
+  if (!item) return null;
   const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) {
-    console.error(`[ItemDetailsDisplay] getItemDetails: Owner not found for item ID: ${itemId}, owner ID: ${item.ownerId}`);
-    return null;
-  }
-  // console.log(`[ItemDetailsDisplay] getItemDetails: Found item "${item.name}" and owner "${owner.name}"`);
+  if (!owner) return null;
   return { item, owner };
 }
 
+function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, owner: User }) {
+  if (!logistics) {
+    return <p className="text-sm text-muted-foreground font-body">Logistics details not specified for this item.</p>;
+  }
+
+  let locationDisplay = "Profile default location";
+  if (logistics.locationType === 'profile_stored_location' && logistics.selectedUserStoredLocationId) {
+    const storedLoc = owner.locations?.find(l => l.id === logistics.selectedUserStoredLocationId);
+    locationDisplay = storedLoc ? `${storedLoc.name} (${storedLoc.address || 'Address not set'})` : "Selected stored address (details unavailable)";
+  } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
+    locationDisplay = logistics.itemSpecificAddress;
+  } else if (logistics.locationType === 'profile_default_location') {
+     const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
+     const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
+     if (defaultLoc) {
+       locationDisplay = `Profile default: ${defaultLoc.name} (${defaultLoc.address || 'Address not specified'})`;
+     } else {
+       locationDisplay = "Uses profile default location (specific address not set on profile).";
+     }
+  }
+
+
+  const shippingDisplayMap = {
+    profile_default_shipping: `Profile Default (${owner.logisticsPreferences?.defaultShippingOption.replace(/_/g, ' ') || 'Not Set'})`,
+    pickup_only: "Local Pickup Only",
+    ship_domestic: "Willing to Ship (Domestic)",
+    ship_international: "Willing to Ship (International)"
+  };
+
+  const meetupDisplayMap = {
+    profile_default_meetup: `Profile Default (${owner.logisticsPreferences?.defaultMeetupOption.replace(/_/g, ' ') || 'Not Set'})`,
+    public_meetup: "Public Meetup Preferred",
+    flexible: "Flexible Meetup"
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" /> Location:</h4>
+        <p className="text-sm text-foreground/90 font-body pl-5">{locationDisplay}</p>
+      </div>
+      <div>
+        <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Shipping:</h4>
+        <p className="text-sm text-foreground/90 font-body pl-5">{shippingDisplayMap[logistics.shippingOption] || "Not specified"}</p>
+      </div>
+      <div>
+        <h4 className="font-headline text-md flex items-center gap-1.5"><Users2 className="h-4 w-4 text-muted-foreground" /> Meetup:</h4>
+        <p className="text-sm text-foreground/90 font-body pl-5">{meetupDisplayMap[logistics.meetupOption] || "Not specified"}</p>
+      </div>
+      {logistics.notes && (
+        <div>
+          <h4 className="font-headline text-md flex items-center gap-1.5"><Edit2 className="h-4 w-4 text-muted-foreground" /> Notes:</h4>
+          <p className="text-sm text-foreground/90 font-body pl-5 whitespace-pre-wrap">{logistics.notes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
-  // console.log(`[ItemDetailsDisplay] Rendering for itemId: ${itemId}`);
   const itemDetails = await getItemDetails(itemId);
 
   if (!itemDetails) {
     return (
-      <div className="space-y-8"> 
+      <div className="space-y-8">
         <Card>
           <CardHeader><CardTitle className="text-center font-headline">Item Not Found</CardTitle></CardHeader>
           <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}</p></CardContent>
@@ -51,10 +100,8 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   const currentUserId = dummyUsers[0]?.id || 'user1_fallback';
   const isCurrentUserOwner = item.ownerId === currentUserId;
 
-  // console.log(`[ItemDetailsDisplay] Successfully fetched and rendering item: ${item.name}`);
-
   return (
-    <div className="space-y-8"> 
+    <div className="space-y-8">
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
           <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted">
@@ -99,7 +146,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
             <CardContent className="p-0 flex-grow">
               <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap break-words mb-4">{item.description}</p>
               <Separator className="my-4" />
-              <div className="space-y-3">
+              <div className="space-y-3 mb-4">
                 <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
@@ -113,6 +160,11 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                     </div>
                   </div>
                 </div>
+              </div>
+              <Separator className="my-4" />
+               <div className="space-y-3">
+                <h3 className="font-headline text-xl flex items-center gap-2"><Truck className="h-6 w-6 text-primary" />Logistics Information</h3>
+                <LogisticsDisplay logistics={item.logistics} owner={owner} />
               </div>
             </CardContent>
 
@@ -150,42 +202,43 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
 function ItemPageLoadingState() {
   return (
-    <div className="space-y-8 animate-pulse"> 
+    <div className="space-y-8 animate-pulse">
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
-          {/* Image Skeleton */}
           <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted rounded-l-lg md:rounded-l-lg md:rounded-r-none"></div>
-          {/* Details Skeleton */}
           <div className="p-6 flex flex-col">
-            <div className="p-0 pb-4"> 
-              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div> 
-              <div className="flex items-center gap-2 mb-1"> 
+            <div className="p-0 pb-4">
+              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div>
+              <div className="flex items-center gap-2 mb-1">
                 <div className="h-5 w-5 bg-muted-foreground/20 rounded-full"></div>
                 <div className="h-6 bg-muted-foreground/20 rounded w-1/3"></div>
               </div>
-              <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div> 
+              <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div>
             </div>
-            <div className="p-0 flex-grow"> 
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> 
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> 
-              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div> 
-              <div className="my-4 h-px bg-border"></div> 
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> 
-              <div className="flex items-center gap-3"> 
+            <div className="p-0 flex-grow">
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div>
+              <div className="my-4 h-px bg-border"></div>
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
+              <div className="flex items-center gap-3">
                 <div className="h-12 w-12 rounded-full bg-muted-foreground/20"></div>
                 <div>
                   <div className="h-5 bg-muted-foreground/20 rounded w-24 mb-1"></div>
                   <div className="h-4 bg-muted-foreground/20 rounded w-32"></div>
                 </div>
               </div>
+               <div className="my-4 h-px bg-border"></div>
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> {/* Logistics title skeleton */}
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> {/* Logistics line skeleton */}
+              <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div> {/* Logistics line skeleton */}
             </div>
-            <div className="p-0 pt-6"> 
-              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div> 
+            <div className="p-0 pt-6">
+              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>
             </div>
           </div>
         </div>
       </Card>
-      {/* Placeholder for SuggestedMatches loading */}
       <Card className="animate-pulse">
         <CardHeader>
           <div className="h-7 bg-muted-foreground/20 rounded w-1/2"></div>
@@ -234,16 +287,12 @@ function SuggestedMatchesLoadingState() {
   );
 }
 
-// Main page wrapper component
 export default function ItemDetailPageWrapper({ params: paramsProp }: { params: { id: string } }) {
-  // console.log('[ItemDetailPageWrapper] Received paramsProp:', paramsProp);
-  const params = use(paramsProp); 
-  // console.log('[ItemDetailPageWrapper] Resolved params by `use`:', params);
+  const params = use(paramsProp);
 
   if (!params || !params.id) {
-    // console.error('[ItemDetailPageWrapper] Params or params.id is missing.');
     return (
-      <div className="space-y-8"> 
+      <div className="space-y-8">
         <Card className="border-destructive">
           <CardHeader><CardTitle className="text-destructive font-headline">Error: Missing Item ID</CardTitle></CardHeader>
           <CardContent><p className="font-body">The item ID was not provided in the request.</p></CardContent>
@@ -251,12 +300,10 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
       </div>
     );
   }
-  
-  // console.log(`[ItemDetailPageWrapper] Rendering Suspense for ItemDetailsDisplay with itemId: ${params.id}`);
+
   return (
     <Suspense fallback={<ItemPageLoadingState />}>
       <ItemDetailsDisplay itemId={params.id} />
     </Suspense>
   );
 }
-

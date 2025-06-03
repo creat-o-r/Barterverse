@@ -1,6 +1,6 @@
 
-import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences } from '@/types';
-import type { InferUserPreferencesOutput, InferredUserPreferences } from '@/types'; // Adjusted import
+import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics } from '@/types';
+import type { InferredUserPreferences } from '@/types';
 
 export const dummyUsers: User[] = [
   {
@@ -11,12 +11,21 @@ export const dummyUsers: User[] = [
     rating: 4.5,
     tradesCompleted: 12,
     bio: 'Loves vintage books and handmade crafts. Always open for a fair trade!',
-    items: [], // Will be populated later
+    items: [],
     interestedInThirdPartyFulfillment: true,
     motivations: ['unique-finds', 'community-building'] as UserMotivation[],
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
-    minimumMatchRating: 'Medium', 
+    minimumMatchRating: 'Medium',
+    locations: [
+      { id: 'user1_home', name: 'Home', address: '123 Main St, Anytown', isDefault: true },
+      { id: 'user1_work', name: 'Office', address: '456 Business Rd, Anytown' },
+    ],
+    logisticsPreferences: {
+      defaultShippingOption: 'ship_domestic',
+      defaultMeetupOption: 'public_meetup',
+      preferredStoredLocationId: 'user1_home',
+    },
   },
   {
     id: 'user2',
@@ -31,7 +40,15 @@ export const dummyUsers: User[] = [
     motivations: ['maximize-trades'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Prefers trades within the city for larger items.' },
     tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
-    minimumMatchRating: 'Low', 
+    minimumMatchRating: 'Low',
+    locations: [
+      { id: 'user2_apt', name: 'Apartment', address: '789 Central Ave, Anytown', isDefault: true },
+    ],
+    logisticsPreferences: {
+      defaultShippingOption: 'pickup_only',
+      defaultMeetupOption: 'flexible',
+      preferredStoredLocationId: 'user2_apt',
+    },
   },
   {
     id: 'user3',
@@ -46,7 +63,8 @@ export const dummyUsers: User[] = [
     motivations: ['help-others', 'convenience-focused'] as UserMotivation[],
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'staged' as TradeTimingPreference,
-    minimumMatchRating: 'Low', // Defaulted to Low as it was undefined
+    minimumMatchRating: 'Low',
+    // No specific locations or logistics preferences, will use system defaults
   },
   {
     id: 'user4',
@@ -61,7 +79,11 @@ export const dummyUsers: User[] = [
     motivations: ['unique-finds'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Willing to ship smaller items.' },
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
-    minimumMatchRating: 'High', 
+    minimumMatchRating: 'High',
+    logisticsPreferences: {
+      defaultShippingOption: 'ship_international',
+      defaultMeetupOption: 'public_meetup',
+    }
   },
   {
     id: 'user5',
@@ -80,7 +102,7 @@ export const dummyUsers: User[] = [
   },
 ];
 
-export let dummyItems: Item[] = [ // Changed to let for modification
+export let dummyItems: Item[] = [
   {
     id: 'item1',
     name: 'Vintage Leather Journal',
@@ -92,8 +114,15 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'offer',
-    minimumMatchRatingOverride: 'High', // This specific journal requires High matches
+    minimumMatchRatingOverride: 'High',
     isGiftItForward: false,
+    logistics: {
+      locationType: 'profile_stored_location',
+      selectedUserStoredLocationId: 'user1_home',
+      shippingOption: 'ship_domestic',
+      meetupOption: 'public_meetup',
+      notes: "Can also meet downtown on weekdays."
+    }
   },
   {
     id: 'item2',
@@ -106,8 +135,13 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Bob Barterer',
     status: 'available',
     listingType: 'offer',
-    // No override, will use Bob's global 'Low'
     isGiftItForward: false,
+    logistics: {
+      locationType: 'item_specific_location',
+      itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
+      shippingOption: 'pickup_only',
+      meetupOption: 'flexible',
+    }
   },
   {
     id: 'item3',
@@ -121,6 +155,11 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     status: 'available',
     listingType: 'offer',
     isGiftItForward: true,
+    logistics: { // Even gifts can have logistics
+      locationType: 'profile_default_location',
+      shippingOption: 'profile_default_shipping',
+      meetupOption: 'profile_default_meetup',
+    }
   },
   {
     id: 'item4',
@@ -147,6 +186,11 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
+     logistics: {
+      locationType: 'profile_default_location', // Charlie uses profile defaults
+      shippingOption: 'profile_default_shipping',
+      meetupOption: 'profile_default_meetup',
+    }
   },
   {
     id: 'item6',
@@ -172,7 +216,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'want',
-    minimumMatchRatingOverride: 'Medium', 
+    minimumMatchRatingOverride: 'Medium',
   },
   {
     id: 'item8',
@@ -264,7 +308,6 @@ export let dummyItems: Item[] = [ // Changed to let for modification
   }
 ];
 
-// Assign items to users for profile pages
 dummyUsers.forEach(user => {
   user.items = dummyItems.filter(item => item.ownerId === user.id);
 });
@@ -276,10 +319,9 @@ dummyItems.forEach(item => {
   }
 });
 
-// Function to update user preferences in the dummyUsers array (in-memory)
 export function updateUserPreferencesInDummyData(
   userId: string,
-  newPreferences: InferredUserPreferences // Using the more specific InferredUserPreferences type
+  newPreferences: InferredUserPreferences
 ): boolean {
   const userIndex = dummyUsers.findIndex(u => u.id === userId);
   if (userIndex === -1) {
@@ -301,14 +343,12 @@ export function updateUserPreferencesInDummyData(
   if (newPreferences.interestedInThirdPartyFulfillment !== undefined) {
     userToUpdate.interestedInThirdPartyFulfillment = newPreferences.interestedInThirdPartyFulfillment;
   }
-  // minimumMatchRating is now required in InferredUserPreferences
   userToUpdate.minimumMatchRating = newPreferences.minimumMatchRating;
-  
+
   dummyUsers[userIndex] = userToUpdate;
   return true;
 }
 
-// Function to add a new item to the dummyItems array (in-memory)
 export function addNewItemToDummyData(
   itemData: Omit<Item, 'id' | 'ownerName' | 'status' | 'dataAiHint'> & { ownerId: string }
 ): Item {
@@ -322,14 +362,19 @@ export function addNewItemToDummyData(
     ...itemData,
     id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     ownerName: owner.name,
-    status: 'available', 
+    status: 'available',
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`,
-    isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false, 
+    isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false,
+    logistics: itemData.logistics || { // Default logistics if not provided
+      locationType: 'profile_default_location',
+      shippingOption: 'profile_default_shipping',
+      meetupOption: 'profile_default_meetup',
+    }
   };
 
   dummyItems.push(newItem);
-  
+
   const userIndex = dummyUsers.findIndex(u => u.id === itemData.ownerId);
   if (userIndex !== -1) {
     dummyUsers[userIndex].items.push(newItem);
