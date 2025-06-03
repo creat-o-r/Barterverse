@@ -41,15 +41,14 @@ export type UserStoredLocation = {
 
 export type ItemDeliveryMethod = 
   | 'pickup_only' 
-  | 'ship_domestic' 
-  | 'ship_international' 
+  | 'willing_to_ship' 
   | 'delivery_area' 
   | 'possible_delivery'
   | 'public_meetup'
   | 'flexible_meetup';
 
 export type UserLogisticsPreferences = {
-  defaultDeliveryMethods: ItemDeliveryMethod[]; // Changed from single to array
+  defaultDeliveryMethods: ItemDeliveryMethod[];
   preferredStoredLocationId?: string;
 };
 
@@ -72,7 +71,7 @@ export type ItemLogistics = {
   locationType: ItemLogisticsLocationType;
   selectedUserStoredLocationId?: string;
   itemSpecificAddress?: string;
-  deliveryMethods: ItemDeliveryMethod[]; // Changed from single to array
+  deliveryMethods: ItemDeliveryMethod[];
   notes?: string;
 };
 

@@ -34,8 +34,7 @@ const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
 
 const deliveryMethodEnum = z.enum([
   'pickup_only', 
-  'ship_domestic', 
-  'ship_international', 
+  'willing_to_ship', 
   'delivery_area', 
   'possible_delivery',
   'public_meetup',
@@ -68,9 +67,8 @@ const itemFormSchema = z.object({
 type ItemFormValues = z.infer<typeof itemFormSchema>;
 
 const deliveryMethodMapConcrete: Record<ItemDeliveryMethod, string> = {
-  pickup_only: "Pickup", // Changed label
-  ship_domestic: "Willing to Ship (Domestic)",
-  ship_international: "Willing to Ship (International)",
+  pickup_only: "Pickup",
+  willing_to_ship: "Willing to Ship",
   delivery_area: "Delivery Area (Specify in Notes)",
   possible_delivery: "Possible Delivery (Discuss)",
   public_meetup: "Public Meetup",
@@ -105,7 +103,7 @@ export default function NewItemPage() {
       isGiftItForward: false,
       selectedLocationIdentifier: ITEM_SPECIFIC_LOCATION_VALUE,
       itemSpecificAddress: '',
-      deliveryMethods: ['pickup_only'], // Default to an array
+      deliveryMethods: ['pickup_only'],
       logisticsNotes: '',
     },
   });
@@ -351,7 +349,6 @@ export default function NewItemPage() {
                                   } else {
                                     newValues = currentValues.filter(value => value !== key);
                                   }
-                                  // Ensure pickup_only is not duplicated if already there by other means
                                   newValues = [...new Set(newValues)];
                                   field.onChange(newValues);
                                 }}

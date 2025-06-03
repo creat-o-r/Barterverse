@@ -115,8 +115,7 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
 
   const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
     pickup_only: "Pickup",
-    ship_domestic: "Willing to Ship (Domestic)",
-    ship_international: "Willing to Ship (International)",
+    willing_to_ship: "Willing to Ship",
     delivery_area: "Delivery Area",
     possible_delivery: "Possible Delivery",
     public_meetup: "Public Meetup",

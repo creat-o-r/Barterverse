@@ -23,9 +23,8 @@ async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User
 }
 
 const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
-  pickup_only: "Pickup", // Changed label
-  ship_domestic: "Willing to Ship (Domestic)",
-  ship_international: "Willing to Ship (International)",
+  pickup_only: "Pickup",
+  willing_to_ship: "Willing to Ship",
   delivery_area: "Delivery Area (Details in Notes/Chat)",
   possible_delivery: "Possible Delivery (Discuss)",
   public_meetup: "Public Meetup",
