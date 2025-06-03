@@ -204,7 +204,7 @@ Do NOT suggest:
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
 Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status, and reciprocalItemId if applicable) if available, ensuring ALL suggested items meet the applicable minimum match score rule. Aim for variety and strong reciprocal potential if multiple good options exist.
-If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential or gift fulfillments if significant. If you identified a `reciprocalItemId` for a match, briefly mention how that item contributes to the overall match quality or reciprocal benefit in your reasoning.
+If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential or gift fulfillments if significant. If you identified a 'reciprocalItemId' for a match, briefly mention how that item contributes to the overall match quality or reciprocal benefit in your reasoning.
 If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
   `,
 });
