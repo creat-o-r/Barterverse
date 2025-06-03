@@ -16,10 +16,10 @@ import { Badge } from '@/components/ui/badge';
 interface UserItemSuggestion {
   userItem: Item;
   suggestedMatches: (Item & { matchScore: string })[]; 
-  reasoning: string | null;
+  // reasoning: string | null; // Reasoning will be shown on opportunity page
   isLoading: boolean;
   error: string | null;
-  preferencesConsidered: boolean; // To show if AI used user prefs
+  preferencesConsidered: boolean; 
   usedMatchingMode: 'simple' | 'advanced' | undefined;
 }
 
@@ -46,7 +46,7 @@ export default function HomePage() {
         setUserItemSuggestions([{
           userItem: { id: 'no-offers', name: 'No Offers Found', description: "You haven't listed any 'offer' items yet.", imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' },
           suggestedMatches: [],
-          reasoning: "List an 'offer' item to see personalized AI matches and potential trades here!",
+          // reasoning: "List an 'offer' item to see personalized AI matches and potential trades here!",
           isLoading: false,
           error: null,
           preferencesConsidered: false,
@@ -59,7 +59,7 @@ export default function HomePage() {
       const initialSuggestions = userOfferItems.map(item => ({
         userItem: item,
         suggestedMatches: [],
-        reasoning: null,
+        // reasoning: null,
         isLoading: true,
         error: null,
         preferencesConsidered: false,
@@ -86,7 +86,7 @@ export default function HomePage() {
             success: true,
             data: {
               suggestedMatches: [],
-              reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
+              reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`, // Reasoning kept for internal logic, not display here
               preferencesConsidered: false,
               usedMatchingMode: 'simple',
             } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning' | 'preferencesConsidered' | 'usedMatchingMode'>,
@@ -133,7 +133,7 @@ export default function HomePage() {
               newSuggestions[index] = {
                 ...newSuggestions[index],
                 suggestedMatches: itemsWithScores,
-                reasoning: data.reasoning || (itemsWithScores.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
+                // reasoning: data.reasoning || (itemsWithScores.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
                 isLoading: false,
                 error: null,
                 preferencesConsidered: data.preferencesConsidered || false,
@@ -212,7 +212,9 @@ export default function HomePage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-muted-foreground font-body text-center py-4">{userItemSuggestions[0].reasoning}</p>
+                    <p className="text-muted-foreground font-body text-center py-4">
+                        List an 'offer' item to see personalized AI matches and potential trades here!
+                    </p>
                 </CardContent>
             </Card>
             <Separator className="my-8" />
@@ -236,9 +238,6 @@ export default function HomePage() {
                         <Badge variant={itemSuggestion.preferencesConsidered ? 'default' : 'secondary'}>Prefs: {itemSuggestion.preferencesConsidered ? 'On' : 'Off'}</Badge>
                     </div>
                 </div>
-                {!itemSuggestion.isLoading && itemSuggestion.reasoning && !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 && (
-                  <p className="text-sm text-muted-foreground mt-1 font-body">{itemSuggestion.reasoning}</p>
-                )}
                  {!itemSuggestion.isLoading && itemSuggestion.error && (
                   <p className="text-sm text-destructive mt-1 font-body">{itemSuggestion.error}</p>
                 )}
@@ -252,7 +251,6 @@ export default function HomePage() {
                         <CardContent className="p-4 flex-grow space-y-2">
                           <div className="h-5 bg-muted-foreground/20 rounded animate-pulse w-3/4"></div>
                           <div className="h-4 bg-muted-foreground/20 rounded animate-pulse w-full"></div>
-                          <div className="h-4 bg-muted-foreground/20 rounded animate-pulse w-1/2"></div>
                         </CardContent>
                         <CardFooter className="p-4 border-t border-muted-foreground/10">
                           <div className="h-9 bg-muted-foreground/20 rounded animate-pulse w-full"></div>
@@ -263,7 +261,9 @@ export default function HomePage() {
                 ) : !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 ? (
                   <ItemList items={itemSuggestion.suggestedMatches} mainContextItemId={itemSuggestion.userItem.id} />
                 ) : !itemSuggestion.error && (
-                  <p className="text-muted-foreground font-body text-center py-4">{itemSuggestion.reasoning || "No specific AI suggestions found for this item at the moment."}</p>
+                  <p className="text-muted-foreground font-body text-center py-4">
+                    {itemSuggestion.suggestedMatches.length === 0 ? `We couldn't find specific AI matches for your "${itemSuggestion.userItem.name}" right now.` : "No matches found."}
+                  </p>
                 )}
               </CardContent>
             </Card>

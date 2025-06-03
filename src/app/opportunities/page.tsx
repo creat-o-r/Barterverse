@@ -9,11 +9,13 @@ import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
 import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
+
 
 // Helper to get item and owner details
 async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; owner: User } | null> {
@@ -87,18 +89,59 @@ export default function OpportunityMatchPage() {
   const [mainItemDetails, setMainItemDetails] = useState<{ item: Item; owner: User } | null>(null);
   const [suggestedItemDetails, setSuggestedItemDetails] = useState<{ item: Item; owner: User } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [opportunityReasoning, setOpportunityReasoning] = useState<string | null>(null);
+  const [loadingReasoning, setLoadingReasoning] = useState(false);
 
   const currentUserId = dummyUsers[0].id; // Simulate current user
 
   useEffect(() => {
-    async function fetchData() {
+    async function fetchDataAndReasoning() {
       setLoading(true);
+      setOpportunityReasoning(null);
       const mainD = await getItemAndOwner(mainItemIdQuery);
       const suggestedD = await getItemAndOwner(suggestedItemIdQuery);
 
       if (mainD && suggestedD) {
         setMainItemDetails(mainD);
         setSuggestedItemDetails(suggestedD);
+        
+        // Fetch reasoning for this specific opportunity
+        setLoadingReasoning(true);
+        try {
+            const inputForReasoning: Parameters<typeof suggestMatchingItems>[0] = {
+                triggeringUserId: currentUserId,
+                currentItem: {
+                    id: mainD.item.id,
+                    name: mainD.item.name,
+                    description: mainD.item.description,
+                    category: mainD.item.category,
+                    ownerId: mainD.item.ownerId,
+                    listingType: mainD.item.listingType,
+                },
+                availableItems: [{ // Only the suggested item is "available" for this reasoning context
+                    id: suggestedD.item.id,
+                    name: suggestedD.item.name,
+                    description: suggestedD.item.description,
+                    category: suggestedD.item.category,
+                    ownerId: suggestedD.item.ownerId,
+                    listingType: suggestedD.item.listingType,
+                }],
+            };
+            const reasoningResult: ItemMatchOutput = await suggestMatchingItems(inputForReasoning);
+            if (reasoningResult.reasoning && !reasoningResult.reasoning.toLowerCase().includes('error') && !reasoningResult.reasoning.toLowerCase().includes('could not')) {
+                 setOpportunityReasoning(reasoningResult.reasoning);
+            } else if (reasoningResult.reasoning) {
+                setOpportunityReasoning("AI could not provide specific reasoning for this pairing at the moment.");
+            } else {
+                setOpportunityReasoning("AI did not provide reasoning for this match.");
+            }
+        } catch (error) {
+            console.error("Error fetching opportunity reasoning:", error);
+            setOpportunityReasoning("Could not load AI reasoning for this match.");
+        } finally {
+            setLoadingReasoning(false);
+        }
+
       } else {
         setMainItemDetails(null);
         setSuggestedItemDetails(null);
@@ -106,10 +149,11 @@ export default function OpportunityMatchPage() {
       setLoading(false);
     }
     if (mainItemIdQuery && suggestedItemIdQuery) {
-        fetchData();
+        fetchDataAndReasoning();
     } else {
         setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mainItemIdQuery, suggestedItemIdQuery]);
 
   if (loading) {
@@ -154,12 +198,18 @@ export default function OpportunityMatchPage() {
   } else { 
     mainItemOpportunityLabel = `${mainItemOwner.name}'s ${mainItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
     suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s ${suggestedItem.listingType === 'offer' ? 'Matching Offer' : 'Matching Want'}`;
-    tradeId = `discuss-${mainItem.id}-with-${suggestedItem.id}`;
+    // For non-user-involved opportunities, generate a more generic discussion ID
+    // This specific tradeId format is for direct negotiation start.
+    // If neither item belongs to the current user, direct chat might not be the primary action from this page.
+    // However, for demo purposes, we can still create a link if needed, or guide user to item pages.
+    tradeId = `discuss-${mainItem.id}-with-${suggestedItem.id}`; // A generic ID
     chatButtonText = `Discuss This Opportunity`;
+    // Potentially disable direct chat button or change its text if current user owns neither.
+    // For now, assume a discussion can be initiated.
   }
    if (mainItem.ownerId === currentUserId && suggestedItem.ownerId === currentUserId) {
-    negotiationContextValid = false;
-    chatButtonText = "View Items Separately";
+    negotiationContextValid = false; // User can't trade with themselves
+    chatButtonText = "View Items Separately"; // Or some other appropriate text
   }
 
 
@@ -174,6 +224,21 @@ export default function OpportunityMatchPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+           {loadingReasoning && (
+            <div className="text-center text-muted-foreground font-body py-3 flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Reasoning...
+            </div>
+           )}
+           {!loadingReasoning && opportunityReasoning && (
+             <Card className="bg-muted/50 border-primary/30">
+                <CardHeader className="pb-2 pt-3">
+                    <CardTitle className="font-headline text-base flex items-center gap-2"><FileText className="h-4 w-4 text-primary"/>AI's Rationale for this Match</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <p className="text-sm font-body text-muted-foreground italic">{opportunityReasoning}</p>
+                </CardContent>
+             </Card>
+           )}
            <div className="hidden md:flex items-center justify-center my-4">
             <ArrowRightLeft className="h-8 w-8 text-muted-foreground" />
           </div>

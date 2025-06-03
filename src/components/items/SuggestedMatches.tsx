@@ -18,15 +18,17 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
   const [suggestedItems, setSuggestedItems] = useState<(Item & { matchScore: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [aiReasoning, setAiReasoning] = useState<string | null>(null);
+  // const [aiReasoning, setAiReasoning] = useState<string | null>(null); // Reasoning removed from here
   const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
   const [matchModeUsed, setMatchModeUsed] = useState<'simple' | 'advanced' | undefined>(undefined);
+  const [internalReasoning, setInternalReasoning] = useState<string | null>(null); // For system messages
 
   useEffect(() => {
     async function fetchSuggestions() {
       setLoading(true);
       setFetchError(null);
-      setAiReasoning(null);
+      // setAiReasoning(null);
+      setInternalReasoning(null);
       setSuggestedItems([]); 
       setPreferencesWereConsidered(false);
       setMatchModeUsed(undefined);
@@ -34,7 +36,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       if (!currentItem?.id) {
           setLoading(false);
           const missingItemError = "Cannot fetch suggestions: current item information is missing.";
-          setAiReasoning(missingItemError);
+          // setAiReasoning(missingItemError);
+          setInternalReasoning(missingItemError);
           setFetchError(missingItemError);
           return;
       }
@@ -56,10 +59,11 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
         if (otherAvailableItems.length === 0) {
             const noItemsReasoning = `No other items currently available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'this item'} "${currentItem.name}".`;
-            setAiReasoning(noItemsReasoning);
+            // setAiReasoning(noItemsReasoning);
+            setInternalReasoning(noItemsReasoning);
             setSuggestedItems([]);
             setLoading(false);
-            setMatchModeUsed('simple'); // Default if no items to match
+            setMatchModeUsed('simple'); 
             return;
         }
 
@@ -87,7 +91,6 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         }).filter(Boolean) as (Item & { matchScore: string })[];
 
         setSuggestedItems(itemsWithScores);
-        setAiReasoning(result.reasoning || null);
         
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
             result.reasoning.toLowerCase().includes('error') || 
@@ -99,16 +102,24 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         );
 
         if (itemsWithScores.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
-             setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
+             // setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
+             setInternalReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
         } else if (result.reasoning && reasoningIsErrorOrSystemMessage) {
             setFetchError(result.reasoning);
+            setInternalReasoning(result.reasoning);
+        } else if (itemsWithScores.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage){
+            // If we have items and valid reasoning, store it internally but don't display here.
+            // Opportunity page will fetch its own reasoning.
+            setInternalReasoning(result.reasoning);
         }
+
 
       } catch (err: any) {
         console.error("Failed to fetch item matches from flow (client-side catch):", err);
         const clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
         setFetchError(clientErrorMsg);
-        setAiReasoning(clientErrorMsg); 
+        // setAiReasoning(clientErrorMsg); 
+        setInternalReasoning(clientErrorMsg);
       } finally {
         setLoading(false);
       }
@@ -161,7 +172,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         </CardHeader>
         <CardContent>
           <p className="font-body text-destructive">
-            {aiReasoning || fetchError}
+            {internalReasoning || fetchError}
           </p>
         </CardContent>
       </Card>
@@ -182,13 +193,11 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
               <Badge variant={preferencesWereConsidered ? 'default' : 'secondary'}>Prefs: {preferencesWereConsidered ? 'On' : 'Off'}</Badge>
             </div>
           </div>
-          {aiReasoning && (
-            <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>
-          )}
+          {/* Reasoning text removed from CardDescription here */}
         </CardHeader>
         <CardContent>
           <p className="font-body text-muted-foreground text-center py-4">
-            {aiReasoning ? "" : (currentItem.listingType === 'offer' ? "No specific AI-powered matches found at this moment." : "No specific AI-powered fulfillments found for this want at this moment.")}
+            {internalReasoning && !fetchError ? internalReasoning : (currentItem.listingType === 'offer' ? "No specific AI-powered matches found at this moment." : "No specific AI-powered fulfillments found for this want at this moment.")}
           </p>
         </CardContent>
       </Card>
@@ -208,9 +217,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
                 <Badge variant={preferencesWereConsidered ? 'default' : 'secondary'}>Prefs: {preferencesWereConsidered ? 'On' : 'Off'}</Badge>
             </div>
           </div>
-           {aiReasoning && (
-              <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>
-           )}
+           {/* Reasoning text removed from CardDescription here. If there's a non-error internalReasoning and items are shown, it's not displayed. */}
       </CardHeader>
       <CardContent>
           <ItemList items={suggestedItems} mainContextItemId={currentItem.id} />
