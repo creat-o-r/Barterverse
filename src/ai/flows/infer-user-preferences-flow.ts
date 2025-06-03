@@ -109,24 +109,28 @@ Engagement Notes:
 {{/each}}
 {{/if}}
 
-Analyze ALL the provided data (listed items, current preferences if any, chat snippets, engagement notes, trade history) to infer the following preferences:
-1.  **Motivations**: What seems to drive this user to trade? Choose one or two from: 'help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds'.
-    -   'help-others': Phrases like "happy to help", "if you need it" in chat. Generous offers.
-    -   'maximize-trades': Focus on value, getting good deals, extensive negotiation. Mentions of item condition or value in chat.
-    -   'convenience-focused': Phrases like "quick and easy", "prefer pickup", mentions of simplicity in chat or notes. Prefers local trades.
-    -   'community-building': Mentions of meeting people, local community, friendly interactions in chat.
-    -   'unique-finds': Looking for rare, specific, or collectible items. Focus on specific item attributes in their 'want' listings or chat.
-2.  **Location Preference**:
-    -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades in their items, notes, current preferences or chat snippets? If yes, true. Otherwise, false.
-    -   notes (string, optional): If sensitive, capture any specific notes like "prefers local pickup" or "willing to ship small items".
-3.  **Trade Timing Preference**: Choose from: 'simultaneous' (prefers to swap items at the same time), 'staged' (open to one person sending first, then the other), 'flexible' (seems open to either or doesn't specify).
-    -   'simultaneous': May mention "in-person swap", "meet up" in chat or notes. Often linked to 'convenience-focused' if local.
-    -   'staged': May mention "I can send mine first", or be open to shipping logistics.
-    -   'flexible': No strong indication, or explicit mention of flexibility. Default to 'flexible' if unsure.
-4.  **Interested in 3rd Party Fulfillments** (boolean): Does the user seem open to more complex trade scenarios? If they seem flexible, community-oriented, or focused on 'unique-finds', lean towards true. If they seem very 'convenience-focused' on simple direct trades, or their current preference is 'No', lean towards false. Default to true if unsure and no explicit preference against.
+Analyze ALL the provided data (listed items, current preferences if any, chat snippets, engagement notes, trade history) to infer the following preferences.
+The output object MUST contain:
+1.  A 'suggestedPreferences' object.
+    -   Inside 'suggestedPreferences', you should aim to include:
+        -   'motivations' (array of strings, optional): What seems to drive this user to trade? Choose one or two from: 'help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds'.
+            -   'help-others': Phrases like "happy to help", "if you need it" in chat. Generous offers.
+            -   'maximize-trades': Focus on value, getting good deals, extensive negotiation. Mentions of item condition or value in chat.
+            -   'convenience-focused': Phrases like "quick and easy", "prefer pickup", mentions of simplicity in chat or notes. Prefers local trades.
+            -   'community-building': Mentions of meeting people, local community, friendly interactions in chat.
+            -   'unique-finds': Looking for rare, specific, or collectible items. Focus on specific item attributes in their 'want' listings or chat.
+        -   'locationPreference' (object, optional):
+            -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades in their items, notes, current preferences or chat snippets? If yes, true. Otherwise, false.
+            -   notes (string, optional): If sensitive, capture any specific notes like "prefers local pickup" or "willing to ship small items".
+        -   'tradeTimingPreference' (string, optional): Choose from: 'simultaneous' (prefers to swap items at the same time), 'staged' (open to one person sending first, then the other), 'flexible' (seems open to either or doesn't specify).
+            -   'simultaneous': May mention "in-person swap", "meet up" in chat or notes. Often linked to 'convenience-focused' if local.
+            -   'staged': May mention "I can send mine first", or be open to shipping logistics.
+            -   'flexible': No strong indication, or explicit mention of flexibility. Default to 'flexible' if unsure.
+        -   'interestedInThirdPartyFulfillment' (boolean, optional): Does the user seem open to more complex trade scenarios? If they seem flexible, community-oriented, or focused on 'unique-finds', lean towards true. If they seem very 'convenience-focused' on simple direct trades, or their current preference is 'No', lean towards false. Default to true if unsure and no explicit preference against.
+    -   If data is too vague for a specific preference, you can omit that optional field from 'suggestedPreferences' or use sensible defaults (e.g., for 'locationPreference', if unsure, you might return `{ isSensitive: false }`). If completely unsure about all preferences, 'suggestedPreferences' can be an empty object `{}`.
+2.  A 'confidence' field (string: 'High', 'Medium', or 'Low'). This field is required.
+3.  A 'reasoning' field (string, optional, max 2 sentences). This field is optional.
 
-Based on your analysis, provide the inferred preferences. Also, state your confidence level (High, Medium, Low) and a brief reasoning.
-If the data is too vague for some fields, omit those optional fields in 'suggestedPreferences' or use sensible defaults (e.g. locationPreference.isSensitive = false, tradeTimingPreference = 'flexible').
 Weight explicit preferences heavily if provided, but refine them if other activity strongly contradicts or adds nuance.
 `,
 });
@@ -150,36 +154,43 @@ const inferUserPreferencesFlow = ai.defineFlow(
       };
 
       const {output} = await prompt(processedInput);
-      if (!output || !output.suggestedPreferences) {
+      if (!output || !output.suggestedPreferences) { // Check if suggestedPreferences object exists
         console.warn(`${flowName}: Prompt returned null or incomplete output for suggestedPreferences.`);
         return {
             userId: input.userId,
-            suggestedPreferences: {
-                locationPreference: { isSensitive: false},
-                tradeTimingPreference: 'flexible',
-                interestedInThirdPartyFulfillment: true,
+            suggestedPreferences: { // Ensure a default structure for suggestedPreferences
+                locationPreference: { isSensitive: false}, // Default for nested object
+                tradeTimingPreference: 'flexible', // Default enum
+                interestedInThirdPartyFulfillment: true, // Default boolean
+                // motivations: [], // Default array, can be empty
             },
-            confidence: 'Low',
+            confidence: 'Low', // Default enum
             reasoning: "AI could not reliably infer preferences from the provided data.",
             errorMessage: "The AI assistant could not infer preferences at this time."
         };
       }
       return {
         userId: input.userId,
-        suggestedPreferences: output.suggestedPreferences,
-        confidence: output.confidence,
+        suggestedPreferences: { // Ensure all parts of suggestedPreferences are at least defaulted if not present from LLM
+          motivations: output.suggestedPreferences.motivations || undefined,
+          locationPreference: output.suggestedPreferences.locationPreference || { isSensitive: false },
+          tradeTimingPreference: output.suggestedPreferences.tradeTimingPreference || 'flexible',
+          interestedInThirdPartyFulfillment: output.suggestedPreferences.interestedInThirdPartyFulfillment === undefined ? true : output.suggestedPreferences.interestedInThirdPartyFulfillment,
+        },
+        confidence: output.confidence, // This should be present if output is valid
         reasoning: output.reasoning,
       };
     } catch (error: any) {
       console.error(`Error in ${flowName} calling prompt:`, error);
-      let userMessage = "An unexpected error occurred while trying to infer user preferences.";
        try {
         console.error(`Detailed error object in ${flowName}:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
         console.error(`Could not stringify detailed error object in ${flowName}:`, e);
       }
 
+      let userMessage = "An unexpected error occurred while trying to infer user preferences.";
       const lowerErrorMessage = error.message?.toLowerCase() || "";
+
       if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
         userMessage = "The preference inference service has reached its current usage limit.";
       } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
