@@ -38,6 +38,7 @@ async function getUserProfile(userId: string): Promise<User | null> {
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
 const tradeTimingTextMap: Record<TradeTimingPreference, string> = { 'simultaneous': 'Prefers Simultaneous', 'staged': 'Open to Staged Trades', 'flexible': 'Flexible Timing', };
+
 const deliveryMethodDisplayMapConcrete: Record<ItemDeliveryMethod, string> = {
   pickup_only: "Pickup",
   willing_to_ship: "Willing to Ship",
@@ -45,6 +46,18 @@ const deliveryMethodDisplayMapConcrete: Record<ItemDeliveryMethod, string> = {
   possible_delivery: "Possible Delivery",
   public_meetup: "Public Meetup",
   flexible_meetup: "Flexible Meetup",
+};
+
+const getThirdPartyFulfillmentSimpleText = (interested?: boolean): string => {
+    if (interested === true) return "Open to it";
+    if (interested === false) return "Prefers direct trades";
+    return "Not Specified";
+};
+
+const getChainDeliveryBadgeText = (openToChain?: boolean): string => {
+    if (openToChain === true) return "Chain Delivery: Yes";
+    if (openToChain === false) return "Chain Delivery: No";
+    return "Chain Delivery: Not Specified";
 };
 
 
@@ -204,12 +217,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     }
   }
   
-  const getThirdPartyFulfillmentSimpleText = (interested?: boolean): string => {
-    if (interested === true) return "Open to it";
-    if (interested === false) return "Prefers direct trades";
-    return "Not Specified";
-  };
-
   return (
     <div className="space-y-8">
       <Card className="overflow-hidden">
@@ -270,32 +277,31 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           <div>
             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location &amp; Delivery:</h4>
             <div className="space-y-1 pl-5">
-              <Badge variant={user.locationPreference?.isSensitive ? "secondary" : "outline"} className="text-xs">
-                {user.locationPreference?.isSensitive ? "Location Sensitive" : "Location Flexible"}
-              </Badge>
-              {user.locationPreference?.isSensitive && user.locationPreference.notes && (
-                <p className="text-xs text-muted-foreground font-body italic">{user.locationPreference.notes}</p>
-              )}
-              {preferredLocation && (
-                <div className="flex items-center gap-1.5 text-xs">
-                  {preferredLocationIcon}
-                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-auto max-w-full truncate">
-                    {preferredLocation.name}{preferredLocation.address ? ` (${preferredLocation.address})` : ''}
-                  </Badge>
-                </div>
-              )}
-              {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 && (
+                <Badge variant={user.locationPreference?.isSensitive ? "secondary" : "outline"} className="text-xs">
+                    {user.locationPreference?.isSensitive ? "Location Sensitive" : "Location Flexible"}
+                </Badge>
+                {user.locationPreference?.isSensitive && user.locationPreference.notes && (
+                    <p className="text-xs text-muted-foreground font-body italic">{user.locationPreference.notes}</p>
+                )}
+                {preferredLocation && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                    {preferredLocationIcon}
+                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-auto max-w-full truncate">
+                        {preferredLocation.name}{preferredLocation.address ? ` (${preferredLocation.address})` : ''}
+                    </Badge>
+                    </div>
+                )}
+                {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 && (
                 <div className="text-xs pt-0.5">
-                  <span className="font-medium text-muted-foreground">Preferred Methods: </span>
-                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    <div className="flex flex-wrap gap-1 mt-0.5">
                     {user.logisticsPreferences.defaultDeliveryMethods.map(method => (
-                      <Badge key={method} variant="outline" className="text-xs cursor-default py-0.5 px-1.5">
+                        <Badge key={method} variant="outline" className="text-xs cursor-default py-0.5 px-1.5">
                         {deliveryMethodDisplayMapConcrete[method] || method}
-                      </Badge>
+                        </Badge>
                     ))}
-                  </div>
+                    </div>
                 </div>
-              )}
+                )}
             </div>
           </div>
 
@@ -307,20 +313,19 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           )}
           
           <div>
-            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>Fulfillment Options:</h4>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5">
-                <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">3rd Party:</span>
-                    <Badge variant={user.interestedInThirdPartyFulfillment ? "default" : (user.interestedInThirdPartyFulfillment === false ? "secondary" : "outline")} className="text-xs">
-                        {getThirdPartyFulfillmentSimpleText(user.interestedInThirdPartyFulfillment)}
-                    </Badge>
-                </div>
-                <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground">Chain Delivery:</span>
-                    <Badge variant="outline" className="text-xs">
-                        {user.logisticsPreferences?.openToChainDelivery === true ? "Yes" : user.logisticsPreferences?.openToChainDelivery === false ? "No" : "Not Specified"}
-                    </Badge>
-                </div>
+            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:
+            </h4>
+            <div className="flex flex-wrap items-center gap-1.5 pl-5">
+                <Badge variant={user.interestedInThirdPartyFulfillment ? "default" : (user.interestedInThirdPartyFulfillment === false ? "secondary" : "outline")} className="text-xs">
+                    {getThirdPartyFulfillmentSimpleText(user.interestedInThirdPartyFulfillment)}
+                </Badge>
+                <Badge 
+                  variant={user.logisticsPreferences?.openToChainDelivery === true ? 'default' : (user.logisticsPreferences?.openToChainDelivery === false ? 'secondary' : 'outline')} 
+                  className="text-xs"
+                >
+                  {getChainDeliveryBadgeText(user.logisticsPreferences?.openToChainDelivery)}
+                </Badge>
             </div>
           </div>
           
@@ -359,5 +364,4 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
-
     
