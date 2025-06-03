@@ -98,77 +98,13 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
   </div>
 );
 
-const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
+const deliveryMethodDisplayMapConcrete: Record<ItemDeliveryMethod, string> = {
   pickup_only: "Pickup",
   willing_to_ship: "Willing to Ship",
   delivery_area: "Delivery Area",
   possible_delivery: "Possible Delivery",
   public_meetup: "Public Meetup",
   flexible_meetup: "Flexible Meetup",
-};
-
-const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile }: { logisticsPreferences?: UserLogisticsPreferences, locations?: UserStoredLocation[], isOwnProfile: boolean }) => {
-  if (!logisticsPreferences && (!locations || locations.length === 0)) {
-    return (
-      <CardContent className="pt-2">
-        <p className="text-muted-foreground font-body">Logistics preferences not set up yet.</p>
-        {isOwnProfile && (
-          <Button variant="outline" size="sm" className="mt-3" disabled>
-            <Edit3 className="mr-2 h-4 w-4" /> Set Up Logistics
-          </Button>
-        )}
-      </CardContent>
-    );
-  }
-
-  const preferredLocation = logisticsPreferences?.preferredStoredLocationId && locations
-    ? locations.find(loc => loc.id === logisticsPreferences.preferredStoredLocationId)
-    : null;
-
-  return (
-    <CardContent className="space-y-4 pt-2">
-      <div className="p-3 border rounded-lg bg-background shadow-sm space-y-2">
-        <div className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-muted-foreground" />
-            <span className="font-headline text-md">Delivery Methods</span>
-        </div>
-        {logisticsPreferences?.defaultDeliveryMethods && logisticsPreferences.defaultDeliveryMethods.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {logisticsPreferences.defaultDeliveryMethods.map(method => (
-              <Badge key={method} variant="outline" className="text-xs cursor-default">
-                {deliveryMethodDisplayMap[method] || method}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-             <p className="text-xs text-muted-foreground font-body">No default delivery methods set.</p>
-        )}
-      </div>
-
-       <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
-            <div className="flex items-center gap-2">
-                {preferredLocation ? (
-                    preferredLocation.name.toLowerCase().includes('work') || preferredLocation.name.toLowerCase().includes('office') ? 
-                    <Briefcase className="h-5 w-5 text-muted-foreground" /> : 
-                    <Home className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                    <MapPin className="h-5 w-5 text-muted-foreground" />
-                )}
-                <span className="font-headline text-md">Location</span>
-            </div>
-            <Badge variant="outline" className="text-xs px-2 py-1 h-auto max-w-[200px] truncate cursor-default">
-                {preferredLocation ? `${preferredLocation.name} ${preferredLocation.address ? `(${preferredLocation.address.substring(0,20)}${preferredLocation.address.length > 20 ? '...' : ''})` : '(Address not set)'}` : 
-                (logisticsPreferences?.preferredStoredLocationId ? `ID: ${logisticsPreferences.preferredStoredLocationId}` : 'Not set')}
-            </Badge>
-        </div>
-        
-      {isOwnProfile && (
-        <Button variant="outline" size="sm" className="mt-4 w-full md:w-auto" disabled>
-          <Edit3 className="mr-2 h-4 w-4" /> Edit Logistics Preferences
-        </Button>
-      )}
-    </CardContent>
-  );
 };
 
 
@@ -256,13 +192,19 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
   
   const effectiveMinimumMatchRating = user.minimumMatchRating;
 
-  const getThirdPartyFulfillmentText = () => {
-    let baseText = user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades";
-    if (user.interestedInThirdPartyFulfillment && user.logisticsPreferences?.openToChainDelivery) {
-      baseText += " (incl. Chain Delivery)";
+  const preferredLocation = user.logisticsPreferences?.preferredStoredLocationId && user.locations
+    ? user.locations.find(loc => loc.id === user.logisticsPreferences.preferredStoredLocationId)
+    : null;
+
+  let preferredLocationIcon = <MapPin className="h-4 w-4 text-muted-foreground"/>;
+  if (preferredLocation) {
+    if (preferredLocation.name.toLowerCase().includes('work') || preferredLocation.name.toLowerCase().includes('office')) {
+        preferredLocationIcon = <Briefcase className="h-4 w-4 text-muted-foreground"/>;
+    } else if (preferredLocation.name.toLowerCase().includes('home') || preferredLocation.name.toLowerCase().includes('house') || preferredLocation.name.toLowerCase().includes('apt')) {
+        preferredLocationIcon = <Home className="h-4 w-4 text-muted-foreground"/>;
     }
-    return baseText;
-  };
+  }
+
 
   return (
     <div className="space-y-8">
@@ -289,7 +231,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
         <CardHeader>
           <div className="flex justify-between items-start flex-wrap gap-2">
             <div className="flex-grow">
-                <CardTitle className="font-headline text-xl flex items-center gap-3"><Sparkles className="h-6 w-6 text-primary" />Trading Style & Preferences</CardTitle>
+                <CardTitle className="font-headline text-xl flex items-center gap-3"><Sparkles className="h-6 w-6 text-primary" />Trading Style &amp; Preferences</CardTitle>
                 <CardDescription className="font-body mt-1">Insights into how {user.name} likes to trade. {isOwnProfile && allowAutoPreferenceInference && "Click the button to let AI analyze your activity and suggest updates!"}</CardDescription>
             </div>
             {isOwnProfile && allowAutoPreferenceInference && (
@@ -315,13 +257,50 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
                 variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"} 
                 className="text-xs"
             >
-                {getThirdPartyFulfillmentText()}
+                {user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}
+            </Badge>
+          </div>
+           <div>
+            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Network className="h-4 w-4 text-muted-foreground"/>Chain Delivery:</h4>
+            <Badge 
+                variant={user.logisticsPreferences?.openToChainDelivery ? "default" : (user.logisticsPreferences?.openToChainDelivery === false ? "secondary" : "outline")} 
+                className="text-xs"
+            >
+                {user.logisticsPreferences?.openToChainDelivery === true ? "Yes" : (user.logisticsPreferences?.openToChainDelivery === false ? "No" : "Not Specified")}
             </Badge>
           </div>
           {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
-          {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Preference:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
+          {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Sensitivity:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
           {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
           
+          {/* Moved Logistics Preferences Here */}
+          <div>
+             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">{preferredLocationIcon}Preferred Item Location:</h4>
+              <Badge variant="outline" className="text-xs px-2 py-1 h-auto max-w-full truncate">
+                {preferredLocation ? `${preferredLocation.name}${preferredLocation.address ? ` (${preferredLocation.address})` : ''}` : 
+                (user.logisticsPreferences?.preferredStoredLocationId ? `Stored ID: ${user.logisticsPreferences.preferredStoredLocationId} (Not Found)` : 'Not set')}
+              </Badge>
+          </div>
+           <div>
+             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground"/>Default Delivery Methods:</h4>
+             {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                    {user.logisticsPreferences.defaultDeliveryMethods.map(method => (
+                    <Badge key={method} variant="outline" className="text-xs cursor-default">
+                        {deliveryMethodDisplayMapConcrete[method] || method}
+                    </Badge>
+                    ))}
+                </div>
+                ) : (
+                    <Badge variant="outline" className="text-xs">Not specified</Badge>
+             )}
+          </div>
+          {isOwnProfile && (
+            <Button variant="outline" size="sm" className="mt-4 w-full md:w-auto" disabled>
+                <Edit3 className="mr-2 h-4 w-4" /> Edit All Preferences
+            </Button>
+          )}
+
           {isOwnProfile && allowAutoPreferenceInference && (
             <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4">
                  <CollapsibleTrigger asChild>
@@ -347,34 +326,13 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       </Card>
 
       <Separator />
-
-       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center flex-wrap gap-2">
-            <CardTitle className="font-headline text-xl flex items-center gap-3">
-              <Truck className="h-6 w-6 text-primary" />Logistics Preferences
-            </CardTitle>
-          </div>
-           <CardDescription className="font-body mt-1">
-            These are {user.name}&apos;s general settings for item location and delivery methods. Individual items can override these.
-          </CardDescription>
-        </CardHeader>
-        <DefaultLogisticsDisplay 
-            logisticsPreferences={user.logisticsPreferences} 
-            locations={user.locations}
-            isOwnProfile={isOwnProfile}
-        />
-      </Card>
-
-
-      <Separator />
       <section><h2 className="text-2xl font-headline mb-4 flex items-center gap-2"><Gift className="h-6 w-6 text-green-600" />Items Offered ({offeredItems.length})</h2>{offeredItems.length > 0 ? <ItemList items={offeredItems} /> : <p className="text-muted-foreground font-body">This user has no items currently offered for trade.</p>}</section>
       <Separator />
       <section><h2 className="text-2xl font-headline mb-4 flex items-center gap-2"><Search className="h-6 w-6 text-blue-600" />Items Wanted ({wantedItems.length})</h2>{wantedItems.length > 0 ? <ItemList items={wantedItems} /> : <p className="text-muted-foreground font-body">This user is not currently looking for any specific items.</p>}</section>
       <Separator />
-      <section><h2 className="text-2xl font-headline mb-4">Trade & Fulfillment History ({tradedOrFulfilledItems.length})</h2>{tradedOrFulfilledItems.length > 0 ? <ItemList items={tradedOrFulfilledItems} /> : <p className="text-muted-foreground font-body">No completed trades or fulfilled wants yet.</p>}</section>
+      <section><h2 className="text-2xl font-headline mb-4">Trade &amp; Fulfillment History ({tradedOrFulfilledItems.length})</h2>{tradedOrFulfilledItems.length > 0 ? <ItemList items={tradedOrFulfilledItems} /> : <p className="text-muted-foreground font-body">No completed trades or fulfilled wants yet.</p>}</section>
       <Separator />
-      <section><h2 className="text-2xl font-headline mb-4">User Reviews & Ratings</h2><Card><CardContent className="p-6"><p className="text-muted-foreground font-body">User reviews and ratings will be displayed here.</p></CardContent></Card></section>
+      <section><h2 className="text-2xl font-headline mb-4">User Reviews &amp; Ratings</h2><Card><CardContent className="p-6"><p className="text-muted-foreground font-body">User reviews and ratings will be displayed here.</p></CardContent></Card></section>
     </div>
   );
 }
