@@ -1,4 +1,6 @@
 
+"use client"; // Added "use client" directive
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
@@ -15,9 +17,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { suggestMatchingItems, type ItemMatchInput, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
-import type { AIMatchingMode } from '@/services/ai-config-service'; // Simplified
+import type { AIMatchingMode } from '@/services/ai-config-service';
 import ItemList from '@/components/items/ItemList';
-import { useState, useEffect } from 'react'; // For Admin Panel state
+import { useState, useEffect } from 'react';
 
 
 // Helper function to find item and owner (simulates data fetching)
@@ -25,7 +27,7 @@ async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User
   const item = dummyItems.find((i) => i.id === itemId);
   if (!item) return null;
   const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) return null; 
+  if (!owner) return null;
   return { item, owner };
 }
 
@@ -41,7 +43,7 @@ function TemporaryAdminMatchTestPanel({ itemToTest }: { itemToTest: Item | null 
   const [testError, setTestError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
 
-  const currentViewingUser = dummyUsers[0]; 
+  const currentViewingUser = dummyUsers[0];
 
   const handleRunTestSuggestions = async () => {
     if (!itemToTest) {
@@ -130,7 +132,7 @@ function TemporaryAdminMatchTestPanel({ itemToTest }: { itemToTest: Item | null 
                 id={`test-mode-switch-${itemToTest.id}`}
                 checked={testMatchingMode === 'advanced'}
                 onCheckedChange={(checked) => setTestMatchingMode(checked ? 'advanced' : 'simple')}
-                disabled={true} 
+                disabled={true}
               />
               <Label htmlFor={`test-mode-switch-${itemToTest.id}`} className="font-headline text-sm">Use Advanced Matching (Currently Ignored by Flow)</Label>
             </div>
@@ -293,7 +295,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
               </CardContent>
             </Card>
           )}
-          
+
           {item.status === 'pending' && (
               <Card className="border-yellow-500">
                   <CardHeader>
@@ -303,7 +305,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                   </CardHeader>
                   <CardContent>
                       <p className="font-body text-yellow-700">
-                        {item.listingType === 'offer' 
+                        {item.listingType === 'offer'
                           ? "This item is currently part of a pending trade negotiation."
                           : "This want listing is currently in discussion for fulfillment."
                         }
@@ -320,7 +322,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                   </CardHeader>
                   <CardContent>
                       <p className="font-body text-red-700">
-                        {item.listingType === 'offer' 
+                        {item.listingType === 'offer'
                           ? "This item has already been traded."
                           : "This want listing has been successfully fulfilled."
                         }
