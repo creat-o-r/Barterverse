@@ -116,11 +116,6 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
     possible_delivery: "Possible Delivery",
   };
 
-  const meetupOptionMap = {
-    public_meetup: "Public Meetup Preferred",
-    flexible: "Flexible Meetup",
-  };
-
   const preferredLocation = logisticsPreferences?.preferredStoredLocationId && locations
     ? locations.find(loc => loc.id === logisticsPreferences.preferredStoredLocationId)
     : null;
@@ -131,22 +126,11 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
         <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
           <div className="flex items-center gap-2">
             <Truck className="h-5 w-5 text-muted-foreground" />
-            <span className="font-headline text-md">Shipping</span>
+            <span className="font-headline text-md">Delivery</span>
           </div>
           <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto">
             {shippingOptionMap[logisticsPreferences.defaultShippingOption] || logisticsPreferences.defaultShippingOption}
           </Button>
-        </div>
-      )}
-      {logisticsPreferences?.defaultMeetupOption && (
-         <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
-            <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-muted-foreground" />
-                <span className="font-headline text-md">Meetup</span>
-            </div>
-            <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto">
-                {meetupOptionMap[logisticsPreferences.defaultMeetupOption] || logisticsPreferences.defaultMeetupOption}
-            </Button>
         </div>
       )}
        <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
@@ -158,7 +142,7 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
                 ) : (
                     <MapPin className="h-5 w-5 text-muted-foreground" />
                 )}
-                <span className="font-headline text-md">Preferred Item Location</span>
+                <span className="font-headline text-md">Item Location</span>
             </div>
             <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto max-w-[200px] truncate">
                 {preferredLocation ? `${preferredLocation.name} ${preferredLocation.address ? `(${preferredLocation.address.substring(0,20)}${preferredLocation.address.length > 20 ? '...' : ''})` : '(Address not set)'}` : 
@@ -344,7 +328,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
             </CardTitle>
           </div>
            <CardDescription className="font-body mt-1">
-            These are {user.name}&apos;s general settings for item location, shipping, and meetups. Individual items can override these.
+            These are {user.name}&apos;s general settings for item location and delivery. Individual items can override these.
           </CardDescription>
         </CardHeader>
         <DefaultLogisticsDisplay 

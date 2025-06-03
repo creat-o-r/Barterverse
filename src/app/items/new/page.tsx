@@ -26,7 +26,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data';
-import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemLogisticsShippingOption, ItemLogisticsMeetupOption, ItemLogistics } from '@/types';
+import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemLogisticsShippingOption, ItemLogistics } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 
@@ -45,11 +45,7 @@ const itemFormSchema = z.object({
   itemSpecificAddress: z.string().optional(),
   shippingOption: z.custom<ItemLogisticsShippingOption>(
     (val) => ['pickup_only', 'ship_domestic', 'ship_international', 'delivery_area', 'possible_delivery'].includes(val as string),
-    { message: "Invalid shipping option." }
-  ),
-  meetupOption: z.custom<ItemLogisticsMeetupOption>(
-    (val) => ['public_meetup', 'flexible'].includes(val as string),
-    { message: "Invalid meetup option." }
+    { message: "Invalid delivery option." }
   ),
   logisticsNotes: z.string().optional(),
 }).refine(data => {
@@ -70,11 +66,6 @@ const shippingOptionMapConcrete: Record<ItemLogisticsShippingOption, string> = {
   ship_international: "Willing to Ship (International)",
   delivery_area: "Delivery Area (Specify in Notes)",
   possible_delivery: "Possible Delivery (Discuss)",
-};
-
-const meetupOptionMapConcrete: Record<ItemLogisticsMeetupOption, string> = {
-  public_meetup: "Public Meetup Preferred",
-  flexible: "Flexible Meetup",
 };
 
 
@@ -106,42 +97,51 @@ export default function NewItemPage() {
       selectedLocationIdentifier: ITEM_SPECIFIC_LOCATION_VALUE,
       itemSpecificAddress: '',
       shippingOption: 'pickup_only',
-      meetupOption: 'flexible',
       logisticsNotes: '',
     },
   });
   
-  useEffect(() => {
+ useEffect(() => {
     if (currentUser && form.reset) {
+        const name = form.getValues('name');
+        const description = form.getValues('description');
+        const category = form.getValues('category');
+        const imageUrl = form.getValues('imageUrl');
+        const listingType = form.getValues('listingType');
+        const isGiftItForward = form.getValues('isGiftItForward');
+        const logisticsNotes = form.getValues('logisticsNotes');
+        // Preserve existing form state for non-logistics fields if they exist
+        
         let defaultSelectedLocationId: string = ITEM_SPECIFIC_LOCATION_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
 
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
             defaultSelectedLocationId = preferredStoredLocId;
         } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
+            // Fallback to first stored location if preferred is not set or invalid
             defaultSelectedLocationId = currentUser.locations[0].id;
         }
+        // If no stored locations or preferred, it remains ITEM_SPECIFIC_LOCATION_VALUE
 
         form.reset({
-            name: form.getValues('name') || '',
-            description: form.getValues('description') || '',
-            category: form.getValues('category') || '',
-            imageUrl: form.getValues('imageUrl') || '',
-            listingType: form.getValues('listingType') || 'offer',
+            name: name || '',
+            description: description || '',
+            category: category || '',
+            imageUrl: imageUrl || '',
+            listingType: listingType || 'offer',
             minimumMatchRatingOverride: form.getValues('minimumMatchRatingOverride') || currentUser.minimumMatchRating || 'Low',
-            isGiftItForward: form.getValues('isGiftItForward') || false,
+            isGiftItForward: isGiftItForward || false,
             
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (form.getValues('itemSpecificAddress') || '') : '',
             shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'pickup_only',
-            meetupOption: currentUser.logisticsPreferences?.defaultMeetupOption || 'flexible',
-            logisticsNotes: form.getValues('logisticsNotes') || '',
+            logisticsNotes: logisticsNotes || '',
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser]);
+  }, [currentUser, form.reset]); // Added form.reset dependency
 
-  const listingType = form.watch('listingType');
+  const listingTypeWatch = form.watch('listingType');
   const selectedLocationIdentifierWatch = form.watch('selectedLocationIdentifier');
 
   const handleAiSuggestions = useCallback(async () => {
@@ -205,7 +205,6 @@ export default function NewItemPage() {
           selectedUserStoredLocationId: storedLocationIdForLogistics,
           itemSpecificAddress: specificAddressForLogistics,
           shippingOption: data.shippingOption,
-          meetupOption: data.meetupOption,
           notes: data.logisticsNotes,
       };
 
@@ -247,7 +246,6 @@ export default function NewItemPage() {
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: '',
             shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'pickup_only',
-            meetupOption: currentUser.logisticsPreferences?.defaultMeetupOption || 'flexible',
             logisticsNotes: '',
         });
       } else {
@@ -336,7 +334,7 @@ export default function NewItemPage() {
 
                 <FormField control={form.control} name="shippingOption" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Shipping</FormLabel>
+                    <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -348,21 +346,7 @@ export default function NewItemPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-
-                <FormField control={form.control} name="meetupOption" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-headline flex items-center gap-2"><Users2 className="h-5 w-5 text-muted-foreground" />Meetup Preference</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                         {Object.entries(meetupOptionMapConcrete).map(([key, label]) => (
-                            <SelectItem key={key} value={key as ItemLogisticsMeetupOption}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                
                  <FormField
                   control={form.control}
                   name="logisticsNotes"
@@ -384,7 +368,7 @@ export default function NewItemPage() {
                 />
               </section>
               
-              {listingType === 'offer' && (<FormField control={form.control} name="isGiftItForward" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoadingOverall} id="isGiftItForward"/></FormControl><div className="space-y-1 leading-none"><FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2"><HeartHandshake className="h-5 w-5 text-pink-500" />Gift It Forward</FormLabel><FormDescription className="font-body">Offer this item freely, no direct trade expected.</FormDescription></div></FormItem>)} />)}
+              {listingTypeWatch === 'offer' && (<FormField control={form.control} name="isGiftItForward" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoadingOverall} id="isGiftItForward"/></FormControl><div className="space-y-1 leading-none"><FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2"><HeartHandshake className="h-5 w-5 text-pink-500" />Gift It Forward</FormLabel><FormDescription className="font-body">Offer this item freely, no direct trade expected.</FormDescription></div></FormItem>)} />)}
               
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
                 {isLoadingOverall ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting...' : (isInferringListingType ? 'Inferring...' : 'Loading...'))}</>) : (`Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`)}

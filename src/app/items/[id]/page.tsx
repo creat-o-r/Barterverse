@@ -3,7 +3,7 @@ import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User, ItemLogistics, UserStoredLocation, ItemLogisticsShippingOption, ItemLogisticsMeetupOption } from '@/types';
+import type { Item, User, ItemLogistics, UserStoredLocation, ItemLogisticsShippingOption } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -30,11 +30,6 @@ const shippingOptionDisplayMap: Record<ItemLogisticsShippingOption, string> = {
   possible_delivery: "Possible Delivery (Discuss)",
 };
 
-const meetupOptionDisplayMap: Record<ItemLogisticsMeetupOption, string> = {
-  public_meetup: "Public Meetup Preferred",
-  flexible: "Flexible Meetup",
-};
-
 function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, owner: User }) {
   if (!logistics) {
     return <p className="text-sm text-muted-foreground font-body">Logistics details not specified for this item.</p>;
@@ -47,6 +42,7 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
     locationDisplay = logistics.itemSpecificAddress;
   } else { 
+    // Fallback if item logistics are incomplete, check owner's preferred default
     const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
     const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
     if (defaultLoc) {
@@ -61,13 +57,10 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
         <p className="text-sm text-foreground/90 font-body pl-5">{locationDisplay}</p>
       </div>
       <div>
-        <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Shipping:</h4>
+        <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Delivery:</h4>
         <p className="text-sm text-foreground/90 font-body pl-5">{shippingOptionDisplayMap[logistics.shippingOption] || "Not specified"}</p>
       </div>
-      <div>
-        <h4 className="font-headline text-md flex items-center gap-1.5"><Users2 className="h-4 w-4 text-muted-foreground" /> Meetup:</h4>
-        <p className="text-sm text-foreground/90 font-body pl-5">{meetupOptionDisplayMap[logistics.meetupOption] || "Not specified"}</p>
-      </div>
+      
       {logistics.notes && (
         <div>
           <h4 className="font-headline text-md flex items-center gap-1.5"><Edit2 className="h-4 w-4 text-muted-foreground" /> Notes:</h4>

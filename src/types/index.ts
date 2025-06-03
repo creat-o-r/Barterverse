@@ -40,8 +40,8 @@ export type UserStoredLocation = {
 };
 
 export type UserLogisticsPreferences = {
-  defaultShippingOption: ItemLogisticsShippingOption; // Updated to use the main type
-  defaultMeetupOption: ItemLogisticsMeetupOption; // Updated to use the main type
+  defaultShippingOption: ItemLogisticsShippingOption;
+  // defaultMeetupOption: ItemLogisticsMeetupOption; // Removed
   preferredStoredLocationId?: string;
 };
 
@@ -60,14 +60,14 @@ export type User = {
 
 export type ItemLogisticsLocationType = 'profile_stored_location' | 'item_specific_location';
 export type ItemLogisticsShippingOption = 'pickup_only' | 'ship_domestic' | 'ship_international' | 'delivery_area' | 'possible_delivery';
-export type ItemLogisticsMeetupOption = 'public_meetup' | 'flexible';
+// export type ItemLogisticsMeetupOption = 'public_meetup' | 'flexible'; // Removed
 
 export type ItemLogistics = {
   locationType: ItemLogisticsLocationType;
   selectedUserStoredLocationId?: string;
   itemSpecificAddress?: string;
   shippingOption: ItemLogisticsShippingOption;
-  meetupOption: ItemLogisticsMeetupOption;
+  // meetupOption: ItemLogisticsMeetupOption; // Removed
   notes?: string;
 };
 

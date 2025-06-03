@@ -1,5 +1,5 @@
 
-import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics, ItemLogisticsShippingOption, ItemLogisticsMeetupOption } from '@/types';
+import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics, ItemLogisticsShippingOption } from '@/types';
 import type { InferredUserPreferences } from '@/types';
 
 export const dummyUsers: User[] = [
@@ -23,7 +23,6 @@ export const dummyUsers: User[] = [
     ],
     logisticsPreferences: {
       defaultShippingOption: 'ship_domestic',
-      defaultMeetupOption: 'public_meetup',
       preferredStoredLocationId: 'user1_home',
     },
   },
@@ -46,7 +45,6 @@ export const dummyUsers: User[] = [
     ],
     logisticsPreferences: {
       defaultShippingOption: 'pickup_only',
-      defaultMeetupOption: 'flexible',
       preferredStoredLocationId: 'user2_apt',
     },
   },
@@ -65,8 +63,7 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'staged' as TradeTimingPreference,
     minimumMatchRating: 'Low',
     logisticsPreferences: {
-      defaultShippingOption: 'delivery_area', // Example of new option
-      defaultMeetupOption: 'flexible',
+      defaultShippingOption: 'delivery_area', 
     },
   },
   {
@@ -84,8 +81,7 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
     minimumMatchRating: 'High',
     logisticsPreferences: {
-      defaultShippingOption: 'possible_delivery', // Example of new option
-      defaultMeetupOption: 'public_meetup',
+      defaultShippingOption: 'possible_delivery', 
     }
   },
   {
@@ -104,7 +100,6 @@ export const dummyUsers: User[] = [
     minimumMatchRating: 'Medium',
     logisticsPreferences: {
         defaultShippingOption: 'pickup_only',
-        defaultMeetupOption: 'public_meetup',
     }
   },
 ];
@@ -127,7 +122,6 @@ export let dummyItems: Item[] = [
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
       shippingOption: 'ship_domestic',
-      meetupOption: 'public_meetup',
       notes: "Can also meet downtown on weekdays."
     }
   },
@@ -147,7 +141,6 @@ export let dummyItems: Item[] = [
       locationType: 'item_specific_location',
       itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
       shippingOption: 'pickup_only',
-      meetupOption: 'flexible',
     }
   },
   {
@@ -166,7 +159,6 @@ export let dummyItems: Item[] = [
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
       shippingOption: 'ship_domestic',
-      meetupOption: 'public_meetup',
     }
   },
   {
@@ -185,7 +177,6 @@ export let dummyItems: Item[] = [
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
       shippingOption: 'pickup_only',
-      meetupOption: 'flexible',
     }
   },
   {
@@ -203,8 +194,7 @@ export let dummyItems: Item[] = [
      logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Balcony Garden",
-      shippingOption: 'delivery_area', // Example of new option
-      meetupOption: 'flexible',
+      shippingOption: 'delivery_area', 
     }
   },
   {
@@ -219,6 +209,11 @@ export let dummyItems: Item[] = [
     status: 'traded',
     listingType: 'offer',
     isGiftItForward: false,
+     logistics: { // Added example logistics for a traded item
+      locationType: 'item_specific_location',
+      itemSpecificAddress: "Charlie's Workshop",
+      shippingOption: 'ship_domestic',
+    }
   },
   {
     id: 'item7',
@@ -232,6 +227,11 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     minimumMatchRatingOverride: 'Medium',
+    logistics: { // Wants can also have logistics if it implies how they'd receive
+      locationType: 'profile_stored_location',
+      selectedUserStoredLocationId: 'user1_home',
+      shippingOption: 'ship_domestic', // Means they are okay with it being shipped to them
+    }
   },
   {
     id: 'item8',
@@ -244,6 +244,11 @@ export let dummyItems: Item[] = [
     ownerName: 'Bob Barterer',
     status: 'available',
     listingType: 'want',
+    logistics: {
+      locationType: 'profile_stored_location',
+      selectedUserStoredLocationId: 'user2_apt',
+      shippingOption: 'pickup_only', // Means they want to pick it up
+    }
   },
   {
     id: 'item9',
@@ -260,8 +265,7 @@ export let dummyItems: Item[] = [
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Diana's Boutique",
-        shippingOption: 'possible_delivery', // Example of new option
-        meetupOption: 'public_meetup'
+        shippingOption: 'possible_delivery', 
     }
   },
   {
@@ -275,10 +279,15 @@ export let dummyItems: Item[] = [
     ownerName: 'Diana Doodad',
     status: 'available',
     listingType: 'want',
+    logistics: {
+        locationType: 'item_specific_location', // User 4 doesn't have stored locations in this dummy data
+        itemSpecificAddress: 'Diana Doodad Wants This Shipped To: 12Collector Lane',
+        shippingOption: 'ship_international',
+    }
   },
   {
     id: 'item11',
-    name: '4-Person Camping Tent (Gift It Forward)',
+    name: '4-Person Camping Tent (Gift It Forward!)',
     description: 'Spacious 4-person dome tent. Used twice, in great condition. Includes rainfly and carrying bag. Perfect for family camping trips. Offering this as a gift to a good home!',
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'camping tent',
@@ -292,7 +301,6 @@ export let dummyItems: Item[] = [
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Garage",
         shippingOption: 'pickup_only',
-        meetupOption: 'public_meetup'
     }
   },
   {
@@ -311,7 +319,6 @@ export let dummyItems: Item[] = [
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Home Gym",
         shippingOption: 'pickup_only',
-        meetupOption: 'public_meetup'
     }
   },
   {
@@ -330,7 +337,6 @@ export let dummyItems: Item[] = [
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_work',
       shippingOption: 'ship_domestic',
-      meetupOption: 'public_meetup',
     }
   },
   {
@@ -344,6 +350,11 @@ export let dummyItems: Item[] = [
     ownerName: 'Charlie Swapper',
     status: 'available',
     listingType: 'want',
+    logistics: {
+        locationType: 'item_specific_location', // Charlie has no stored locations
+        itemSpecificAddress: "Charlie Swapper wants this delivered locally if possible.",
+        shippingOption: 'delivery_area',
+    }
   }
 ];
 
@@ -398,16 +409,16 @@ export function addNewItemToDummyData(
   }
 
   let finalLogistics: ItemLogistics;
-  if (itemData.logistics) {
+  if (itemData.logistics) { // This case should now always be true from the form
     finalLogistics = {
         locationType: itemData.logistics.locationType,
         selectedUserStoredLocationId: itemData.logistics.locationType === 'profile_stored_location' ? itemData.logistics.selectedUserStoredLocationId : undefined,
         itemSpecificAddress: itemData.logistics.locationType === 'item_specific_location' ? itemData.logistics.itemSpecificAddress : undefined,
         shippingOption: itemData.logistics.shippingOption,
-        meetupOption: itemData.logistics.meetupOption,
         notes: itemData.logistics.notes,
     };
   } else {
+    // Fallback - should ideally not be hit if form sends full logistics
     let defaultLocType: 'profile_stored_location' | 'item_specific_location' = 'item_specific_location';
     let defaultStoredId: string | undefined = undefined;
     if (owner.logisticsPreferences?.preferredStoredLocationId && owner.locations?.find(l => l.id === owner.logisticsPreferences?.preferredStoredLocationId)) {
@@ -423,7 +434,7 @@ export function addNewItemToDummyData(
         selectedUserStoredLocationId: defaultStoredId,
         itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
         shippingOption: owner.logisticsPreferences?.defaultShippingOption || 'pickup_only',
-        meetupOption: owner.logisticsPreferences?.defaultMeetupOption || 'flexible',
+        notes: '',
     };
   }
 
