@@ -194,14 +194,12 @@ export default function MatchReportsPage() {
             <Button onClick={fetchReports} disabled={isLoadingReports} variant="outline" size="sm"><RefreshCw className={`mr-2 h-4 w-4 ${isLoadingReports ? 'animate-spin' : ''}`} />Refresh Logs</Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="max-h-[70vh] overflow-y-auto">
           {isLoadingReports ? (
              <div className="text-center py-12 text-muted-foreground font-body flex items-center justify-center gap-2"><RefreshCw className="h-5 w-5 animate-spin" /> Loading suggestion logs...</div>
           ) : reports.length === 0 ? (
             <p className="text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</p>
           ) : (
-            // The Table component itself has an internal div with "overflow-auto".
-            // We rely on this for scrolling, combined with min-w-full on the table element.
             <Table className="min-w-full">
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
