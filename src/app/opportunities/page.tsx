@@ -26,7 +26,7 @@ async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; own
 }
 
 // Item display component for this page
-function OpportunityItemDisplay({ item, owner, label, itemTypeLabel }: { item: Item; owner: User; label: string; itemTypeLabel: string }) {
+function OpportunityItemDisplay({ item, owner, label }: { item: Item; owner: User; label: string; }) {
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
@@ -35,7 +35,6 @@ function OpportunityItemDisplay({ item, owner, label, itemTypeLabel }: { item: I
             {item.listingType === 'offer' ? <Gift className="h-6 w-6 text-green-600" /> : <Search className="h-6 w-6 text-blue-600" />}
             {label}
           </CardTitle>
-           <Badge variant="outline" className="capitalize">{itemTypeLabel}</Badge>
         </div>
         <CardDescription className="font-body">{item.name}</CardDescription>
       </CardHeader>
@@ -113,7 +112,6 @@ export default function OpportunityMatchPage() {
 
   // Determine labels for display
   let mainItemDisplayLabel = "Context Item";
-  let mainItemTypeLabel = mainItem.listingType;
   if (mainItem.ownerId === currentUserId) {
     mainItemDisplayLabel = mainItem.listingType === 'offer' ? "Your Offer" : "Your Want";
   } else {
@@ -121,7 +119,6 @@ export default function OpportunityMatchPage() {
   }
 
   let suggestedItemDisplayLabel = suggestedItem.listingType === 'offer' ? "Matching Offer" : "Matching Want";
-  let suggestedItemTypeLabel = suggestedItem.listingType;
 
 
   // --- Trade ID and Chat Button Text Logic ---
@@ -175,13 +172,13 @@ export default function OpportunityMatchPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6 items-start">
-            <OpportunityItemDisplay item={mainItem} owner={mainItemOwner} label={mainItemDisplayLabel} itemTypeLabel={mainItemTypeLabel} />
+            <OpportunityItemDisplay item={mainItem} owner={mainItemOwner} label={mainItemDisplayLabel} />
             <div className="hidden md:flex flex-col items-center justify-center h-full pt-16">
                 <ArrowRightLeft className="h-12 w-12 text-muted-foreground my-4" />
                 <Badge variant="secondary">Potential Match</Badge>
             </div>
             <div className="md:hidden my-4"> <Separator /> </div>
-            <OpportunityItemDisplay item={suggestedItem} owner={suggestedItemOwner} label={suggestedItemDisplayLabel} itemTypeLabel={suggestedItemTypeLabel} />
+            <OpportunityItemDisplay item={suggestedItem} owner={suggestedItemOwner} label={suggestedItemDisplayLabel} />
           </div>
           <Separator />
           <div className="text-center">
