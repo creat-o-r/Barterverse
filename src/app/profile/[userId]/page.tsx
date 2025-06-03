@@ -10,42 +10,67 @@ import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-serv
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2 } from 'lucide-react';
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 
 async function getUserProfile(userId: string): Promise<User | null> {
   const actualUserId = userId === 'me' ? dummyUsers[0].id : userId;
   const user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
-  // Ensure items are up-to-date if dummyItems was modified elsewhere (though less likely for this direct fetch)
   user.items = dummyItems.filter(item => item.ownerId === user.id);
-  return JSON.parse(JSON.stringify(user)); // Return a deep copy to avoid direct state mutation issues
+  return JSON.parse(JSON.stringify(user));
 }
 
+const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
+const tradeTimingTextMap: Record<TradeTimingPreference, string> = { 'simultaneous': 'Prefers Simultaneous', 'staged': 'Open to Staged Trades', 'flexible': 'Flexible Timing', };
+
+
+// Updated to generate more dynamic summary based on user's current preferences
 const generateMockActivitySummaryForUser = (user: User | null): string => {
   if (!user) return "No user data available to generate activity summary.";
-  let summary = `Activity Analysis for ${user.name} (ID: ${user.id}):\n`;
-  const userItems = dummyItems.filter(i => i.ownerId === user.id); // Use current dummyItems state
-  const offers = userItems.filter(i => i.listingType === 'offer' && (i.status === 'available' || i.status === 'pending')).slice(0, 2);
-  const wants = userItems.filter(i => i.listingType === 'want' && (i.status === 'available' || i.status === 'pending')).slice(0, 1);
+  let summary = `Activity Analysis for ${user.name} (ID: ${user.id}) to refine preferences:\n`;
+  const userItems = dummyItems.filter(i => i.ownerId === user.id);
+  const offers = userItems.filter(i => i.listingType === 'offer' && (i.status === 'available' || i.status === 'pending')).slice(0, 3);
+  const wants = userItems.filter(i => i.listingType === 'want' && (i.status === 'available' || i.status === 'pending')).slice(0, 2);
 
   if (offers.length > 0) {
     summary += "\nRecent Offers Listed:\n";
-    offers.forEach(item => { summary += `- "${item.name}" (Category: ${item.category})\n`; });
+    offers.forEach(item => { summary += `- "${item.name}" (Category: ${item.category}, Desc: "...${item.description.substring(0, 50)}...")\n`; });
   }
   if (wants.length > 0) {
     summary += "\nRecent Wants Listed:\n";
-    wants.forEach(item => { summary += `- "${item.name}" (Seeking in ${item.category})\n`; });
+    wants.forEach(item => { summary += `- "${item.name}" (Seeking in ${item.category}, Desc: "...${item.description.substring(0, 50)}...")\n`; });
   }
-  summary += "\nGeneral Chat Behavior (Illustrative):\n";
-  if (user.id === 'user1') summary += "- Often expresses desire for unique finds and enjoys community interaction. Open to shipping.\n";
-  else if (user.id === 'user2') summary += "- Appears focused on getting fair value, prefers direct trades, sometimes mentions local pickup.\n";
-  else summary += "- Seems flexible and prioritizes convenient, friendly exchanges.\n";
+  
+  summary += "\nContext from Current Profile Settings (for AI refinement):\n";
+  if (user.motivations && user.motivations.length > 0) {
+    summary += `- Currently expressed motivations: ${user.motivations.map(m => motivationTextMap[m] || m).join(', ')}.\n`;
+  }
+  if (user.locationPreference) {
+    summary += `- Current location preference: ${user.locationPreference.isSensitive ? 'Sensitive' : 'Flexible'}. ${user.locationPreference.notes ? `Details: "${user.locationPreference.notes}"` : ''}\n`;
+  }
+  if (user.tradeTimingPreference) {
+    summary += `- Current preferred trade timing: ${tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}.\n`;
+  }
+  if (user.interestedInThirdPartyFulfillment !== undefined) {
+    summary += `- Current interest in 3rd party fulfillment: ${user.interestedInThirdPartyFulfillment ? 'Yes' : 'No'}.\n`;
+  }
+  if (!user.motivations?.length && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined) {
+    summary += "- User has not specified detailed trading preferences yet. AI should analyze overall activity.\n";
+  } else {
+    summary += "- User has some explicit preferences set; AI can use these as a baseline for refinement.\n"
+  }
+  
+  if (user.tradesCompleted > 5) {
+     summary += "- User has a history of completed trades, suggesting engagement.\n";
+  }
+  summary += "- User is actively seeking to update/refine their preferences via AI.\n";
   return summary.trim();
 };
 
@@ -57,42 +82,46 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
   </div>
 );
 
-const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
-const tradeTimingTextMap: Record<TradeTimingPreference, string> = { 'simultaneous': 'Prefers Simultaneous', 'staged': 'Open to Staged Trades', 'flexible': 'Flexible Timing', };
-
 export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
-  const resolvedParams = use(paramsProp); 
+  const params = use(paramsProp); 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [allowAutoPreferenceInference, setAllowAutoPreferenceInference] = useState(false);
   const [isLearningPreferences, setIsLearningPreferences] = useState(false);
+  const [showActivityForAI, setShowActivityForAI] = useState(false);
+  const [activitySummaryForAI, setActivitySummaryForAI] = useState<string>('');
   const { toast } = useToast();
 
-  const currentViewingUserId = dummyUsers[0].id; // Simulate current logged-in user
-  const isOwnProfile = resolvedParams.userId === 'me' || resolvedParams.userId === currentViewingUserId;
+  const currentViewingUserId = dummyUsers[0].id; 
+  const isOwnProfile = params.userId === 'me' || params.userId === currentViewingUserId;
 
   useEffect(() => {
-    async function loadData() {
+    async function loadUserProfile() {
       setLoading(true);
-      const profile = await getUserProfile(resolvedParams.userId);
+      const profile = await getUserProfile(params.userId);
       setUser(profile);
       if (isOwnProfile) {
         const allowInference = await getEnableAutomaticPreferenceInference();
         setAllowAutoPreferenceInference(allowInference);
+        if (profile) {
+            setActivitySummaryForAI(generateMockActivitySummaryForUser(profile));
+        }
       }
       setLoading(false);
     }
-    if (resolvedParams.userId) {
-        loadData();
+    if (params.userId) {
+        loadUserProfile();
     }
-  }, [resolvedParams.userId, isOwnProfile]); 
+  }, [params.userId, isOwnProfile]); 
 
   const handleLearnPreferences = async () => {
     if (!user) return;
     setIsLearningPreferences(true);
+    const currentActivitySummary = generateMockActivitySummaryForUser(user); // Generate fresh summary
+    setActivitySummaryForAI(currentActivitySummary); // Update for display if collapsible is open
+
     try {
-      const activitySummary = generateMockActivitySummaryForUser(user);
-      const input: InferUserPreferencesInput = { userId: user.id, activitySummary };
+      const input: InferUserPreferencesInput = { userId: user.id, activitySummary: currentActivitySummary };
       const result: InferUserPreferencesOutput = await inferUserPreferences(input);
 
       if (result.errorMessage || !result.suggestedPreferences) {
@@ -100,9 +129,8 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       } else {
         const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences);
         if (updateSuccess) {
-          // Re-fetch user to reflect updated preferences from dummyData
           const updatedProfile = await getUserProfile(user.id);
-          setUser(updatedProfile); // This will trigger re-render with new preferences
+          setUser(updatedProfile); 
           toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
         } else {
           toast({ title: "Error Updating Preferences", description: "Could not save the learned preferences locally.", variant: "destructive" });
@@ -150,16 +178,18 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="font-headline text-xl flex items-center gap-3"><Sparkles className="h-6 w-6 text-primary" />Trading Style & Preferences</CardTitle>
+          <div className="flex justify-between items-start flex-wrap gap-2">
+            <div className="flex-grow">
+                <CardTitle className="font-headline text-xl flex items-center gap-3"><Sparkles className="h-6 w-6 text-primary" />Trading Style & Preferences</CardTitle>
+                <CardDescription className="font-body mt-1">Insights into how {user.name} likes to trade. {isOwnProfile && allowAutoPreferenceInference && "Click the button to let AI analyze your activity and suggest updates!"}</CardDescription>
+            </div>
             {isOwnProfile && allowAutoPreferenceInference && (
-              <Button onClick={handleLearnPreferences} disabled={isLearningPreferences} size="sm" variant="outline">
+              <Button onClick={handleLearnPreferences} disabled={isLearningPreferences} size="sm" variant="outline" className="whitespace-nowrap">
                 {isLearningPreferences ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4 text-accent" />}
                 {isLearningPreferences ? "AI Learning..." : "AI, Update My Preferences"}
               </Button>
             )}
           </div>
-          <CardDescription className="font-body">Insights into how {user.name} likes to trade. {isOwnProfile && allowAutoPreferenceInference && "Click the button to let AI analyze your (mock) activity and suggest updates!"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
           <div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4><Badge variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"} className="text-xs">{user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}</Badge></div>
@@ -167,6 +197,28 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Preference:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
           {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
           {(!user.motivations || user.motivations.length === 0) && !user.locationPreference && !user.tradeTimingPreference && (<p className="text-sm text-muted-foreground font-body">No specific preferences set yet.</p>)}
+        
+          {isOwnProfile && allowAutoPreferenceInference && (
+            <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4">
+                 <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full flex justify-between items-center text-left text-xs text-muted-foreground hover:text-foreground">
+                        <span>{showActivityForAI ? 'Hide' : 'Show'} Activity Summary Sent to AI for Preference Update</span>
+                        {showActivityForAI ? <ChevronUp className="h-4 w-4 ml-2 shrink-0" /> : <ChevronDown className="h-4 w-4 ml-2 shrink-0" />}
+                    </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 space-y-2">
+                    <div className="p-3 bg-muted/30 rounded-md border">
+                    <h4 className="font-headline text-xs mb-1.5 flex items-center gap-1.5">
+                        <FileText className="h-4 w-4 text-muted-foreground"/>
+                        Activity Summary for AI
+                    </h4>
+                    <pre className="text-xs font-code whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
+                        {activitySummaryForAI || "No activity summary generated yet."}
+                    </pre>
+                    </div>
+                </CollapsibleContent>
+            </Collapsible>
+          )}
         </CardContent>
       </Card>
 
