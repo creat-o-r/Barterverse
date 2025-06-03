@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { UserMotivation, TradeTimingPreference, InferredUserPreferences } from '@/types'; // Adjusted import
+import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference } from '@/types';
 
 // Define Zod enums based on string literal types from src/types for consistency
 const UserMotivationEnum = z.enum(['help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds']);
@@ -155,82 +155,96 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
       const {output} = await prompt(processedInput);
 
-      if (!output) {
-        console.warn(`${flowName}: Prompt returned a null/undefined output object.`);
-        return {
-            userId: input.userId,
-            suggestedPreferences: {
-                locationPreference: { isSensitive: false },
-                tradeTimingPreference: 'flexible',
-                interestedInThirdPartyFulfillment: true,
-            },
-            confidence: 'Low',
-            reasoning: "AI failed to generate a response for preference inference. The model may be temporarily unavailable or did not provide data.",
-            errorMessage: "The AI assistant did not return a valid response. This might be due to a model issue or temporary service problem."
-        };
-      }
-      
+      // Initialize default values for the return structure
       let finalSuggestedPreferences: InferredUserPreferences = {
-        locationPreference: { isSensitive: false },
-        tradeTimingPreference: 'flexible',
+        locationPreference: { isSensitive: false } as UserProfileLocationPreference,
+        tradeTimingPreference: 'flexible' as TradeTimingPreference,
         interestedInThirdPartyFulfillment: true,
         motivations: undefined,
       };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
-      let reasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Using default values for some preferences.";
+      // Default reasoning if AI response is problematic
+      let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values have been applied for some preferences.";
       let errorMessage: string | undefined = undefined;
 
+      if (!output) {
+        console.warn(`${flowName}: Prompt returned a null or undefined output object.`);
+        baseReasoning = "AI failed to generate a response for preference inference. The model may be temporarily unavailable or did not provide data.";
+        errorMessage = "The AI assistant did not return a valid response. This might be due to a model issue or temporary service problem.";
+      } else {
+        // Process suggestedPreferences carefully
+        if (output.suggestedPreferences && typeof output.suggestedPreferences === 'object') {
+          finalSuggestedPreferences.motivations = Array.isArray(output.suggestedPreferences.motivations) 
+            ? output.suggestedPreferences.motivations.filter((m: any) => UserMotivationEnum.safeParse(m).success) as UserMotivation[]
+            : undefined;
 
-      if (output.suggestedPreferences && typeof output.suggestedPreferences === 'object') {
-        finalSuggestedPreferences = {
-          motivations: output.suggestedPreferences.motivations || undefined,
-          locationPreference: output.suggestedPreferences.locationPreference || { isSensitive: false },
-          tradeTimingPreference: output.suggestedPreferences.tradeTimingPreference || 'flexible',
-          interestedInThirdPartyFulfillment: output.suggestedPreferences.interestedInThirdPartyFulfillment === undefined ? true : output.suggestedPreferences.interestedInThirdPartyFulfillment,
-        };
-        // Confidence must exist and be one of the enum values.
+          if (output.suggestedPreferences.locationPreference && typeof output.suggestedPreferences.locationPreference === 'object') {
+            finalSuggestedPreferences.locationPreference = {
+              isSensitive: typeof output.suggestedPreferences.locationPreference.isSensitive === 'boolean' ? output.suggestedPreferences.locationPreference.isSensitive : false,
+              notes: typeof output.suggestedPreferences.locationPreference.notes === 'string' ? output.suggestedPreferences.locationPreference.notes : undefined,
+            };
+          } else {
+            // If locationPreference is missing or not an object, keep default.
+             finalSuggestedPreferences.locationPreference = { isSensitive: false } as UserProfileLocationPreference;
+            if (output.suggestedPreferences.locationPreference !== undefined) { // only add error if it was present but malformed
+                errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for location preference was malformed.";
+            }
+          }
+
+          finalSuggestedPreferences.tradeTimingPreference = TradeTimingPreferenceEnum.safeParse(output.suggestedPreferences.tradeTimingPreference).success
+            ? output.suggestedPreferences.tradeTimingPreference
+            : 'flexible';
+          
+          finalSuggestedPreferences.interestedInThirdPartyFulfillment = typeof output.suggestedPreferences.interestedInThirdPartyFulfillment === 'boolean' 
+            ? output.suggestedPreferences.interestedInThirdPartyFulfillment 
+            : true;
+        } else {
+          console.warn(`${flowName}: Prompt output was missing 'suggestedPreferences' or it was not an object. Output received:`, JSON.stringify(output, null, 2));
+          errorMessage = (errorMessage ? errorMessage + " " : "") + "The AI's response for preferences was malformed or incomplete. Default preferences have been applied.";
+          baseReasoning = "AI response for preferences was malformed. Using default values.";
+          // Confidence will remain 'Low' as initialized
+        }
+
+        // Process confidence
         if (output.confidence && ['High', 'Medium', 'Low'].includes(output.confidence)) {
             confidence = output.confidence;
         } else {
             console.warn(`${flowName}: Prompt output had missing or invalid 'confidence' field. Defaulting to 'Low'. Received confidence:`, output.confidence);
-            confidence = 'Low';
-            reasoning += " Confidence defaulted to Low due to missing/invalid value from AI.";
-            errorMessage = errorMessage || "AI response for confidence was missing or invalid.";
+            confidence = 'Low'; 
+            baseReasoning += " Confidence defaulted to Low due to missing/invalid value from AI.";
+            errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for confidence was missing or invalid.";
         }
-        reasoning = output.reasoning || (confidence === 'Low' ? "AI provided some preferences but with low confidence or incomplete reasoning." : "Preferences inferred by AI.");
-      } else {
-        console.warn(`${flowName}: Prompt output was missing or had an invalid 'suggestedPreferences' field. Output received:`, JSON.stringify(output, null, 2));
-        errorMessage = "The AI's response for preferences was malformed or incomplete. Default preferences have been applied.";
-        reasoning = "AI response for preferences was malformed. Using default values.";
-        confidence = 'Low'; // Explicitly set low confidence if suggestedPreferences is bad
+        
+        // Process reasoning (if provided and valid, otherwise use the baseReasoning)
+        baseReasoning = typeof output.reasoning === 'string' && output.reasoning.trim() !== '' ? output.reasoning : baseReasoning;
       }
       
       return {
         userId: input.userId,
         suggestedPreferences: finalSuggestedPreferences,
         confidence: confidence,
-        reasoning: reasoning.trim(),
-        errorMessage: errorMessage,
+        reasoning: baseReasoning.trim(),
+        errorMessage: errorMessage ? errorMessage.trim() : undefined,
       };
 
     } catch (error: any) {
-      console.error(`Error in ${flowName} calling prompt:`, error);
-       try {
+      // Log basic error info first, as stringify can fail
+      console.error(`${flowName} - Caught Error Name: ${error.name}, Message: ${error.message}`);
+      
+      // Then attempt detailed logging
+      try {
         const errorDetails = {
           name: error.name,
           message: error.message,
-          stack: error.stack?.substring(0, 500), // Limit stack trace length
+          stack: error.stack?.substring(0, 500), 
           cause: error.cause,
-          // Genkit specific error details if available
-          ...(error.isGenkitError && {
-            isGenkitError: true,
-            details: error.details,
-            statusCode: error.statusCode,
-          }),
+          isGenkitError: error.isGenkitError,
+          details: error.isGenkitError ? error.details : undefined,
+          statusCode: error.isGenkitError ? error.statusCode : undefined,
         };
         console.error(`Detailed error object in ${flowName}:`, JSON.stringify(errorDetails, null, 2));
       } catch (e) {
-        console.error(`Could not stringify detailed error object in ${flowName}. Raw error:`, error);
+        console.error(`Could not stringify detailed error object in ${flowName}. Raw error object:`, error);
       }
 
       let userMessage = "An unexpected error occurred while trying to infer user preferences.";
@@ -246,17 +260,17 @@ const inferUserPreferencesFlow = ai.defineFlow(
         userMessage = "The AI's response for preferences was not in the expected format. This might indicate a schema validation issue.";
       }
       
-      console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error message: "${error.message || 'N/A'}".`);
+      console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${error.name} - ${error.message || 'N/A'}".`);
 
       return {
         userId: input.userId,
         suggestedPreferences: {
-            locationPreference: { isSensitive: false},
-            tradeTimingPreference: 'flexible',
+            locationPreference: { isSensitive: false} as UserProfileLocationPreference,
+            tradeTimingPreference: 'flexible' as TradeTimingPreference,
             interestedInThirdPartyFulfillment: true,
         },
         confidence: 'Low',
-        reasoning: "Failed to infer preferences due to system error.",
+        reasoning: "Failed to infer preferences due to a system error. Default preferences applied.",
         errorMessage: userMessage
       };
     }
