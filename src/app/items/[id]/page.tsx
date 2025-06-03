@@ -6,20 +6,175 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, HelpingHand } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, HelpingHand, Settings, Loader2, AlertCircle, Link2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { suggestMatchingItems, type ItemMatchInput, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
+import type { AIMatchingMode } from '@/services/ai-config-service'; // Simplified
+import ItemList from '@/components/items/ItemList';
+import { useState, useEffect } from 'react'; // For Admin Panel state
+
 
 // Helper function to find item and owner (simulates data fetching)
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
   const item = dummyItems.find((i) => i.id === itemId);
   if (!item) return null;
   const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) return null; // Should not happen with consistent dummy data
+  if (!owner) return null; 
   return { item, owner };
 }
+
+// Temporary Admin Panel for testing matching logic FOR THIS ITEM
+function TemporaryAdminMatchTestPanel({ itemToTest }: { itemToTest: Item | null }) {
+  const [testMatchingMode, setTestMatchingMode] = useState<AIMatchingMode>('simple');
+  const [testUseUserPrefs, setTestUseUserPrefs] = useState(false);
+  const [testSuggestions, setTestSuggestions] = useState<(Item & { matchScore: string })[]>([]);
+  const [testReasoning, setTestReasoning] = useState<string | null>(null);
+  const [testPrefsConsidered, setTestPrefsConsidered] = useState<boolean>(false);
+  const [testModeUsed, setTestModeUsed] = useState<AIMatchingMode | undefined>(undefined);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  const currentViewingUser = dummyUsers[0]; 
+
+  const handleRunTestSuggestions = async () => {
+    if (!itemToTest) {
+      setTestError("Item to test not available.");
+      return;
+    }
+    setTestLoading(true);
+    setTestError(null);
+    setTestSuggestions([]);
+    setTestReasoning(null);
+    setTestModeUsed(undefined);
+    setTestPrefsConsidered(false);
+
+    const otherAvailableItems = dummyItems.filter(
+      (item) => item.id !== itemToTest.id &&
+                 (item.status === 'available' || item.status === 'pending')
+    ).map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        ownerId: item.ownerId,
+        listingType: item.listingType,
+    }));
+
+    try {
+      const inputForFlow: ItemMatchInput = {
+        triggeringUserId: currentViewingUser.id,
+        currentItem: {
+          id: itemToTest.id,
+          name: itemToTest.name,
+          description: itemToTest.description,
+          category: itemToTest.category,
+          ownerId: itemToTest.ownerId,
+          listingType: itemToTest.listingType,
+        },
+        availableItems: otherAvailableItems,
+      };
+
+      // The simplified item-match-flow ignores testUseUserPrefs and testMatchingMode.
+      // This panel primarily observes the current (simple) flow's behavior.
+      const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
+
+      setTestPrefsConsidered(result.preferencesConsidered);
+      setTestModeUsed(result.usedMatchingMode);
+
+      const augmentedMatchedItems = (result.suggestedMatches || []).map(match => {
+        const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
+        return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+      }).filter(Boolean) as (Item & { matchScore: string })[];
+
+      setTestSuggestions(augmentedMatchedItems);
+      setTestReasoning(result.reasoning || "No specific reasoning provided by AI.");
+      if (result.reasoning && (result.reasoning.toLowerCase().includes('error') || result.reasoning.toLowerCase().includes('could not process'))) {
+        setTestError(result.reasoning);
+      }
+
+    } catch (err: any) {
+      setTestError(err.message || "An unknown error occurred during test suggestion.");
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  if (!itemToTest) return null;
+
+  return (
+    <Card className="mt-8 border-dashed border-primary/50">
+      <Collapsible open={panelOpen} onOpenChange={setPanelOpen} className="w-full">
+        <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full flex justify-between items-center text-left mb-0 py-3 px-4 hover:bg-primary/10">
+                <span className="font-headline text-md flex items-center gap-2 text-primary">
+                    <Settings className="h-5 w-5" />
+                    Admin: Test AI Suggestions for &quot;{itemToTest.name}&quot;
+                </span>
+                <span className="text-xs">{panelOpen ? "Hide Panel" : "Show Panel"}</span>
+            </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="p-4 space-y-4 border-t border-dashed border-primary/30">
+            <CardDescription className="text-xs font-body mb-2">
+              Test the AI matching logic specifically for this item. Note: The underlying flow is currently simplified and may not use all test parameters.
+            </CardDescription>
+            <div className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
+              <Switch
+                id={`test-mode-switch-${itemToTest.id}`}
+                checked={testMatchingMode === 'advanced'}
+                onCheckedChange={(checked) => setTestMatchingMode(checked ? 'advanced' : 'simple')}
+                disabled={true} 
+              />
+              <Label htmlFor={`test-mode-switch-${itemToTest.id}`} className="font-headline text-sm">Use Advanced Matching (Currently Ignored by Flow)</Label>
+            </div>
+            <div className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
+              <Switch
+                id={`test-prefs-switch-${itemToTest.id}`}
+                checked={testUseUserPrefs}
+                onCheckedChange={setTestUseUserPrefs}
+                disabled={true}
+              />
+              <Label htmlFor={`test-prefs-switch-${itemToTest.id}`} className="font-headline text-sm">Consider User Profile Preferences (Currently Ignored by Flow)</Label>
+            </div>
+            <Button onClick={handleRunTestSuggestions} disabled={testLoading || !itemToTest} size="sm">
+              {testLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
+              Run Test AI Suggestions
+            </Button>
+
+            {testLoading && <p className="text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Fetching test suggestions...</p>}
+            {testError && (
+              <div className="p-3 border border-destructive bg-destructive/10 rounded-md text-destructive text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <p>{testError}</p>
+              </div>
+            )}
+            {!testLoading && !testError && (testSuggestions.length > 0 || testReasoning) && (
+              <div className="mt-4 space-y-3">
+                <h4 className="font-headline text-md">Test Results:</h4>
+                {testReasoning && <p className="text-xs italic text-muted-foreground">Reasoning: {testReasoning}</p>}
+                <p className="text-xs text-muted-foreground">AI Preferences Considered: <Badge variant={testPrefsConsidered ? "default" : "secondary"}>{testPrefsConsidered ? 'Yes' : 'No'}</Badge></p>
+                <p className="text-xs text-muted-foreground">AI Matching Mode Used: <Badge variant={testModeUsed === 'advanced' ? "default" : "secondary"}>{testModeUsed || 'N/A'}</Badge></p>
+                {testSuggestions.length > 0 ? (
+                  <ItemList items={testSuggestions} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No items suggested by this test run.</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+    </Collapsible>
+    </Card>
+  );
+}
+
 
 export default async function ItemDetailPage({ params }: { params: { id: string } }) {
   const itemDetails = await getItemDetails(params.id);
@@ -29,6 +184,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
   }
 
   const { item, owner } = itemDetails;
+  const isCurrentUserOwner = item.ownerId === dummyUsers[0].id; // Assuming dummyUsers[0] is current user
 
   return (
     <>
@@ -107,8 +263,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             </CardFooter>
           </Card>
 
-          {/* Trade initiation / Contact for 'available' items */}
-          {item.status === 'available' && item.listingType === 'offer' && item.ownerId !== dummyUsers[0].id && ( // Assuming dummyUsers[0] is current user
+          {!isCurrentUserOwner && item.status === 'available' && item.listingType === 'offer' && (
             <Card>
               <CardHeader>
                   <CardTitle className="font-headline text-xl flex items-center gap-2">
@@ -122,7 +277,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             </Card>
           )}
 
-          {item.status === 'available' && item.listingType === 'want' && item.ownerId !== dummyUsers[0].id && ( // Assuming dummyUsers[0] is current user
+          {!isCurrentUserOwner && item.status === 'available' && item.listingType === 'want' && (
             <Card>
               <CardHeader>
                 <CardTitle className="font-headline text-xl flex items-center gap-2">
@@ -134,13 +289,11 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
                 <p className="text-sm font-body text-muted-foreground mb-4">
                   If you have an item that matches "{item.name}" which {owner.name} is looking for, you can initiate a discussion.
                 </p>
-                 {/* This could be an ItemTradeInitiationContent if offering one of your items, or a general message button */}
                 <ItemTradeInitiationContent item={item} ownerName={owner.name} ownerId={owner.id} />
               </CardContent>
             </Card>
           )}
           
-          {/* Status indicators for non-available items */}
           {item.status === 'pending' && (
               <Card className="border-yellow-500">
                   <CardHeader>
@@ -178,13 +331,16 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
         </div>
       </div>
 
-      {/* AI Suggested Matches/Fulfillments for 'available' items not owned by current user */}
-      {item.status === 'available' && item.ownerId !== dummyUsers[0].id && (
+      {/* AI Suggested Matches/Fulfillments (only if not owner and item available) */}
+      {!isCurrentUserOwner && item.status === 'available' && (
         <div className="mt-12">
           <Separator className="my-8" />
           <SuggestedMatches currentItem={item} />
         </div>
       )}
+
+      {/* Admin Panel for testing AI suggestions for THIS item */}
+      <TemporaryAdminMatchTestPanel itemToTest={item} />
     </>
   );
 }
