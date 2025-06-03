@@ -204,6 +204,24 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     }
   }
 
+  const getThirdPartyFulfillmentDisplayText = (
+    interested?: boolean,
+    openToChain?: boolean
+  ): string => {
+    if (interested === true) {
+      if (openToChain === true) {
+        return "Open to it (incl. Chain Delivery)";
+      } else if (openToChain === false) {
+        return "Open to it (Chain Delivery: No)";
+      } else {
+        return "Open to it (Chain Delivery: Not Specified)";
+      }
+    } else if (interested === false) {
+      return "Prefers direct trades";
+    }
+    return "Not Specified";
+  };
+
 
   return (
     <div className="space-y-8">
@@ -215,7 +233,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
             <RatingStarsDisplay score={user.rating} count={user.tradesCompleted} />
             <p className="font-body text-muted-foreground mt-2 max-w-xl">{user.bio || "This user hasn't added a bio yet."}</p>
           </div>
-          {isOwnProfile ? (<Button variant="outline"><Edit3 className="mr-2 h-4 w-4" /> Edit Profile</Button>) : (<Button variant="default" className="bg-primary hover:bg-primary/90"><MessageSquare className="mr-2 h-4 w-4" /> Message User</Button>)}
+          {isOwnProfile ? (<Button variant="outline" disabled><Edit3 className="mr-2 h-4 w-4" /> Edit Profile</Button>) : (<Button variant="default" className="bg-primary hover:bg-primary/90"><MessageSquare className="mr-2 h-4 w-4" /> Message User</Button>)}
         </CardHeader>
         <CardContent className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div className="p-4 bg-background rounded-lg"><Gift className="h-8 w-8 text-green-600 mx-auto mb-2"/><p className="text-2xl font-headline">{user.items.filter(i => i.listingType === 'offer').length}</p><p className="text-sm text-muted-foreground font-body">Items Offered</p></div>
@@ -252,7 +270,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           </div>
           {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
           
-          {/* Consolidated Location Section */}
           <div>
             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location &amp; Delivery:</h4>
             <div className="space-y-2 pl-5">
@@ -263,16 +280,14 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
                 
                 <div className="flex items-center gap-1.5 text-xs">
                     {preferredLocationIcon}
-                    <span className="text-muted-foreground">Preferred Spot:</span>
                     <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-auto max-w-full truncate">
                     {preferredLocation ? `${preferredLocation.name}${preferredLocation.address ? ` (${preferredLocation.address})` : ''}` : 
-                    (user.logisticsPreferences?.preferredStoredLocationId ? `Stored ID: ${user.logisticsPreferences.preferredStoredLocationId} (Not Found)` : 'Not set')}
+                    (user.logisticsPreferences?.preferredStoredLocationId ? `Stored ID: ${user.logisticsPreferences.preferredStoredLocationId} (Not Found)` : 'Preferred spot not set')}
                     </Badge>
                 </div>
-
+                
                 {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 && (
                     <div className="text-xs">
-                        <span className="text-muted-foreground mr-1.5">Default Delivery Methods:</span>
                         <div className="flex flex-wrap gap-1 pt-0.5">
                             {user.logisticsPreferences.defaultDeliveryMethods.map(method => (
                             <Badge key={method} variant="outline" className="text-xs cursor-default py-0.5 px-1.5">
@@ -287,32 +302,24 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
 
           {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
           
-          <div>
-            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4>
-            <Badge 
-                variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"} 
+          {user.interestedInThirdPartyFulfillment !== undefined && (
+            <div>
+              <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                3rd Party Fulfillments:
+              </h4>
+              <Badge
+                variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"}
                 className="text-xs"
-            >
-                {user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}
-            </Badge>
-          </div>
-
-          <div>
-             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Network className="h-4 w-4 text-muted-foreground"/>Chain Delivery:</h4>
-            <Badge 
-                variant={user.logisticsPreferences?.openToChainDelivery ? "default" : (user.logisticsPreferences?.openToChainDelivery === false ? "secondary" : "outline")} 
-                className="text-xs"
-            >
-                {user.logisticsPreferences?.openToChainDelivery === true ? "Yes" : (user.logisticsPreferences?.openToChainDelivery === false ? "No" : "Not Specified")}
-            </Badge>
-          </div>
-          
-          {isOwnProfile && (
-            <Button variant="outline" size="sm" className="mt-4 w-full md:w-auto" disabled>
-                <Edit3 className="mr-2 h-4 w-4" /> Edit All Preferences
-            </Button>
+              >
+                {getThirdPartyFulfillmentDisplayText(
+                  user.interestedInThirdPartyFulfillment,
+                  user.logisticsPreferences?.openToChainDelivery
+                )}
+              </Badge>
+            </div>
           )}
-
+          
           {isOwnProfile && allowAutoPreferenceInference && (
             <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4">
                  <CollapsibleTrigger asChild>
