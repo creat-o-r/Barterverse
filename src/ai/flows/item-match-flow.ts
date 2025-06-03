@@ -123,7 +123,7 @@ Do not suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}) as direct matches for their own items.
 
-Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
+Respond with a list of up to 5 suggested matches if available, each including the 'itemId' and its 'matchScore'. Aim for variety if multiple good options exist.
 If no good matches are found (or none meet the minimum rating if specified), return an empty list for 'suggestedMatches' AND provide a brief reasoning.
 Optionally, if matches are found, provide a brief (1-2 sentences) overall reasoning for your suggestions.
   `,
@@ -185,7 +185,7 @@ Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
-Return a list of 'suggestedMatches' (itemId, matchScore), ensuring ALL suggested items meet the applicable minimum match score rule mentioned above.
+Return a list of up to 5 suggested matches (itemId, matchScore) if available, ensuring ALL suggested items meet the applicable minimum match score rule mentioned above. Aim for variety and strong reciprocal potential if multiple good options exist.
 If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential if significant.
 If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
   `,
