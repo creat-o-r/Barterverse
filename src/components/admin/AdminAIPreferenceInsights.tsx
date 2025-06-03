@@ -2,9 +2,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { User, Item, UserMotivation, TradeTimingPreference, InferUserPreferencesOutput as RealInferUserPreferencesOutput } from '@/types';
+import type { User, Item as FullItemType, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType } from '@/types';
 import { dummyUsers, dummyItems } from '@/lib/dummy-data';
-import { inferUserPreferences, type InferUserPreferencesInput } from '@/ai/flows/infer-user-preferences-flow';
+import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,6 @@ import { FileText, Brain, ChevronDown, ChevronUp, UserCircle as UserIconLucide, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { useToast } from "@/hooks/use-toast";
-
-type AIPreferenceSuggestions = RealInferUserPreferencesOutput['suggestedPreferences'];
 
 const motivationTextMap: Record<UserMotivation, string> = {
   'help-others': 'Helping Others',
@@ -31,97 +29,62 @@ const tradeTimingTextMap: Record<TradeTimingPreference, string> = {
   'flexible': 'Flexible Timing',
 };
 
-const generateActivitySummaryForUser = (user?: User): string => {
-  if (!user) return "No user selected to generate activity summary.";
-  let summary = `Activity Analysis Target for ${user.name} (ID: ${user.id}):\n`;
-  const userItems = dummyItems.filter(i => i.ownerId === user.id);
-  const offers = userItems.filter(i => i.listingType === 'offer' && (i.status === 'available' || i.status === 'pending')).slice(0, 3);
-  const wants = userItems.filter(i => i.listingType === 'want' && (i.status === 'available' || i.status === 'pending')).slice(0, 2);
+const preparePreferenceInferenceInputForAdmin = (user?: User): InferUserPreferencesInput | null => {
+  if (!user) return null;
 
-  if (offers.length > 0) {
-    summary += "\nRecent Offers Listed by User:\n";
-    offers.forEach(item => {
-      summary += `- "${item.name}" (Category: ${item.category}, Desc: "...${item.description.substring(0, 50)}...")\n`;
-    });
-  }
-  if (wants.length > 0) {
-    summary += "\nRecent Wants Listed by User:\n";
-    wants.forEach(item => {
-      summary += `- "${item.name}" (Seeking in ${item.category}, Desc: "...${item.description.substring(0, 50)}...")\n`;
-    });
-  }
+  const userListedItems = dummyItems
+    .filter(i => i.ownerId === user.id && (i.status === 'available' || i.status === 'pending'))
+    .slice(0, 5) // Take up to 5 items for brevity in admin demo
+    .map(item => ({
+      name: item.name,
+      description: item.description.substring(0,100) + (item.description.length > 100 ? "..." : ""), // Truncate
+      category: item.category,
+      listingType: item.listingType,
+    }));
 
-  summary += "\nDerived Behavioral Notes & Current Preferences (for AI analysis):\n";
-  if (user.motivations && user.motivations.length > 0) {
-    summary += `- Current motivations suggest focus on: ${user.motivations.map(m => motivationTextMap[m] || m).join(', ')}.\n`;
-  }
-  if (user.locationPreference) {
-    summary += `- Location preference is ${user.locationPreference.isSensitive ? 'sensitive' : 'flexible'}. ${user.locationPreference.notes ? `Notes: "${user.locationPreference.notes}"` : ''}\n`;
-  }
-  if (user.tradeTimingPreference) {
-    summary += `- Indicated trade timing preference: ${tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}.\n`;
-  }
-  if (user.interestedInThirdPartyFulfillment !== undefined) {
-    summary += `- Openness to 3rd party fulfillment: ${user.interestedInThirdPartyFulfillment ? 'Yes' : 'No'}.\n`;
-  }
+  const currentPrefs: UserProfilePreferencesType | undefined = {
+    motivations: user.motivations,
+    locationPreference: user.locationPreference,
+    tradeTimingPreference: user.tradeTimingPreference,
+    interestedInThirdPartyFulfillment: user.interestedInThirdPartyFulfillment,
+  };
 
-  summary += "\nSimulated Interaction Notes & Engagement Style:\n";
-  if (user.tradesCompleted > 5) {
-    summary += `- User is an active trader with ${user.tradesCompleted} completed trades, suggesting good engagement and experience.\n`;
-  } else if (user.tradesCompleted < 2 && offers.length + wants.length < 3) {
-    summary += "- User is relatively new or has limited recent activity. Preferences may be less defined.\n";
-  }
+  const engagementNotes: string[] = [];
+  if (user.tradesCompleted > 10) engagementNotes.push("Experienced trader based on trade volume.");
+  else if (user.tradesCompleted < 2 && userListedItems.length < 2) engagementNotes.push("Limited activity data available (few trades, few listings).");
+  if (user.locationPreference?.isSensitive) engagementNotes.push(`Notes indicate location sensitivity: "${user.locationPreference.notes || 'General sensitivity'}"`);
 
-  if (user.motivations?.includes('community-building')) {
-    summary += `- Simulated Chat: "Great trading with you, always nice to connect with others in the community!" (Positive, community-focused)\n`;
-    summary += `- Engagement: Likely to leave reviews and interact respectfully.\n`;
-  }
-  if (user.motivations?.includes('maximize-trades')) {
-     summary += `- Simulated Chat: "Could you add a bit more to your offer? I'm looking for a slightly higher value." (Negotiation-focused)\n`;
-     summary += `- Engagement: Appears to negotiate carefully and consider item values, may be discerning.\n`;
-  }
-  if (user.motivations?.includes('convenience-focused') || user.locationPreference?.notes?.toLowerCase().includes('pickup')) {
-      summary += `- Simulated Chat: "Is local pickup possible? That would be easiest for me." (Logistics-focused)\n`;
-      summary += `- Engagement: Likely prefers straightforward and quick interactions. May pass on complex trades.\n`;
-  } else if (user.motivations?.includes('unique-finds')) {
-      summary += `- Simulated Chat: "Does it have the original packaging? I'm looking for one in mint condition." (Detail-oriented for specific items)\n`;
-      summary += `- Engagement: May spend more time researching specific items and less on general browsing.\n`;
-  } else {
-      summary += `- Simulated Chat: "Happy to discuss shipping options for the right trade." (Flexible)\n`;
-  }
+  const simulatedChatSnippets: string[] = [];
+  if (user.motivations?.includes('convenience-focused')) simulatedChatSnippets.push("Prefers quick local meetups if possible.");
+  if (user.motivations?.includes('unique-finds')) simulatedChatSnippets.push("Often asks very specific questions about item condition or rarity.");
+  if (simulatedChatSnippets.length === 0) simulatedChatSnippets.push("Generally polite and open to discussion in simulated chats.");
 
-  if (user.items.filter(i => i.listingType === 'want').length > 2) {
-    summary += `- Engagement: Actively lists 'want' items, indicating specific needs and clear search intent.\n`;
-  }
 
-  const offeredCategories = [...new Set(offers.map(o => o.category))];
-  if (offeredCategories.length > 0) {
-    summary += `- Hypothetical Browsing: Likely spends considerable time browsing items in categories like: ${offeredCategories.join(', ')}.\n`;
-  }
-  if (!user.motivations?.length && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined) {
-    summary += "- Profile lacks explicit preferences; AI should infer primarily from item listings and simulated behavioral notes.\n";
-  } else {
-     summary += "- User has some explicit preferences set, which should be weighted in the analysis along with simulated behaviors.\n"
-  }
-  
-  return summary.trim();
+  return {
+    userId: user.id,
+    listedItems: userListedItems.length > 0 ? userListedItems : undefined, // omit if empty
+    currentPreferences: Object.values(currentPrefs).some(val => val !== undefined && (!Array.isArray(val) || val.length >0)) ? currentPrefs : undefined,
+    simulatedChatSnippets: simulatedChatSnippets.length > 0 ? simulatedChatSnippets : undefined,
+    engagementNotes: engagementNotes.length > 0 ? engagementNotes : undefined,
+    tradesCompleted: user.tradesCompleted,
+  };
 };
 
 
 export default function AdminAIPreferenceInsights() {
   const [selectedUserId, setSelectedUserId] = useState<string>(dummyUsers[0]?.id || '');
-  const [showSampleActivity, setShowSampleActivity] = useState(false);
+  const [showActivityData, setShowActivityData] = useState(false);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
-  const [currentInsights, setCurrentInsights] = useState<RealInferUserPreferencesOutput | null>(null);
+  const [currentInsights, setCurrentInsights] = useState<InferUserPreferencesOutput | null>(null);
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const selectedUser = dummyUsers.find(u => u.id === selectedUserId);
-  const [activitySummaryForAI, setActivitySummaryForAI] = useState<string>('');
+  const [activityInputForAI, setActivityInputForAI] = useState<InferUserPreferencesInput | null>(null);
 
   useEffect(() => {
     if (selectedUser) {
-        setActivitySummaryForAI(generateActivitySummaryForUser(selectedUser));
+        setActivityInputForAI(preparePreferenceInferenceInputForAdmin(selectedUser));
     }
   }, [selectedUser]);
 
@@ -137,29 +100,30 @@ export default function AdminAIPreferenceInsights() {
       setCurrentInsights(null);
       setInsightsError(null);
       
-      const currentActivitySummary = generateActivitySummaryForUser(selectedUser); 
-      setActivitySummaryForAI(currentActivitySummary);
+      const currentActivityInput = preparePreferenceInferenceInputForAdmin(selectedUser); 
+      setActivityInputForAI(currentActivityInput);
 
+      if (!currentActivityInput) {
+        setInsightsError("Could not prepare activity data for the selected user.");
+        setIsLoadingInsights(false);
+        return;
+      }
 
       try {
-        const input: InferUserPreferencesInput = {
-          userId: selectedUser.id,
-          activitySummary: currentActivitySummary,
-        };
-        const result: RealInferUserPreferencesOutput = await inferUserPreferences(input);
+        const result: InferUserPreferencesOutput = await inferUserPreferences(currentActivityInput);
         
         if (result.errorMessage) {
             setInsightsError(result.errorMessage);
             toast({ title: "AI Preference Inference Warning", description: result.errorMessage, variant: "default", duration: 7000 });
         } else if (!result.suggestedPreferences) {
-            const errMsg = "AI did not return preference suggestions.";
+            const errMsg = "AI did not return preference suggestions for this user.";
             setInsightsError(errMsg);
             toast({ title: "AI Preference Inference Issue", description: errMsg, variant: "default", duration: 7000 });
         }
         setCurrentInsights(result);
 
       } catch (error: any) {
-        console.error("Error fetching real AI preference insights:", error);
+        console.error("Error fetching real AI preference insights for admin view:", error);
         const errMsg = "Failed to fetch AI preference insights. " + (error.message || "Check console for details.");
         setInsightsError(errMsg);
         toast({ title: "AI System Error", description: errMsg, variant: "destructive" });
@@ -246,7 +210,7 @@ export default function AdminAIPreferenceInsights() {
           Live AI Preference Inference (Admin View)
         </CardTitle>
         <CardDescription className="font-body">
-          Select a user to see AI-inferred trading preferences based on their (dynamically generated) activity summary, including simulated engagement patterns.
+          Select a user to see AI-inferred trading preferences based on their structured activity data.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -280,15 +244,15 @@ export default function AdminAIPreferenceInsights() {
             <p className="text-muted-foreground text-center py-4">Please select a user to see insights.</p>
         ) : (
         <>
-            <Collapsible open={showSampleActivity} onOpenChange={setShowSampleActivity}>
+            <Collapsible open={showActivityData} onOpenChange={setShowActivityData}>
             <div className="space-y-2">
                 <p className="text-sm font-body text-muted-foreground">
-                The AI infers preferences by analyzing an activity summary like the one below, generated from the user's items, current profile settings, and simulated interactions.
+                The AI infers preferences by analyzing structured activity data like the JSON below, generated from the user's items, current profile settings, and simulated interactions.
                 </p>
                 <CollapsibleTrigger asChild>
                 <Button variant="outline" size="sm" className="w-full flex justify-between items-center text-left">
-                    <span className="flex-grow">{showSampleActivity ? 'Hide' : 'Show'} Generated Activity Data for {selectedUser.name}</span>
-                    {showSampleActivity ? <ChevronUp className="h-4 w-4 ml-2 shrink-0" /> : <ChevronDown className="h-4 w-4 ml-2 shrink-0" />}
+                    <span className="flex-grow">{showActivityData ? 'Hide' : 'Show'} Generated Activity Data for {selectedUser.name}</span>
+                    {showActivityData ? <ChevronUp className="h-4 w-4 ml-2 shrink-0" /> : <ChevronDown className="h-4 w-4 ml-2 shrink-0" />}
                 </Button>
                 </CollapsibleTrigger>
             </div>
@@ -296,10 +260,10 @@ export default function AdminAIPreferenceInsights() {
                 <div className="p-3 bg-muted/30 rounded-md border">
                 <h4 className="font-headline text-[0.9rem] mb-1.5 flex items-center gap-1.5">
                     <FileText className="h-4 w-4 text-muted-foreground"/>
-                    Activity Summary Input for AI ({selectedUser.name})
+                    Structured Input for AI ({selectedUser.name})
                 </h4>
-                <pre className="text-xs font-code whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
-                    {activitySummaryForAI || "Generating summary..."}
+                <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
+                    {activityInputForAI ? JSON.stringify(activityInputForAI, null, 2) : "Generating data..."}
                 </pre>
                 </div>
             </CollapsibleContent>
@@ -320,3 +284,4 @@ export default function AdminAIPreferenceInsights() {
     </Card>
   );
 }
+

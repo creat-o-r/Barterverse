@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Infers a user's trading preferences based on their activity summary.
+ * @fileOverview Infers a user's trading preferences based on their structured activity data.
  *
  * - inferUserPreferences - A function that infers user preferences.
  * - InferUserPreferencesInput - The input type for the inferUserPreferences function.
@@ -10,17 +10,39 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { UserMotivation, TradeTimingPreference } from '@/types'; // Import for enum values
+import type { UserMotivation, TradeTimingPreference } from '@/types';
 
-// Define Zod enums based on string literal types from src/types
+// Define Zod enums based on string literal types from src/types for consistency
 const UserMotivationEnum = z.enum(['help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds']);
 const TradeTimingPreferenceEnum = z.enum(['simultaneous', 'staged', 'flexible']);
 
+// Schema for a brief item representation
+const ItemBriefSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  category: z.string().optional(),
+  listingType: z.enum(['offer', 'want']),
+}).describe("A brief representation of an item listed by the user.");
+
+// Schema for user's current explicit preferences
+const UserCurrentPreferencesSchema = z.object({
+  motivations: z.array(UserMotivationEnum).optional().describe("The user's explicitly stated trading motivations."),
+  locationPreference: z.object({
+    isSensitive: z.boolean(),
+    notes: z.string().optional(),
+  }).optional().describe("The user's explicit preference regarding location for trades."),
+  tradeTimingPreference: TradeTimingPreferenceEnum.optional().describe("The user's explicit preferred trade timing."),
+  interestedInThirdPartyFulfillment: z.boolean().optional().describe("Whether the user has explicitly stated they are open to 3rd party fulfillments."),
+}).describe("The user's currently set explicit preferences, if available.");
+
+
 const InferUserPreferencesInputSchema = z.object({
   userId: z.string().describe('The ID of the user whose preferences are being inferred.'),
-  activitySummary: z.string().describe(
-    'A textual summary of the user\'s recent activity. This could include descriptions of items they listed (offers/wants), snippets from their chats, summaries of trades they\'ve completed, and notes on their engagement style or navigation patterns. Example: "Listed: \'Vintage Sci-Fi Collection (offer)\', \'Wanted: Rare Board Game\'. Chat: \'I\'m happy to ship if needed.\', \'Quick and easy trade preferred.\' Engagement: Spends time in \'Collectibles\' category."'
-  ),
+  listedItems: z.array(ItemBriefSchema).optional().describe("A selection of the user's recently listed items (both offers and wants). Include item name, type, category, and a brief description."),
+  currentPreferences: UserCurrentPreferencesSchema.optional().describe("The user's currently set explicit preferences from their profile."),
+  simulatedChatSnippets: z.array(z.string()).optional().describe("Example chat snippets (simulated) that might indicate communication style or priorities."),
+  engagementNotes: z.array(z.string()).optional().describe("Brief notes on observed or simulated platform engagement patterns (e.g., 'Frequently views 'Electronics' category', 'Often asks detailed questions before trading')."),
+  tradesCompleted: z.number().optional().describe("Number of successfully completed trades, indicating experience level."),
 });
 export type InferUserPreferencesInput = z.infer<typeof InferUserPreferencesInputSchema>;
 
@@ -48,32 +70,64 @@ export async function inferUserPreferences(input: InferUserPreferencesInput): Pr
 const prompt = ai.definePrompt({
   name: 'inferUserPreferencesPrompt',
   input: {schema: InferUserPreferencesInputSchema},
-  output: {schema: InferUserPreferencesOutputSchema.omit({ userId: true, errorMessage: true })}, // AI provides suggestions, confidence, reasoning
-  prompt: `You are an expert user profiler for a bartering platform. Your task is to infer a user's trading preferences based on a summary of their activity.
+  output: {schema: InferUserPreferencesOutputSchema.omit({ userId: true, errorMessage: true })},
+  prompt: `You are an expert user profiler for a bartering platform. Your task is to infer a user's trading preferences based on their activity data.
 
 User ID: {{{userId}}}
-Activity Summary:
-{{{activitySummary}}}
+Trades Completed: {{#if tradesCompleted}}{{{tradesCompleted}}}{{else}}Not specified{{/if}}
 
-Analyze the activity summary, including listed items, current profile settings, simulated interaction notes, and chat snippets, to infer the following preferences:
+{{#if listedItems}}
+User's Listed Items:
+{{#each listedItems}}
+- Type: {{this.listingType}}, Name: "{{this.name}}", Category: {{this.category}}{{#if this.description}}, Description (snippet): "{{this.description}}"{{/if}}
+{{/each}}
+{{else}}
+User has no items currently listed for analysis.
+{{/if}}
+
+{{#if currentPreferences}}
+User's Current Explicit Preferences (to consider and refine):
+{{#if currentPreferences.motivations}} - Motivations: {{#each currentPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
+{{#if currentPreferences.locationPreference}} - Location: {{#if currentPreferences.locationPreference.isSensitive}}Sensitive (Notes: {{currentPreferences.locationPreference.notes}}){{else}}Flexible{{/if}}{{/if}}
+{{#if currentPreferences.tradeTimingPreference}} - Timing: {{{currentPreferences.tradeTimingPreference}}}{{/if}}
+{{#if currentPreferences.interestedInThirdPartyFulfillment}} - 3rd Party Fulfillment: Open{{else if currentPreferences.interestedInThirdPartyFulfillment === false}} - 3rd Party Fulfillment: Prefers Direct{{/if}}
+{{else}}
+User has not specified explicit preferences. Infer based on other data.
+{{/if}}
+
+{{#if simulatedChatSnippets}}
+Simulated Chat Snippets:
+{{#each simulatedChatSnippets}}
+- "{{{this}}}"
+{{/each}}
+{{/if}}
+
+{{#if engagementNotes}}
+Engagement Notes:
+{{#each engagementNotes}}
+- {{{this}}}
+{{/each}}
+{{/if}}
+
+Analyze ALL the provided data (listed items, current preferences if any, chat snippets, engagement notes, trade history) to infer the following preferences:
 1.  **Motivations**: What seems to drive this user to trade? Choose one or two from: 'help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds'.
-    -   'help-others': Phrases like "happy to help", "if you need it".
+    -   'help-others': Phrases like "happy to help", "if you need it" in chat. Generous offers.
     -   'maximize-trades': Focus on value, getting good deals, extensive negotiation. Mentions of item condition or value in chat.
-    -   'convenience-focused': Phrases like "quick and easy", "prefer pickup", mentions of simplicity.
+    -   'convenience-focused': Phrases like "quick and easy", "prefer pickup", mentions of simplicity in chat or notes. Prefers local trades.
     -   'community-building': Mentions of meeting people, local community, friendly interactions in chat.
-    -   'unique-finds': Looking for rare, specific, or collectible items. Focus on specific item attributes.
+    -   'unique-finds': Looking for rare, specific, or collectible items. Focus on specific item attributes in their 'want' listings or chat.
 2.  **Location Preference**:
-    -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades in their items, notes, or chat snippets? If yes, true. Otherwise, false.
+    -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades in their items, notes, current preferences or chat snippets? If yes, true. Otherwise, false.
     -   notes (string, optional): If sensitive, capture any specific notes like "prefers local pickup" or "willing to ship small items".
 3.  **Trade Timing Preference**: Choose from: 'simultaneous' (prefers to swap items at the same time), 'staged' (open to one person sending first, then the other), 'flexible' (seems open to either or doesn't specify).
-    -   'simultaneous': May mention "in-person swap", "meet up".
+    -   'simultaneous': May mention "in-person swap", "meet up" in chat or notes. Often linked to 'convenience-focused' if local.
     -   'staged': May mention "I can send mine first", or be open to shipping logistics.
     -   'flexible': No strong indication, or explicit mention of flexibility. Default to 'flexible' if unsure.
-4.  **Interested in 3rd Party Fulfillments** (boolean): Does the user seem open to more complex trade scenarios, or trades involving more than two people if it helps them get what they want/offer? If they seem flexible, community-oriented, or focused on 'unique-finds', lean towards true. If they seem very 'convenience-focused' on simple direct trades, lean towards false. Default to true if unsure.
+4.  **Interested in 3rd Party Fulfillments** (boolean): Does the user seem open to more complex trade scenarios? If they seem flexible, community-oriented, or focused on 'unique-finds', lean towards true. If they seem very 'convenience-focused' on simple direct trades, or their current preference is 'No', lean towards false. Default to true if unsure and no explicit preference against.
 
-Based on your analysis, provide the inferred preferences. Also, state your confidence level (High, Medium, Low) in these inferences and a brief reasoning.
-If the activity summary is too vague to make reasonable inferences for some fields, you can omit those optional fields in the 'suggestedPreferences' object or use sensible defaults (e.g. locationPreference.isSensitive = false, tradeTimingPreference = 'flexible').
-Consider all parts of the activity summary, including explicit listings, stated preferences, and simulated behavioral notes or chat snippets.
+Based on your analysis, provide the inferred preferences. Also, state your confidence level (High, Medium, Low) and a brief reasoning.
+If the data is too vague for some fields, omit those optional fields in 'suggestedPreferences' or use sensible defaults (e.g. locationPreference.isSensitive = false, tradeTimingPreference = 'flexible').
+Weight explicit preferences heavily if provided, but refine them if other activity strongly contradicts or adds nuance.
 `,
 });
 
@@ -86,18 +140,27 @@ const inferUserPreferencesFlow = ai.defineFlow(
   async (input: InferUserPreferencesInput): Promise<InferUserPreferencesOutput> => {
     const flowName = 'inferUserPreferencesFlow';
     try {
-      const {output} = await prompt(input);
+      // Ensure descriptions are brief if they are too long for the prompt
+      const processedInput = {
+        ...input,
+        listedItems: input.listedItems?.map(item => ({
+          ...item,
+          description: item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : undefined,
+        })),
+      };
+
+      const {output} = await prompt(processedInput);
       if (!output || !output.suggestedPreferences) {
         console.warn(`${flowName}: Prompt returned null or incomplete output for suggestedPreferences.`);
         return {
             userId: input.userId,
-            suggestedPreferences: { // Provide minimal default if AI fails badly
+            suggestedPreferences: {
                 locationPreference: { isSensitive: false},
                 tradeTimingPreference: 'flexible',
                 interestedInThirdPartyFulfillment: true,
             },
             confidence: 'Low',
-            reasoning: "AI could not reliably infer preferences from the provided summary.",
+            reasoning: "AI could not reliably infer preferences from the provided data.",
             errorMessage: "The AI assistant could not infer preferences at this time."
         };
       }
@@ -141,3 +204,4 @@ const inferUserPreferencesFlow = ai.defineFlow(
     }
   }
 );
+
