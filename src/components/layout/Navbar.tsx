@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"; // Added SheetTitle
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
 // Define link configurations
 const primaryNavLinks = [
@@ -25,7 +25,7 @@ const primaryNavLinks = [
   },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
-const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" />, label: "Admin" }; // Added label for mobile
+const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" />, label: "Admin" };
 
 export default function Navbar() {
   const isLoggedIn = true; // Placeholder for auth state
@@ -118,9 +118,9 @@ export default function Navbar() {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right">
+              <SheetContent side="right" className="flex flex-col"> {/* Added flex flex-col to SheetContent */}
                 <SheetTitle className="sr-only">Mobile Navigation Menu</SheetTitle>
-                <nav className="flex flex-col gap-4 mt-8">
+                <nav className="flex flex-col gap-4 mt-8 flex-grow"> {/* Added flex-grow to nav */}
                   {primaryNavLinks.map((link) => (
                     <Button key={`mobile-${link.label}`} variant="ghost" asChild className="justify-start">
                       <Link href={link.href} className="relative flex items-center gap-3 text-base py-2">
@@ -152,7 +152,9 @@ export default function Navbar() {
                       </Link>
                     </Button>
                   )}
-                  <hr className="my-2"/>
+                </nav>
+                {/* User Info and Auth moved to the bottom */}
+                <div className="mt-auto flex flex-col gap-2 pt-4 border-t">
                   {isLoggedIn ? (
                     <>
                       <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-3 text-muted-foreground">
@@ -172,7 +174,7 @@ export default function Navbar() {
                       <Link href="/auth/signin">Login</Link>
                     </Button>
                   )}
-                </nav>
+                </div>
               </SheetContent>
             </Sheet>
           </div>
