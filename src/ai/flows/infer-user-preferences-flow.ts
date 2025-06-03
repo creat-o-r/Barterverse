@@ -127,11 +127,12 @@ The output object MUST contain:
             -   'staged': May mention "I can send mine first", or be open to shipping logistics.
             -   'flexible': No strong indication, or explicit mention of flexibility. Default to 'flexible' if unsure.
         -   'interestedInThirdPartyFulfillment' (boolean, optional): Does the user seem open to more complex trade scenarios? If they seem flexible, community-oriented, or focused on 'unique-finds', lean towards true. If they seem very 'convenience-focused' on simple direct trades, or their current preference is 'No', lean towards false. Default to true if unsure and no explicit preference against.
-    -   If data is too vague for a specific preference, you can omit that optional field from 'suggestedPreferences' or use sensible defaults (e.g., for 'locationPreference', if unsure, you might return `{ isSensitive: false }`). If completely unsure about all preferences, 'suggestedPreferences' can be an empty object `{}`.
+    -   If data is too vague for a specific preference, you can omit that optional field from 'suggestedPreferences' or use sensible defaults (e.g., for 'locationPreference', if unsure, you might return \\\`{ isSensitive: false }\\\`). If completely unsure about all preferences, 'suggestedPreferences' can be an empty object \\\`{}\\\`.
 2.  A 'confidence' field (string: 'High', 'Medium', or 'Low'). This field is required.
 3.  A 'reasoning' field (string, optional, max 2 sentences). This field is optional.
 
 Weight explicit preferences heavily if provided, but refine them if other activity strongly contradicts or adds nuance.
+Your JSON output must be a single object with top-level keys 'suggestedPreferences', 'confidence', and optionally 'reasoning'. The 'suggestedPreferences' itself MUST be an object, even if it's empty.
 `,
 });
 
