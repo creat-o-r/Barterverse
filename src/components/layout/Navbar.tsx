@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"; // Added SheetTitle
 
 // Define link configurations
 const primaryNavLinks = [
@@ -119,6 +119,7 @@ export default function Navbar() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right">
+                <SheetTitle className="sr-only">Mobile Navigation Menu</SheetTitle>
                 <nav className="flex flex-col gap-4 mt-8">
                   {primaryNavLinks.map((link) => (
                     <Button key={`mobile-${link.label}`} variant="ghost" asChild className="justify-start">
