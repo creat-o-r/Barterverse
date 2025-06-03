@@ -16,6 +16,7 @@ import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 // Define Zod enums based on string literal types from src/types for consistency
 const UserMotivationEnum = z.enum(['help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds']);
 const TradeTimingPreferenceEnum = z.enum(['simultaneous', 'staged', 'flexible']);
+const MinimumMatchRatingEnum = z.enum(['Low', 'Medium', 'High']);
 
 // Schema for a brief item representation
 const ItemBriefSchema = z.object({
@@ -34,6 +35,7 @@ const UserCurrentPreferencesSchema = z.object({
   }).optional().describe("The user's explicit preference regarding location for trades."),
   tradeTimingPreference: TradeTimingPreferenceEnum.optional().describe("The user's explicit preferred trade timing."),
   interestedInThirdPartyFulfillment: z.boolean().optional().describe("Whether the user has explicitly stated they are open to 3rd party fulfillments."),
+  minimumMatchRating: MinimumMatchRatingEnum.optional().describe("User's explicitly stated minimum match rating preference (Low, Medium, High)."),
 }).describe("The user's currently set explicit preferences, if available.");
 
 
@@ -57,6 +59,7 @@ const AIPromptOutputSchema = z.object({
     }).optional(),
     tradeTimingPreference: TradeTimingPreferenceEnum.optional(),
     interestedInThirdPartyFulfillment: z.boolean().optional(),
+    minimumMatchRating: MinimumMatchRatingEnum.optional().describe("Suggested minimum match rating preference ('Low', 'Medium', 'High')."),
   }).describe("The AI's suggested preferences. This field is REQUIRED and MUST be an object, even if empty like {}."),
   confidence: z.enum(['High', 'Medium', 'Low']).describe("Confidence level in the inferred preferences. This field is REQUIRED."),
   reasoning: z.string().optional().describe("Brief reasoning for the inferred preferences. This field is optional."),
@@ -73,6 +76,7 @@ const InferUserPreferencesOutputSchema = z.object({
     }).optional(),
     tradeTimingPreference: TradeTimingPreferenceEnum.optional(),
     interestedInThirdPartyFulfillment: z.boolean().optional(),
+    minimumMatchRating: MinimumMatchRatingEnum.optional(),
   }),
   confidence: z.enum(['High', 'Medium', 'Low']),
   reasoning: z.string().optional(),
@@ -109,6 +113,7 @@ User's Current Explicit Preferences (to consider and refine):
 {{#if currentPreferences.locationPreference}} - Location: {{#if currentPreferences.locationPreference.isSensitive}}Sensitive (Notes: {{#if currentPreferences.locationPreference.notes}}"{{currentPreferences.locationPreference.notes}}"{{else}}Not specified{{/if}}){{else}}Flexible{{/if}}{{/if}}
 {{#if currentPreferences.tradeTimingPreference}} - Timing: {{{currentPreferences.tradeTimingPreference}}}{{/if}}
 {{#if currentPreferences.interestedInThirdPartyFulfillment}} - 3rd Party Fulfillment: Open{{else}} - 3rd Party Fulfillment: Prefers Direct{{/if}}
+{{#if currentPreferences.minimumMatchRating}} - Minimum Match Rating: {{{currentPreferences.minimumMatchRating}}}{{/if}}
 {{else}}
 User has not specified explicit preferences. Infer based on other data.
 {{/if}}
@@ -127,30 +132,26 @@ Engagement Notes:
 {{/each}}
 {{/if}}
 
-Analyze ALL the provided data (listed items, current preferences if any, chat snippets, engagement notes, trade history) to infer the following preferences.
+Analyze ALL the provided data to infer the following preferences.
 The output object MUST contain:
 1.  A 'suggestedPreferences' object. This field is REQUIRED and MUST be an object, even if it's empty like {}.
     -   Inside 'suggestedPreferences', you should aim to include:
         -   'motivations' (array of strings, optional): What seems to drive this user to trade? Choose one or two from: 'help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds'.
-            -   'help-others': Phrases like "happy to help", "if you need it" in chat. Generous offers.
-            -   'maximize-trades': Focus on value, getting good deals, extensive negotiation. Mentions of item condition or value in chat.
-            -   'convenience-focused': Phrases like "quick and easy", "prefer pickup", mentions of simplicity in chat or notes. Prefers local trades.
-            -   'community-building': Mentions of meeting people, local community, friendly interactions in chat.
-            -   'unique-finds': Looking for rare, specific, or collectible items. Focus on specific item attributes in their 'want' listings or chat.
         -   'locationPreference' (object, optional):
-            -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades in their items, notes, current preferences or chat snippets? If yes, true. Otherwise, false.
-            -   notes (string, optional): If sensitive, capture any specific notes like "prefers local pickup" or "willing to ship small items".
-        -   'tradeTimingPreference' (string, optional): Choose from: 'simultaneous' (prefers to swap items at the same time), 'staged' (open to one person sending first, then the other), 'flexible' (seems open to either or doesn't specify).
-            -   'simultaneous': May mention "in-person swap", "meet up" in chat or notes. Often linked to 'convenience-focused' if local.
-            -   'staged': May mention "I can send mine first", or be open to shipping logistics.
-            -   'flexible': No strong indication, or explicit mention of flexibility. Default to 'flexible' if unsure.
-        -   'interestedInThirdPartyFulfillment' (boolean, optional): Does the user seem open to more complex trade scenarios? If they seem flexible, community-oriented, or focused on 'unique-finds', lean towards true. If they seem very 'convenience-focused' on simple direct trades, or their current preference is 'No', lean towards false. Default to true if unsure and no explicit preference against.
-    -   If data is too vague for a specific preference, you can omit that optional field from 'suggestedPreferences' or use sensible defaults (e.g., for 'locationPreference', if unsure, you might return \\\`{ isSensitive: false }\\\`). If completely unsure about all preferences, 'suggestedPreferences' can be an empty object \\\`{}\\\`.
+            -   isSensitive (boolean): Does the user mention location, shipping, pickup, or local trades?
+            -   notes (string, optional): If sensitive, capture any specific notes.
+        -   'tradeTimingPreference' (string, optional): Choose from: 'simultaneous', 'staged', 'flexible'. Default to 'flexible' if unsure.
+        -   'interestedInThirdPartyFulfillment' (boolean, optional): Does the user seem open to complex scenarios? Default to true if unsure and no explicit preference against.
+        -   'minimumMatchRating' (string, optional): Choose from 'Low', 'Medium', 'High'.
+            -   Infer 'High' if user has many high-value 'want' items, lists valuable 'offer' items with specific conditions, uses picky language in chat (e.g., "only looking for pristine condition"), or has explicit high preference.
+            -   Infer 'Low' if user lists many common 'offer' items, accepts a wide variety of trades, or seems very open/flexible in chat.
+            -   Default to 'Medium' or omit if signals are mixed, or user has an explicit 'Medium' or no preference.
+    -   If data is too vague for a specific preference, omit that field. If completely unsure, 'suggestedPreferences' can be an empty object \\\`{}\\\`.
 2.  A 'confidence' field (string: 'High', 'Medium', or 'Low'). This field is REQUIRED.
 3.  A 'reasoning' field (string, optional, max 2 sentences). This field is optional.
 
 Weight explicit preferences heavily if provided, but refine them if other activity strongly contradicts or adds nuance.
-Your JSON output must be a single object with top-level keys 'suggestedPreferences', 'confidence', and optionally 'reasoning'. The 'suggestedPreferences' itself MUST be an object, even if it's empty.
+Your JSON output must be a single object with top-level keys 'suggestedPreferences', 'confidence', and optionally 'reasoning'.
 `,
 });
 
@@ -169,6 +170,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
       tradeTimingPreference: 'flexible' as TradeTimingPreference,
       interestedInThirdPartyFulfillment: true,
       motivations: undefined,
+      minimumMatchRating: undefined, // Default is no preference
     };
     
     const processedInput = {
@@ -216,6 +218,11 @@ const inferUserPreferencesFlow = ai.defineFlow(
           } else {
             finalSuggestedPreferences.interestedInThirdPartyFulfillment = defaultInferredPreferences.interestedInThirdPartyFulfillment;
           }
+
+          finalSuggestedPreferences.minimumMatchRating = MinimumMatchRatingEnum.safeParse(output.suggestedPreferences.minimumMatchRating).success
+            ? output.suggestedPreferences.minimumMatchRating
+            : defaultInferredPreferences.minimumMatchRating;
+
         } else {
           console.warn(`${flowName}: Prompt output was missing 'suggestedPreferences' or it was not an object. Output received:`, JSON.stringify(output, null, 2));
           errorMessage = (errorMessage ? errorMessage + " " : "") + "The AI's response for preferences was malformed or incomplete. Default preferences have been applied.";
@@ -266,9 +273,10 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
       let userMessage = "An unexpected error occurred while trying to infer user preferences. Default preferences applied. Please check server logs for details.";
       const lowerErrorMessage = String(error.message || "").toLowerCase();
+      const errorName = String(error.name || "").toLowerCase();
 
-      if (lowerErrorMessage.includes('parse error on line')) {
-        userMessage = `The AI preference inference service encountered an issue with the request structure (likely template formatting). Default preferences applied. (User ID: ${input.userId}).`;
+      if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars')) {
+        userMessage = `The AI preference inference service encountered an issue with the request structure (likely template formatting for user ID: ${input.userId}). Default preferences applied. Please check server logs for details.`;
       } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
         userMessage = `The preference inference service received a bad request. This might be due to problematic input data (User ID: ${input.userId}) or an issue with the prompt structure. Please check server logs for details on the input.`;
       } else if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {

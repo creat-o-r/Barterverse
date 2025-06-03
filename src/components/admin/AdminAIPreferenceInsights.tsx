@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Brain, ChevronDown, ChevronUp, UserCircle as UserIconLucide, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, Brain, ChevronDown, ChevronUp, UserCircle as UserIconLucide, Loader2, AlertCircle, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { useToast } from "@/hooks/use-toast";
@@ -47,16 +47,20 @@ const preparePreferenceInferenceInputForAdmin = (user?: User): InferUserPreferen
     locationPreference: user.locationPreference,
     tradeTimingPreference: user.tradeTimingPreference,
     interestedInThirdPartyFulfillment: user.interestedInThirdPartyFulfillment,
+    minimumMatchRating: user.minimumMatchRating,
   };
 
   const engagementNotes: string[] = [];
   if (user.tradesCompleted > 10) engagementNotes.push("Experienced trader based on trade volume.");
   else if (user.tradesCompleted < 2 && userListedItems.length < 2) engagementNotes.push("Limited activity data available (few trades, few listings).");
   if (user.locationPreference?.isSensitive) engagementNotes.push(`Notes indicate location sensitivity: "${user.locationPreference.notes || 'General sensitivity'}"`);
+  if (user.minimumMatchRating === 'High') engagementNotes.push("User explicitly prefers High quality matches.");
+
 
   const simulatedChatSnippets: string[] = [];
   if (user.motivations?.includes('convenience-focused')) simulatedChatSnippets.push("Prefers quick local meetups if possible.");
   if (user.motivations?.includes('unique-finds')) simulatedChatSnippets.push("Often asks very specific questions about item condition or rarity.");
+  if (user.minimumMatchRating === 'High') simulatedChatSnippets.push("Only looking for high quality, I won't waste time on lowball offers.");
   if (simulatedChatSnippets.length === 0) simulatedChatSnippets.push("Generally polite and open to discussion in simulated chats.");
 
 
@@ -164,6 +168,12 @@ export default function AdminAIPreferenceInsights() {
 
     return (
         <div className="p-4 border rounded-md bg-background space-y-3">
+            {suggestions.minimumMatchRating && (
+            <div>
+                <h5 className="text-xs font-semibold text-muted-foreground mb-0.5">Min. Match Rating:</h5>
+                <Badge variant="secondary" className="text-xs">{suggestions.minimumMatchRating}</Badge>
+            </div>
+            )}
             {suggestions.motivations && suggestions.motivations.length > 0 && (
             <div>
                 <h5 className="text-xs font-semibold text-muted-foreground mb-0.5">Motivations:</h5>

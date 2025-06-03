@@ -7,7 +7,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2 } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
@@ -38,7 +38,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
   if (!itemDetails) {
     return (
-      <div className="py-8"> {/* Removed container classes, relying on layout's container */}
+      <div className="space-y-8"> 
         <Card>
           <CardHeader><CardTitle className="text-center font-headline">Item Not Found</CardTitle></CardHeader>
           <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}</p></CardContent>
@@ -54,7 +54,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   // console.log(`[ItemDetailsDisplay] Successfully fetched and rendering item: ${item.name}`);
 
   return (
-    <div className="space-y-8"> {/* Removed container classes, relying on layout's container. Kept space-y-8 */}
+    <div className="space-y-8"> 
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
           <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted">
@@ -71,17 +71,24 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
           <div className="p-6 flex flex-col">
             <CardHeader className="p-0 pb-4">
               <CardTitle className="font-headline text-3xl mb-2">{item.name}</CardTitle>
-              <div className="flex items-center gap-2 mb-1">
-                <Tag className="h-5 w-5 text-primary" />
-                <Badge variant="secondary" className="text-sm">{item.category}</Badge>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-primary" />
+                  <Badge variant="secondary" className="text-sm">{item.category}</Badge>
+                </div>
+                <Badge
+                  variant={item.listingType === 'offer' ? 'default' : 'secondary'}
+                  className={`capitalize text-xs w-fit ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                >
+                  {item.listingType === 'offer' ? <Gift className="mr-1 h-3 w-3" /> : <Search className="mr-1 h-3 w-3" />}
+                  {item.listingType}
+                </Badge>
+                {item.minimumMatchRatingOverride && (
+                  <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                    <Filter className="mr-1 h-3 w-3" /> Min. Match: {item.minimumMatchRatingOverride}
+                  </Badge>
+                )}
               </div>
-              <Badge
-                variant={item.listingType === 'offer' ? 'default' : 'secondary'}
-                className={`capitalize text-xs w-fit ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-              >
-                {item.listingType === 'offer' ? <Gift className="mr-1 h-3 w-3" /> : <Search className="mr-1 h-3 w-3" />}
-                {item.listingType}
-              </Badge>
             </CardHeader>
 
             <CardContent className="p-0 flex-grow">
@@ -130,28 +137,28 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
 function ItemPageLoadingState() {
   return (
-    <div className="space-y-8 animate-pulse"> {/* Removed container classes */}
+    <div className="space-y-8 animate-pulse"> 
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Image Skeleton */}
           <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted rounded-l-lg md:rounded-l-lg md:rounded-r-none"></div>
           {/* Details Skeleton */}
           <div className="p-6 flex flex-col">
-            <div className="p-0 pb-4"> {/* Mimicking CardHeader structure */}
-              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div> {/* Title */}
-              <div className="flex items-center gap-2 mb-1"> {/* Badges */}
+            <div className="p-0 pb-4"> 
+              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div> 
+              <div className="flex items-center gap-2 mb-1"> 
                 <div className="h-5 w-5 bg-muted-foreground/20 rounded-full"></div>
                 <div className="h-6 bg-muted-foreground/20 rounded w-1/3"></div>
               </div>
-              <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div> {/* Listing Type Badge */}
+              <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div> 
             </div>
-            <div className="p-0 flex-grow"> {/* Mimicking CardContent structure */}
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> {/* Description line 1 */}
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> {/* Description line 2 */}
-              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div> {/* Description line 3 */}
-              <div className="my-4 h-px bg-border"></div> {/* Mimicking Separator */}
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> {/* Owner Details Title */}
-              <div className="flex items-center gap-3"> {/* Owner Info */}
+            <div className="p-0 flex-grow"> 
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> 
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> 
+              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div> 
+              <div className="my-4 h-px bg-border"></div> 
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> 
+              <div className="flex items-center gap-3"> 
                 <div className="h-12 w-12 rounded-full bg-muted-foreground/20"></div>
                 <div>
                   <div className="h-5 bg-muted-foreground/20 rounded w-24 mb-1"></div>
@@ -159,8 +166,8 @@ function ItemPageLoadingState() {
                 </div>
               </div>
             </div>
-            <div className="p-0 pt-6"> {/* Mimicking CardFooter structure */}
-              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div> {/* Button */}
+            <div className="p-0 pt-6"> 
+              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div> 
             </div>
           </div>
         </div>
@@ -223,7 +230,7 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
   if (!params || !params.id) {
     // console.error('[ItemDetailPageWrapper] Params or params.id is missing.');
     return (
-      <div className="py-8"> {/* Removed container classes */}
+      <div className="space-y-8"> 
         <Card className="border-destructive">
           <CardHeader><CardTitle className="text-destructive font-headline">Error: Missing Item ID</CardTitle></CardHeader>
           <CardContent><p className="font-body">The item ID was not provided in the request.</p></CardContent>
@@ -239,3 +246,4 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
     </Suspense>
   );
 }
+

@@ -10,7 +10,7 @@ import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-serv
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -50,6 +50,7 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
     locationPreference: user.locationPreference,
     tradeTimingPreference: user.tradeTimingPreference,
     interestedInThirdPartyFulfillment: user.interestedInThirdPartyFulfillment,
+    minimumMatchRating: user.minimumMatchRating,
   };
   
   const engagementNotes: string[] = [];
@@ -68,6 +69,7 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
   if (user.motivations?.includes('maximize-trades')) simulatedChatSnippets.push("What's the condition like? I'm looking for items in very good shape.");
   if (user.motivations?.includes('unique-finds')) simulatedChatSnippets.push("This is exactly the rare piece I've been searching for!");
   if (user.motivations?.includes('community-building')) simulatedChatSnippets.push("Thanks for the chat! Always nice to connect with other traders.");
+  if (user.minimumMatchRating === 'High') simulatedChatSnippets.push("Only looking for high-quality matches, please.");
   if (simulatedChatSnippets.length === 0) simulatedChatSnippets.push("Open to discussing details further.");
 
 
@@ -208,11 +210,15 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
           </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
+          {user.minimumMatchRating && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Filter className="h-4 w-4 text-muted-foreground"/>Minimum Match Rating:</h4><Badge variant="outline" className="text-xs">{user.minimumMatchRating}</Badge></div>)}
           <div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4><Badge variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"} className="text-xs">{user.interestedInThirdPartyFulfillment ? "Open to it" : "Prefers direct trades"}</Badge></div>
           {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
           {user.locationPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location Preference:</h4><Badge variant={user.locationPreference.isSensitive ? "secondary" : "outline"} className="text-xs">{user.locationPreference.isSensitive ? "Location Sensitive" : "Location Flexible"}</Badge>{user.locationPreference.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic mt-1">{user.locationPreference.notes}</p>)}</div>)}
           {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
-          {(!user.motivations || user.motivations.length === 0) && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined && (<p className="text-sm text-muted-foreground font-body">No specific preferences set yet.</p>)}
+          
+          {!user.minimumMatchRating && (!user.motivations || user.motivations.length === 0) && !user.locationPreference && !user.tradeTimingPreference && user.interestedInThirdPartyFulfillment === undefined && (
+            <p className="text-sm text-muted-foreground font-body">No specific preferences set yet.</p>
+          )}
         
           {isOwnProfile && allowAutoPreferenceInference && (
             <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4">
