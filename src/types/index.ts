@@ -40,8 +40,8 @@ export type UserStoredLocation = {
 };
 
 export type UserLogisticsPreferences = {
-  defaultShippingOption: 'pickup_only' | 'ship_domestic' | 'ship_international';
-  defaultMeetupOption: 'public_meetup' | 'flexible';
+  defaultShippingOption: ItemLogisticsShippingOption; // Updated to use the main type
+  defaultMeetupOption: ItemLogisticsMeetupOption; // Updated to use the main type
   preferredStoredLocationId?: string;
 };
 
@@ -59,7 +59,7 @@ export type User = {
 } & UserProfilePreferences;
 
 export type ItemLogisticsLocationType = 'profile_stored_location' | 'item_specific_location';
-export type ItemLogisticsShippingOption = 'pickup_only' | 'ship_domestic' | 'ship_international';
+export type ItemLogisticsShippingOption = 'pickup_only' | 'ship_domestic' | 'ship_international' | 'delivery_area' | 'possible_delivery';
 export type ItemLogisticsMeetupOption = 'public_meetup' | 'flexible';
 
 export type ItemLogistics = {

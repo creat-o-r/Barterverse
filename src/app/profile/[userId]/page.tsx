@@ -4,7 +4,7 @@
 import { use, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
-import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, UserLogisticsPreferences, UserStoredLocation } from '@/types';
+import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, UserLogisticsPreferences, UserStoredLocation, ItemLogisticsShippingOption } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,6 @@ async function getUserProfile(userId: string): Promise<User | null> {
   let user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
   
-  // Ensure minimumMatchRating always has a value, defaulting to 'Low'
   if (user.minimumMatchRating === undefined) {
     user.minimumMatchRating = 'Low';
   }
@@ -55,7 +54,7 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
     locationPreference: user.locationPreference,
     tradeTimingPreference: user.tradeTimingPreference,
     interestedInThirdPartyFulfillment: user.interestedInThirdPartyFulfillment,
-    minimumMatchRating: user.minimumMatchRating, // This is now required
+    minimumMatchRating: user.minimumMatchRating,
   };
   
   const engagementNotes: string[] = [];
@@ -109,10 +108,12 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
     );
   }
 
-  const shippingOptionMap = {
+  const shippingOptionMap: Record<ItemLogisticsShippingOption, string> = {
     pickup_only: "Local Pickup Only",
     ship_domestic: "Willing to Ship (Domestic)",
     ship_international: "Willing to Ship (International)",
+    delivery_area: "Delivery Area",
+    possible_delivery: "Possible Delivery",
   };
 
   const meetupOptionMap = {
@@ -341,7 +342,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
             <CardTitle className="font-headline text-xl flex items-center gap-3">
               <Truck className="h-6 w-6 text-primary" />Logistics Preferences
             </CardTitle>
-            {/* Placeholder for edit button, functionality to be added later */}
           </div>
            <CardDescription className="font-body mt-1">
             These are {user.name}&apos;s general settings for item location, shipping, and meetups. Individual items can override these.

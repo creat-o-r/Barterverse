@@ -26,6 +26,8 @@ const shippingOptionDisplayMap: Record<ItemLogisticsShippingOption, string> = {
   pickup_only: "Local Pickup Only",
   ship_domestic: "Willing to Ship (Domestic)",
   ship_international: "Willing to Ship (International)",
+  delivery_area: "Delivery Area (Details in Notes/Chat)",
+  possible_delivery: "Possible Delivery (Discuss)",
 };
 
 const meetupOptionDisplayMap: Record<ItemLogisticsMeetupOption, string> = {
@@ -44,7 +46,7 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
     locationDisplay = storedLoc ? `${storedLoc.name} (${storedLoc.address || 'Address not set'})` : "Stored address (details unavailable)";
   } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
     locationDisplay = logistics.itemSpecificAddress;
-  } else { // Fallback if locationType or specific details are missing, try owner's default
+  } else { 
     const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
     const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
     if (defaultLoc) {

@@ -1,5 +1,5 @@
 
-import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics } from '@/types';
+import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics, ItemLogisticsShippingOption, ItemLogisticsMeetupOption } from '@/types';
 import type { InferredUserPreferences } from '@/types';
 
 export const dummyUsers: User[] = [
@@ -64,8 +64,8 @@ export const dummyUsers: User[] = [
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'staged' as TradeTimingPreference,
     minimumMatchRating: 'Low',
-    logisticsPreferences: { // Added default logistics for Charlie
-      defaultShippingOption: 'ship_domestic',
+    logisticsPreferences: {
+      defaultShippingOption: 'delivery_area', // Example of new option
       defaultMeetupOption: 'flexible',
     },
   },
@@ -84,7 +84,7 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
     minimumMatchRating: 'High',
     logisticsPreferences: {
-      defaultShippingOption: 'ship_international',
+      defaultShippingOption: 'possible_delivery', // Example of new option
       defaultMeetupOption: 'public_meetup',
     }
   },
@@ -124,10 +124,10 @@ export let dummyItems: Item[] = [
     minimumMatchRatingOverride: 'High',
     isGiftItForward: false,
     logistics: {
-      locationType: 'profile_stored_location', // User1's preferred is 'user1_home'
+      locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
-      shippingOption: 'ship_domestic', // User1's default
-      meetupOption: 'public_meetup',   // User1's default
+      shippingOption: 'ship_domestic',
+      meetupOption: 'public_meetup',
       notes: "Can also meet downtown on weekdays."
     }
   },
@@ -146,8 +146,8 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
-      shippingOption: 'pickup_only', // Bob's default
-      meetupOption: 'flexible',    // Bob's default
+      shippingOption: 'pickup_only',
+      meetupOption: 'flexible',
     }
   },
   {
@@ -162,7 +162,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: true,
-    logistics: { // Even gifts have logistics, reflecting owner's defaults
+    logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
       shippingOption: 'ship_domestic',
@@ -200,11 +200,11 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
-     logistics: { // Charlie has no stored locations, so this would likely be item_specific or error if not handled
-      locationType: 'item_specific_location', // Assuming Charlie would have to specify
+     logistics: {
+      locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Balcony Garden",
-      shippingOption: 'ship_domestic', // Charlie's default
-      meetupOption: 'flexible',    // Charlie's default
+      shippingOption: 'delivery_area', // Example of new option
+      meetupOption: 'flexible',
     }
   },
   {
@@ -219,7 +219,6 @@ export let dummyItems: Item[] = [
     status: 'traded',
     listingType: 'offer',
     isGiftItForward: false,
-    // No logistics for traded item example
   },
   {
     id: 'item7',
@@ -233,7 +232,6 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     minimumMatchRatingOverride: 'Medium',
-    // Wants might not have logistics in the same way offers do.
   },
   {
     id: 'item8',
@@ -260,10 +258,10 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     logistics: {
-        locationType: 'item_specific_location', // Diana has no stored locations
+        locationType: 'item_specific_location',
         itemSpecificAddress: "Diana's Boutique",
-        shippingOption: 'ship_international', // Diana's default
-        meetupOption: 'public_meetup'     // Diana's default
+        shippingOption: 'possible_delivery', // Example of new option
+        meetupOption: 'public_meetup'
     }
   },
   {
@@ -291,10 +289,10 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: true,
     logistics: {
-        locationType: 'item_specific_location', // Ethan has no stored loc
+        locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Garage",
-        shippingOption: 'pickup_only', // Ethan's default
-        meetupOption: 'public_meetup' // Ethan's default
+        shippingOption: 'pickup_only',
+        meetupOption: 'public_meetup'
     }
   },
   {
@@ -330,7 +328,7 @@ export let dummyItems: Item[] = [
     isGiftItForward: false,
     logistics: {
       locationType: 'profile_stored_location',
-      selectedUserStoredLocationId: 'user1_work', // Example of using another stored location
+      selectedUserStoredLocationId: 'user1_work',
       shippingOption: 'ship_domestic',
       meetupOption: 'public_meetup',
     }
@@ -399,7 +397,6 @@ export function addNewItemToDummyData(
     throw new Error(`Owner not found for ID: ${itemData.ownerId}`);
   }
 
-  // Ensure logistics are concrete and present
   let finalLogistics: ItemLogistics;
   if (itemData.logistics) {
     finalLogistics = {
@@ -411,13 +408,12 @@ export function addNewItemToDummyData(
         notes: itemData.logistics.notes,
     };
   } else {
-    // Fallback if logistics somehow not provided by form (should be, due to defaults)
     let defaultLocType: 'profile_stored_location' | 'item_specific_location' = 'item_specific_location';
     let defaultStoredId: string | undefined = undefined;
     if (owner.logisticsPreferences?.preferredStoredLocationId && owner.locations?.find(l => l.id === owner.logisticsPreferences?.preferredStoredLocationId)) {
         defaultLocType = 'profile_stored_location';
         defaultStoredId = owner.logisticsPreferences.preferredStoredLocationId;
-    } else if (owner.locations && owner.locations.length > 0) {
+    } else if (owner.locations && owner.locations.length > 0 && owner.locations[0]?.id) {
         defaultLocType = 'profile_stored_location';
         defaultStoredId = owner.locations[0].id;
     }

@@ -41,11 +41,10 @@ const itemFormSchema = z.object({
   minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']),
   isGiftItForward: z.boolean().optional(),
   
-  // Logistics fields
-  selectedLocationIdentifier: z.string().min(1, { message: "Please select or specify an item location."}), // Can be a stored location ID or ITEM_SPECIFIC_LOCATION_VALUE
+  selectedLocationIdentifier: z.string().min(1, { message: "Please select or specify an item location."}),
   itemSpecificAddress: z.string().optional(),
   shippingOption: z.custom<ItemLogisticsShippingOption>(
-    (val) => ['pickup_only', 'ship_domestic', 'ship_international'].includes(val as string),
+    (val) => ['pickup_only', 'ship_domestic', 'ship_international', 'delivery_area', 'possible_delivery'].includes(val as string),
     { message: "Invalid shipping option." }
   ),
   meetupOption: z.custom<ItemLogisticsMeetupOption>(
@@ -69,6 +68,8 @@ const shippingOptionMapConcrete: Record<ItemLogisticsShippingOption, string> = {
   pickup_only: "Local Pickup Only",
   ship_domestic: "Willing to Ship (Domestic)",
   ship_international: "Willing to Ship (International)",
+  delivery_area: "Delivery Area (Specify in Notes)",
+  possible_delivery: "Possible Delivery (Discuss)",
 };
 
 const meetupOptionMapConcrete: Record<ItemLogisticsMeetupOption, string> = {
@@ -86,8 +87,7 @@ export default function NewItemPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   useEffect(() => {
-    // Simulate fetching current user. In a real app, this might come from an auth context.
-    const user = dummyUsers.find(u => u.id === 'user1'); // Assuming user1 is the current user
+    const user = dummyUsers.find(u => u.id === 'user1');
     setCurrentUser(user || null);
   }, []);
 
@@ -103,30 +103,26 @@ export default function NewItemPage() {
       listingType: 'offer',
       minimumMatchRatingOverride: currentUserProfileRating, 
       isGiftItForward: false,
-      // Logistics will be set by useEffect based on currentUser
-      selectedLocationIdentifier: '', // Placeholder, will be overwritten by useEffect
+      selectedLocationIdentifier: ITEM_SPECIFIC_LOCATION_VALUE,
       itemSpecificAddress: '',
-      shippingOption: 'pickup_only', // Temporary default
-      meetupOption: 'flexible',   // Temporary default
+      shippingOption: 'pickup_only',
+      meetupOption: 'flexible',
       logisticsNotes: '',
     },
   });
   
   useEffect(() => {
-    if (currentUser && form.reset) { // Ensure form.reset is available
-        let defaultSelectedLocationId: string = ITEM_SPECIFIC_LOCATION_VALUE; // Default to specific if no better option
-
+    if (currentUser && form.reset) {
+        let defaultSelectedLocationId: string = ITEM_SPECIFIC_LOCATION_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
+
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
             defaultSelectedLocationId = preferredStoredLocId;
         } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
-            // If no preferred, but has locations, default to the first one
-             defaultSelectedLocationId = currentUser.locations[0].id;
+            defaultSelectedLocationId = currentUser.locations[0].id;
         }
-        // If still ITEM_SPECIFIC_LOCATION_VALUE, itemSpecificAddress will be blank as per defaultValues
 
         form.reset({
-            // Preserve already typed values for non-logistics fields
             name: form.getValues('name') || '',
             description: form.getValues('description') || '',
             category: form.getValues('category') || '',
@@ -135,16 +131,15 @@ export default function NewItemPage() {
             minimumMatchRatingOverride: form.getValues('minimumMatchRatingOverride') || currentUser.minimumMatchRating || 'Low',
             isGiftItForward: form.getValues('isGiftItForward') || false,
             
-            // Set logistics defaults
             selectedLocationIdentifier: defaultSelectedLocationId,
-            itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (form.getValues('itemSpecificAddress') || '') : '', // Clear if a stored loc is chosen
+            itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (form.getValues('itemSpecificAddress') || '') : '',
             shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'pickup_only',
             meetupOption: currentUser.logisticsPreferences?.defaultMeetupOption || 'flexible',
             logisticsNotes: form.getValues('logisticsNotes') || '',
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser]); // form.reset removed as dependency for now to avoid potential loops if not careful
+  }, [currentUser]);
 
   const listingType = form.watch('listingType');
   const selectedLocationIdentifierWatch = form.watch('selectedLocationIdentifier');
@@ -193,25 +188,26 @@ export default function NewItemPage() {
     setIsSubmitting(true);
     try {
       let itemLogistics: ItemLogistics;
+      let locationTypeForLogistics: ItemLogisticsLocationType;
+      let storedLocationIdForLogistics: string | undefined = undefined;
+      let specificAddressForLogistics: string | undefined = undefined;
+
       if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
-        itemLogistics = {
-            locationType: 'item_specific_location',
-            itemSpecificAddress: data.itemSpecificAddress,
-            selectedUserStoredLocationId: undefined, // Clear this if specific address is used
-            shippingOption: data.shippingOption,
-            meetupOption: data.meetupOption,
-            notes: data.logisticsNotes,
-        };
-      } else { // A stored location ID was selected
-        itemLogistics = {
-            locationType: 'profile_stored_location',
-            selectedUserStoredLocationId: data.selectedLocationIdentifier,
-            itemSpecificAddress: undefined, // Clear this if stored location is used
-            shippingOption: data.shippingOption,
-            meetupOption: data.meetupOption,
-            notes: data.logisticsNotes,
-        };
+        locationTypeForLogistics = 'item_specific_location';
+        specificAddressForLogistics = data.itemSpecificAddress;
+      } else { 
+        locationTypeForLogistics = 'profile_stored_location';
+        storedLocationIdForLogistics = data.selectedLocationIdentifier;
       }
+      
+      itemLogistics = {
+          locationType: locationTypeForLogistics,
+          selectedUserStoredLocationId: storedLocationIdForLogistics,
+          itemSpecificAddress: specificAddressForLogistics,
+          shippingOption: data.shippingOption,
+          meetupOption: data.meetupOption,
+          notes: data.logisticsNotes,
+      };
 
       const newItemData = {
         name: data.name,
@@ -231,7 +227,6 @@ export default function NewItemPage() {
         description: `${data.name} has been successfully posted.`,
       });
       
-      // Reset form to initial defaults derived from user profile
       if (currentUser && form.reset) {
         let defaultSelectedLocationId: string = ITEM_SPECIFIC_LOCATION_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
@@ -250,13 +245,13 @@ export default function NewItemPage() {
             minimumMatchRatingOverride: currentUser.minimumMatchRating || 'Low',
             isGiftItForward: false,
             selectedLocationIdentifier: defaultSelectedLocationId,
-            itemSpecificAddress: '', // Always reset specific address to blank
+            itemSpecificAddress: '',
             shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'pickup_only',
             meetupOption: currentUser.logisticsPreferences?.defaultMeetupOption || 'flexible',
             logisticsNotes: '',
         });
       } else {
-        form.reset(); // Fallback reset
+        form.reset();
       }
       router.push(`/items/${addedItem.id}`);
     } catch (error: any) {
@@ -311,7 +306,7 @@ export default function NewItemPage() {
                         onValueChange={(value) => {
                             field.onChange(value);
                             if (value !== ITEM_SPECIFIC_LOCATION_VALUE) {
-                                form.setValue('itemSpecificAddress', '', {shouldValidate: false}); // Clear specific address if stored is chosen
+                                form.setValue('itemSpecificAddress', '', {shouldValidate: false});
                             }
                         }} 
                         value={field.value} 
@@ -341,7 +336,7 @@ export default function NewItemPage() {
 
                 <FormField control={form.control} name="shippingOption" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Shipping Preference</FormLabel>
+                    <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Shipping</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
