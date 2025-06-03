@@ -11,7 +11,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge'; // Added missing import
+import { Badge } from '@/components/ui/badge';
 
 interface UserItemSuggestion {
   userItem: Item;
@@ -65,7 +65,6 @@ export default function HomePage() {
       setUserItemSuggestions(initialSuggestions);
       setOverallLoading(false); 
 
-      // Prepare current user's preferences to pass to the flow
       const currentUserPreferences: UserProfilePreferences = {
         motivations: currentUser.motivations,
         locationPreference: currentUser.locationPreference,
@@ -92,7 +91,7 @@ export default function HomePage() {
             data: {
               suggestedMatches: [],
               reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
-              preferencesConsidered: false, // Or true if prefs were technically "sent" but no items
+              preferencesConsidered: false, 
             },
           };
         }
@@ -109,7 +108,7 @@ export default function HomePage() {
               listingType: userItem.listingType,
             },
             availableItems: otherItemsForMatching,
-            triggeringUserPreferences: currentUserPreferences, // Pass preferences
+            triggeringUserPreferences: currentUserPreferences,
           });
           return { index, success: true, data: result };
         } catch (error) {
@@ -264,7 +263,7 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 ? (
-                  <ItemList items={itemSuggestion.suggestedMatches} />
+                  <ItemList items={itemSuggestion.suggestedMatches} mainContextItemId={itemSuggestion.userItem.id} />
                 ) : !itemSuggestion.error && (
                   <p className="text-muted-foreground font-body text-center py-4">{itemSuggestion.reasoning || "No specific AI suggestions found for this item at the moment."}</p>
                 )}

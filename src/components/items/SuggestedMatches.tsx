@@ -41,7 +41,6 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       
       const viewingUser = dummyUsers[0]; // Simulate current user is dummyUsers[0]
 
-      // Prepare viewing user's preferences
       const viewingUserPreferences: UserProfilePreferences = {
         motivations: viewingUser.motivations,
         locationPreference: viewingUser.locationPreference,
@@ -81,7 +80,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             listingType: currentItem.listingType,
           },
           availableItems: otherAvailableItems,
-          triggeringUserPreferences: viewingUserPreferences, // Pass preferences
+          triggeringUserPreferences: viewingUserPreferences, 
         };
 
         const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
@@ -94,10 +93,10 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
           let isThirdPartyFulfillment = false;
           if (
-            currentItem.listingType === 'want' && // Current item is a want
-            itemDetails.listingType === 'offer' && // Suggested item is an offer
-            match.ownerId !== viewingUser.id && // Suggested item owner is not the viewer
-            match.ownerId !== currentItem.ownerId // Suggested item owner is not the current item owner
+            currentItem.listingType === 'want' && 
+            itemDetails.listingType === 'offer' && 
+            match.ownerId !== viewingUser.id && 
+            match.ownerId !== currentItem.ownerId 
           ) {
             isThirdPartyFulfillment = true;
           }
@@ -226,7 +225,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
            )}
       </CardHeader>
       <CardContent>
-          <ItemList items={suggestedItemsWithScores} />
+          <ItemList items={suggestedItemsWithScores} mainContextItemId={currentItem.id} />
       </CardContent>
       </Card>
   );

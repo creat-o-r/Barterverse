@@ -5,10 +5,11 @@ import type { Item } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Gift, Search, TrendingUp, TrendingDown, Minus, Users } from 'lucide-react';
+import { Eye, Gift, Search, TrendingUp, TrendingDown, Minus, Users, Link2 } from 'lucide-react';
 
 interface ItemCardProps {
   item: Item & { matchScore?: string; isThirdPartyFulfillment?: boolean };
+  mainContextItemId?: string; // ID of the item for which this 'item' is a suggestion
 }
 
 function getMatchScoreColor(score?: string) {
@@ -30,7 +31,12 @@ function getMatchScoreIcon(score?: string) {
 }
 
 
-export default function ItemCard({ item }: ItemCardProps) {
+export default function ItemCard({ item, mainContextItemId }: ItemCardProps) {
+  const isAISuggestion = item.matchScore && mainContextItemId;
+  const linkHref = isAISuggestion
+    ? `/opportunities?mainItemId=${mainContextItemId}&suggestedItemId=${item.id}`
+    : `/items/${item.id}`;
+
   return (
     <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl group">
       <CardHeader className="p-0 relative">
@@ -70,7 +76,7 @@ export default function ItemCard({ item }: ItemCardProps) {
       </CardHeader>
       <CardContent className="p-2 md:p-4 flex-grow">
         <CardTitle className="text-sm md:text-lg font-headline mb-1 md:mb-2 leading-tight line-clamp-2">
-          <Link href={`/items/${item.id}`} className="hover:text-primary transition-colors">
+          <Link href={linkHref} className="hover:text-primary transition-colors">
             {item.name}
           </Link>
         </CardTitle>
@@ -89,9 +95,9 @@ export default function ItemCard({ item }: ItemCardProps) {
       </CardContent>
       <CardFooter className="p-2 md:p-4 border-t">
         <Button asChild variant="default" className="w-full bg-primary hover:bg-primary/90 h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm">
-          <Link href={`/items/${item.id}`} className="flex items-center gap-1 md:gap-2">
-            <Eye className="h-3.5 w-3.5 md:h-4 md:w-4" />
-            View Details
+          <Link href={linkHref} className="flex items-center gap-1 md:gap-2">
+            {isAISuggestion ? <Link2 className="h-3.5 w-3.5 md:h-4 md:w-4" /> : <Eye className="h-3.5 w-3.5 md:h-4 md:w-4" />}
+            {isAISuggestion ? 'View Opportunity' : 'View Details'}
           </Link>
         </Button>
       </CardFooter>
