@@ -1,28 +1,29 @@
 
-'use client'; 
+'use client';
 
 import { useEffect, useState } from 'react';
 import { getLoggedMatchSuggestions, type LoggedMatchSuggestion } from '@/services/match-report-service';
-import { 
-  getAIMatchingMode, 
-  setAIMatchingMode as setAIMatchingModeService, 
+import {
+  getAIMatchingMode,
+  setAIMatchingMode as setAIMatchingModeService,
   type AIMatchingMode,
   getUseUserProfilePreferencesInMatching,
   setUseUserProfilePreferencesInMatching as setUseUserProfilePreferencesInMatchingService,
   getEnableAutomaticPreferenceInference,
   setEnableAutomaticPreferenceInference as setEnableAutomaticPreferenceInferenceService
 } from '@/services/ai-config-service';
+import { getFeedbackLogContent } from '@/services/feedback-service'; // Import new server action
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2 } from 'lucide-react'; 
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
-import AdminAIPreferenceInsights from '@/components/admin/AdminAIPreferenceInsights'; 
+import AdminAIPreferenceInsights from '@/components/admin/AdminAIPreferenceInsights';
 
 function getMatchScoreColor(score?: string) {
   switch (score?.toLowerCase()) {
@@ -36,7 +37,7 @@ function getMatchScoreColor(score?: string) {
 function getMatchScoreIcon(score?: string) {
   switch (score?.toLowerCase()) {
     case 'high': return <TrendingUp className="h-3 w-3 mr-1" />;
-    case 'medium': return <Minus className="h-3 w-3 mr-1" />; 
+    case 'medium': return <Minus className="h-3 w-3 mr-1" />;
     case 'low': return <TrendingDown className="h-3 w-3 mr-1" />;
     default: return null;
   }
@@ -51,6 +52,7 @@ export default function MatchReportsPage() {
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
+  const [isCopyingLog, setIsCopyingLog] = useState(false);
   const { toast } = useToast();
 
   const fetchReports = async () => {
@@ -98,7 +100,7 @@ export default function MatchReportsPage() {
       } else { throw new Error(result.message || "Failed to update mode server-side"); }
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update AI matching mode.", variant: "destructive" });
-      fetchAdminSettings(); 
+      fetchAdminSettings();
     } finally { setIsUpdatingMode(false); }
   };
 
@@ -131,6 +133,28 @@ export default function MatchReportsPage() {
       fetchAdminSettings();
     } finally { setIsUpdatingAutoPrefToggle(false); }
   };
+
+  const handleCopyFeedbackLog = async () => {
+    setIsCopyingLog(true);
+    try {
+      const result = await getFeedbackLogContent();
+      if (result.success && result.content) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(result.content);
+          toast({ title: "Success", description: "Feedback log copied to clipboard!" });
+        } else {
+          toast({ title: "Clipboard Error", description: "Clipboard API not available. Could not copy.", variant: "destructive" });
+        }
+      } else {
+        throw new Error(result.error || "Failed to fetch feedback log content.");
+      }
+    } catch (error: any) {
+      toast({ title: "Copy Failed", description: error.message || "Could not copy feedback log.", variant: "destructive" });
+    } finally {
+      setIsCopyingLog(false);
+    }
+  };
+
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 py-8">
@@ -243,6 +267,12 @@ export default function MatchReportsPage() {
             </div>
           )}
         </CardContent>
+         <CardFooter className="border-t p-4">
+             <Button onClick={handleCopyFeedbackLog} disabled={isCopyingLog} variant="outline" size="sm">
+                <ClipboardCopy className={`mr-2 h-4 w-4 ${isCopyingLog ? 'animate-spin' : ''}`} />
+                {isCopyingLog ? "Copying..." : "Copy Feedback User Report Log to Clipboard"}
+            </Button>
+         </CardFooter>
       </Card>
       <Separator />
       <AdminAIPreferenceInsights />

@@ -10,7 +10,7 @@ export interface FeedbackReport {
   reportedValue: string | null; // Can be null if reporting about a missing value
   mainItemId: string | null;
   suggestedItemId: string | null;
-  reportingUserId?: string; 
+  reportingUserId?: string;
 }
 
 const FEEDBACK_LOG_FILE_PATH = path.join(process.cwd(), '.feedback-reports.log.json');
@@ -35,7 +35,7 @@ async function readFeedbackLogs(): Promise<FeedbackReport[]> {
       }
     }
     console.error('[Feedback Service] Error reading feedback log file:', error);
-    return []; 
+    return [];
   }
 }
 
@@ -71,5 +71,27 @@ export async function logFeedbackEntry(
     return { success: true, message: 'Feedback logged successfully.' };
   } else {
     return { success: false, message: 'Failed to write feedback to log file.' };
+  }
+}
+
+export async function getFeedbackLogContent(): Promise<{ success: boolean; content?: string; error?: string }> {
+  try {
+    await fs.access(FEEDBACK_LOG_FILE_PATH);
+    const fileContent = await fs.readFile(FEEDBACK_LOG_FILE_PATH, 'utf-8');
+    if (fileContent.trim() === '') {
+      return { success: true, content: "[]" }; // Return empty array string if file is empty
+    }
+    // Validate if it's JSON before returning
+    JSON.parse(fileContent); 
+    return { success: true, content: fileContent };
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      return { success: true, content: "[]" }; // File doesn't exist, treat as empty log
+    }
+    console.error('[Feedback Service] Error reading feedback log content:', error);
+    if (error instanceof SyntaxError) {
+         return { success: false, error: 'Feedback log file is not valid JSON. Please check its content.' };
+    }
+    return { success: false, error: 'Could not read feedback log file.' };
   }
 }
