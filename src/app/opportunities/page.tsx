@@ -11,7 +11,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2 } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
@@ -91,6 +91,7 @@ export default function OpportunityMatchPage() {
   const [loading, setLoading] = useState(true);
   const [opportunityReasoning, setOpportunityReasoning] = useState<string | null>(null);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null); // For specific reasoning fetch errors
 
   const currentUserId = dummyUsers[0].id; // Simulate current user
 
@@ -98,6 +99,7 @@ export default function OpportunityMatchPage() {
     async function fetchDataAndReasoning() {
       setLoading(true);
       setOpportunityReasoning(null);
+      setInsightsError(null); // Reset error for reasoning
       const mainD = await getItemAndOwner(mainItemIdQuery);
       const suggestedD = await getItemAndOwner(suggestedItemIdQuery);
 
@@ -108,7 +110,7 @@ export default function OpportunityMatchPage() {
         setLoadingReasoning(true);
         try {
             const inputForReasoning: Parameters<typeof suggestMatchingItems>[0] = {
-                triggeringUserId: currentUserId,
+                triggeringUserId: currentUserId, // Or a relevant user ID for context
                 currentItem: {
                     id: mainD.item.id,
                     name: mainD.item.name,
@@ -117,7 +119,7 @@ export default function OpportunityMatchPage() {
                     ownerId: mainD.item.ownerId,
                     listingType: mainD.item.listingType,
                 },
-                availableItems: [{ 
+                availableItems: [{ // Only the suggested item is "available" for this specific reasoning
                     id: suggestedD.item.id,
                     name: suggestedD.item.name,
                     description: suggestedD.item.description,
@@ -125,18 +127,23 @@ export default function OpportunityMatchPage() {
                     ownerId: suggestedD.item.ownerId,
                     listingType: suggestedD.item.listingType,
                 }],
+                // preferencesConsidered: false, // Explicitly false for this direct reasoning request
             };
             const reasoningResult: ItemMatchOutput = await suggestMatchingItems(inputForReasoning);
+            
             if (reasoningResult.reasoning && !reasoningResult.reasoning.toLowerCase().includes('error') && !reasoningResult.reasoning.toLowerCase().includes('could not')) {
                  setOpportunityReasoning(reasoningResult.reasoning);
-            } else if (reasoningResult.reasoning) {
-                setOpportunityReasoning("AI could not provide specific reasoning for this pairing at the moment.");
+            } else if (reasoningResult.reasoning) { // Error or system message from AI
+                setInsightsError(reasoningResult.reasoning);
+                setOpportunityReasoning(null); // Ensure no stale reasoning is shown
             } else {
-                setOpportunityReasoning("AI did not provide reasoning for this match.");
+                setInsightsError("AI did not provide reasoning for this specific match.");
+                setOpportunityReasoning(null);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error fetching opportunity reasoning:", error);
-            setOpportunityReasoning("Could not load AI reasoning for this match.");
+            setInsightsError("Could not load AI reasoning for this match due to a system error. " + (error.message || ""));
+            setOpportunityReasoning(null);
         } finally {
             setLoadingReasoning(false);
         }
@@ -144,16 +151,17 @@ export default function OpportunityMatchPage() {
       } else {
         setMainItemDetails(null);
         setSuggestedItemDetails(null);
+        // No items, so no reasoning to fetch
       }
       setLoading(false);
     }
     if (mainItemIdQuery && suggestedItemIdQuery) {
         fetchDataAndReasoning();
     } else {
-        setLoading(false);
+        setLoading(false); // No IDs, nothing to load
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainItemIdQuery, suggestedItemIdQuery]);
+  }, [mainItemIdQuery, suggestedItemIdQuery]); // Removed currentUserId from deps as it's static in this example
 
   if (loading) {
     return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><ArrowRightLeft className="h-5 w-5 animate-spin" /> Loading opportunity details...</div>;
@@ -172,37 +180,41 @@ export default function OpportunityMatchPage() {
   let mainItemOpportunityLabel = '';
   let suggestedItemOpportunityLabel = '';
 
-  if (mainItem.ownerId === currentUserId) {
+  // Determine who the current user is in relation to the items
+  if (mainItem.ownerId === currentUserId) { // Current user owns the main item
     mainItemOpportunityLabel = `Your ${mainItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
-    if (suggestedItem.listingType === 'want') {
+    if (suggestedItem.listingType === 'want') { // Suggested item is a "want" they can fulfill
       suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s Matching Want`;
-      tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
+      tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`; // Incorrect, should be user fulfilling a want
       chatButtonText = `Offer your "${mainItem.name}" for their want: "${suggestedItem.name}"`;
-    } else { 
+    } else { // Suggested item is an "offer" they might want
       suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s Matching Offer`;
       tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
       chatButtonText = `Negotiate for "${suggestedItem.name}" (Offering your "${mainItem.name}")`;
     }
-  } else if (suggestedItem.ownerId === currentUserId) { 
+  } else if (suggestedItem.ownerId === currentUserId) { // Current user owns the suggested item
     suggestedItemOpportunityLabel = `Your ${suggestedItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
-     if (mainItem.listingType === 'want') {
+     if (mainItem.listingType === 'want') { // Main item is a "want" they can fulfill
       mainItemOpportunityLabel = `${mainItemOwner.name}'s Matching Want`;
-      tradeId = `trade-${suggestedItem.ownerId}-wants-${mainItem.id}-from-${mainItem.ownerId}`; 
+      tradeId = `trade-${suggestedItem.ownerId}-wants-${mainItem.id}-from-${mainItem.ownerId}`; // Incorrect, user fulfilling a want
       chatButtonText = `Offer your "${suggestedItem.name}" for their want: "${mainItem.name}"`;
-    } else { 
+    } else { // Main item is an "offer" they might want
       mainItemOpportunityLabel = `${mainItemOwner.name}'s Matching Offer`;
       tradeId = `trade-${currentUserId}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
       chatButtonText = `Negotiate for "${mainItem.name}" (Offering your "${suggestedItem.name}")`;
     }
-  } else { 
+  } else { // Current user is neither owner, viewing as a third party (less common for direct action)
     mainItemOpportunityLabel = `${mainItemOwner.name}'s ${mainItem.listingType === 'offer' ? 'Offer' : 'Want'}`;
     suggestedItemOpportunityLabel = `${suggestedItemOwner.name}'s ${suggestedItem.listingType === 'offer' ? 'Matching Offer' : 'Matching Want'}`;
+    // Generic tradeId, might lead to a general discussion page if such exists, or disabled button
     tradeId = `discuss-${mainItem.id}-with-${suggestedItem.id}`; 
     chatButtonText = `Discuss This Opportunity`;
+    // In a real app, direct negotiation might be disabled if not an owner of either item.
   }
+   // If current user owns both items, or trying to trade with themselves.
    if (mainItem.ownerId === currentUserId && suggestedItem.ownerId === currentUserId) {
     negotiationContextValid = false; 
-    chatButtonText = "View Items Separately"; 
+    chatButtonText = "View Items Separately"; // Or similar inactive state
   }
 
 
@@ -217,22 +229,8 @@ export default function OpportunityMatchPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-           {loadingReasoning && (
-            <div className="text-center text-muted-foreground font-body py-3 flex items-center justify-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Reasoning...
-            </div>
-           )}
-           {!loadingReasoning && opportunityReasoning && (
-             <Card className="bg-muted/50 border-primary/30 mb-6">
-                <CardHeader className="pb-2 pt-3">
-                    <CardTitle className="font-headline text-base flex items-center gap-2"><FileText className="h-4 w-4 text-primary"/>AI's Rationale for this Match</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <p className="text-sm font-body text-muted-foreground italic">{opportunityReasoning}</p>
-                </CardContent>
-             </Card>
-           )}
-           <div className="hidden md:flex items-center justify-center my-4">
+          
+          <div className="hidden md:flex items-center justify-center my-4">
             <ArrowRightLeft className="h-8 w-8 text-muted-foreground" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 items-start">
@@ -247,6 +245,36 @@ export default function OpportunityMatchPage() {
                 opportunityContextLabel={suggestedItemOpportunityLabel}
             />
           </div>
+
+          {/* AI Reasoning Section - MOVED HERE */}
+          <div className="mt-6 pt-6 border-t">
+            {loadingReasoning && (
+                <div className="text-center text-muted-foreground font-body py-3 flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Reasoning...
+                </div>
+            )}
+            {!loadingReasoning && opportunityReasoning && (
+                <Card className="bg-muted/50 border-primary/30">
+                    <CardHeader className="pb-2 pt-3">
+                        <CardTitle className="font-headline text-base flex items-center gap-2"><FileText className="h-4 w-4 text-primary"/>AI's Rationale for this Match</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        <p className="text-sm font-body text-muted-foreground italic">{opportunityReasoning}</p>
+                    </CardContent>
+                </Card>
+            )}
+            {!loadingReasoning && !opportunityReasoning && insightsError && (
+                <Card className="border-destructive/50 bg-destructive/5">
+                    <CardHeader className="pb-2 pt-3">
+                        <CardTitle className="font-headline text-base flex items-center gap-2 text-destructive-foreground"><AlertCircle className="h-4 w-4"/>AI Reasoning Note</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        <p className="text-sm font-body text-destructive-foreground/90">{insightsError}</p>
+                    </CardContent>
+                </Card>
+            )}
+          </div>
+          
           <Separator className="my-6 md:my-8" />
           <div className="text-center">
             <h3 className="font-headline text-xl mb-3">Ready to Discuss?</h3>
