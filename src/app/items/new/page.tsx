@@ -35,7 +35,7 @@ const itemFormSchema = z.object({
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional() // No "use_profile_default" string, undefined means use profile.
+  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional()
     .describe("Optional override for the minimum match rating for this specific item."),
   isGiftItForward: z.boolean().optional(),
 });
@@ -50,7 +50,6 @@ export default function NewItemPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currentUserId = dummyUsers[0]?.id;
-  // In a real app, fetch current user's actual minimumMatchRating to display in placeholder/description
   const currentUserProfileRating = dummyUsers.find(u => u.id === currentUserId)?.minimumMatchRating || 'Low';
 
 
@@ -62,7 +61,7 @@ export default function NewItemPage() {
       category: '',
       imageUrl: '',
       listingType: 'offer',
-      minimumMatchRatingOverride: undefined, // Default to undefined, meaning use profile default
+      minimumMatchRatingOverride: undefined, 
       isGiftItForward: false,
     },
   });
@@ -172,7 +171,7 @@ export default function NewItemPage() {
         listingType: data.listingType,
         imageUrl: data.imageUrl || '', 
         ownerId: currentUserId,
-        minimumMatchRatingOverride: data.minimumMatchRatingOverride || undefined, // Ensure undefined if empty/not selected
+        minimumMatchRatingOverride: data.minimumMatchRatingOverride, 
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false, 
       };
       const addedItem = addNewItemToDummyData(newItemData);
@@ -181,7 +180,7 @@ export default function NewItemPage() {
         title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
         description: `${data.name} has been successfully posted.`,
       });
-      form.reset(); // Resets to defaultValues, including undefined for minimumMatchRatingOverride
+      form.reset(); 
       router.push(`/items/${addedItem.id}`); 
     } catch (error: any) {
         console.error("Error submitting new item:", error);
@@ -350,27 +349,26 @@ export default function NewItemPage() {
                   <FormItem>
                     <FormLabel className="font-headline flex items-center gap-2">
                       <Filter className="h-5 w-5 text-muted-foreground" />
-                      Item Specific Minimum Match Rating (Optional)
+                      Minimum Match Rating Override (Optional)
                     </FormLabel>
                     <Select 
                         onValueChange={field.onChange}
-                        value={field.value || ""} // Handle undefined for Select component
+                        value={field.value} 
                         disabled={isLoadingOverall}
                     >
                       <FormControl>
                         <SelectTrigger disabled={isLoadingOverall}>
-                          <SelectValue placeholder={`Use profile default (currently ${currentUserProfileRating})`} />
+                          <SelectValue placeholder="Select rating to override profile default..." />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {/* No explicit "Use profile default" item - placeholder handles it */}
                         <SelectItem value="Low">Low</SelectItem>
                         <SelectItem value="Medium">Medium</SelectItem>
                         <SelectItem value="High">High</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription className="font-body">
-                      Optionally override your profile's default minimum match rating for this specific item. If nothing is selected, your profile default of '{currentUserProfileRating}' will be used.
+                      If selected, this item will require at least this match quality. Otherwise, your profile default of '{currentUserProfileRating}' will be used.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -422,3 +420,4 @@ export default function NewItemPage() {
     </div>
   );
 }
+
