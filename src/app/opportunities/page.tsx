@@ -11,7 +11,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput } from '@/ai/flows/explain-match-rationale-flow';
@@ -80,6 +80,37 @@ function OpportunityItemCard({
   );
 }
 
+const generalMatchScoreCriteria: Record<string, { title: string; points: string[] }> = {
+  high: {
+    title: "What a \"High\" Match Score Generally Means:",
+    points: [
+      "Strong direct relevance between items.",
+      "Categories are very similar or highly complementary.",
+      "Keywords in names/descriptions show clear overlap or direct need fulfillment.",
+      "Offer/Want types align well (e.g., an offer fulfilling a specific want).",
+      "If both are 'offer' or 'want', they are desirable items in the same niche.",
+    ],
+  },
+  medium: {
+    title: "What a \"Medium\" Match Score Generally Means:",
+    points: [
+      "Good general relevance.",
+      "Categories are related or appeal to similar users.",
+      "Some overlap in keywords or purpose.",
+      "A plausible trade scenario, even if not a perfect keyword match.",
+    ],
+  },
+  low: {
+    title: "What a \"Low\" Match Score Generally Means:",
+    points: [
+      "Possible, but less direct, relevance.",
+      "Categories might be different but could have niche appeal or indirect connection.",
+      "Loose association by theme or potential utility not immediately obvious.",
+      "Could be interesting for users with broad interests or unstated needs.",
+    ],
+  },
+};
+
 
 export default function OpportunityMatchPage() {
   const searchParams = useSearchParams();
@@ -103,7 +134,8 @@ export default function OpportunityMatchPage() {
       setLoading(true);
       setOpportunityReasoning(null);
       setInsightsError(null); 
-      setMatchScore(matchScoreQuery); // Set score from query param
+      const scoreFromQuery = matchScoreQuery?.toLowerCase() || null;
+      setMatchScore(scoreFromQuery);
 
       const mainD = await getItemAndOwner(mainItemIdQuery);
       const suggestedD = await getItemAndOwner(suggestedItemIdQuery);
@@ -162,7 +194,7 @@ export default function OpportunityMatchPage() {
         setLoading(false); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery]); // Added matchScoreQuery to dependencies
+  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery]);
 
   if (loading) {
     return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><ArrowRightLeft className="h-5 w-5 animate-spin" /> Loading opportunity details...</div>;
@@ -213,7 +245,8 @@ export default function OpportunityMatchPage() {
     negotiationContextValid = false; 
     chatButtonText = "View Items Separately";
   }
-
+  
+  const scoreCriteria = matchScore ? generalMatchScoreCriteria[matchScore] : null;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -253,13 +286,13 @@ export default function OpportunityMatchPage() {
                 <Card className={insightsError ? "border-destructive/50 bg-destructive/5" : "bg-muted/50 border-primary/30"}>
                     <CardHeader className="pb-2 pt-3">
                         <CardTitle className={`font-headline text-lg flex items-center gap-2 ${insightsError ? 'text-destructive-foreground' : 'text-primary'}`}>
-                            {insightsError && !opportunityReasoning ? <AlertCircle className="h-5 w-5"/> : <FileText className="h-5 w-5"/>}
+                            {insightsError && !opportunityReasoning ? <AlertCircle className="h-5 w-5"/> : <Info className="h-5 w-5"/>}
                             AI Insights
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0 space-y-3">
                         {matchScore && !insightsError && (
-                            <div className="flex items-center gap-2">
+                            <div className="mb-3">
                                 <span className="font-semibold text-sm">Match Score: </span>
                                 <Badge variant={
                                     matchScore.toLowerCase() === 'high' ? 'default' :
@@ -270,16 +303,26 @@ export default function OpportunityMatchPage() {
                                 </Badge>
                             </div>
                         )}
+                        {scoreCriteria && !insightsError && (
+                            <div className="mb-3">
+                                <h4 className="font-semibold text-sm mb-1">{scoreCriteria.title}</h4>
+                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5 font-body">
+                                    {scoreCriteria.points.map((point, idx) => (
+                                        <li key={idx}>{point}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                         {opportunityReasoning && (
                              <div>
-                                <span className="font-semibold text-sm">Rationale: </span>
+                                <span className="font-semibold text-sm">AI Rationale for this Specific Match: </span>
                                 <p className={`text-sm font-body ${insightsError ? 'text-destructive-foreground/90' : 'text-muted-foreground'}`}>{opportunityReasoning}</p>
                              </div>
                         )}
-                         {!opportunityReasoning && insightsError && !matchScore && ( // Only show this if ONLY an error and no other info
+                         {!opportunityReasoning && insightsError && !matchScore && ( 
                             <p className="text-sm font-body text-destructive-foreground/90">{insightsError}</p>
                         )}
-                         {!opportunityReasoning && !insightsError && !matchScore && ( // Fallback if nothing loaded
+                         {!opportunityReasoning && !insightsError && !matchScore && !scoreCriteria && ( 
                             <p className="text-sm font-body text-muted-foreground">No AI insights available for this specific pairing.</p>
                         )}
                     </CardContent>
