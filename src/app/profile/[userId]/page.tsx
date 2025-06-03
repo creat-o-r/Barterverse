@@ -24,6 +24,7 @@ async function getUserProfile(userId: string): Promise<User | null> {
   let user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
   
+  // Ensure minimumMatchRating always has a value, defaulting to 'Low'
   if (user.minimumMatchRating === undefined) {
     user.minimumMatchRating = 'Low';
   }
@@ -54,7 +55,7 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
     locationPreference: user.locationPreference,
     tradeTimingPreference: user.tradeTimingPreference,
     interestedInThirdPartyFulfillment: user.interestedInThirdPartyFulfillment,
-    minimumMatchRating: user.minimumMatchRating || 'Low',
+    minimumMatchRating: user.minimumMatchRating, // This is now required
   };
   
   const engagementNotes: string[] = [];
@@ -97,11 +98,11 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
 const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile }: { logisticsPreferences?: UserLogisticsPreferences, locations?: UserStoredLocation[], isOwnProfile: boolean }) => {
   if (!logisticsPreferences && (!locations || locations.length === 0)) {
     return (
-      <CardContent>
-        <p className="text-muted-foreground font-body">Default logistics preferences not set up yet.</p>
+      <CardContent className="pt-2">
+        <p className="text-muted-foreground font-body">Logistics preferences not set up yet.</p>
         {isOwnProfile && (
-          <Button variant="outline" size="sm" className="mt-3">
-            <Edit3 className="mr-2 h-4 w-4" /> Set Up Default Logistics
+          <Button variant="outline" size="sm" className="mt-3" disabled>
+            <Edit3 className="mr-2 h-4 w-4" /> Set Up Logistics
           </Button>
         )}
       </CardContent>
@@ -124,41 +125,49 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
     : null;
 
   return (
-    <CardContent className="space-y-3 pt-2">
+    <CardContent className="space-y-4 pt-2">
       {logisticsPreferences?.defaultShippingOption && (
-        <div>
-          <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" />Default Shipping:</h4>
-          <Badge variant="outline" className="text-xs">{shippingOptionMap[logisticsPreferences.defaultShippingOption] || logisticsPreferences.defaultShippingOption}</Badge>
+        <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
+          <div className="flex items-center gap-2">
+            <Truck className="h-5 w-5 text-muted-foreground" />
+            <span className="font-headline text-md">Shipping</span>
+          </div>
+          <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto">
+            {shippingOptionMap[logisticsPreferences.defaultShippingOption] || logisticsPreferences.defaultShippingOption}
+          </Button>
         </div>
       )}
       {logisticsPreferences?.defaultMeetupOption && (
-        <div>
-          <h4 className="font-headline text-md flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground" />Default Meetup:</h4>
-          <Badge variant="outline" className="text-xs">{meetupOptionMap[logisticsPreferences.defaultMeetupOption] || logisticsPreferences.defaultMeetupOption}</Badge>
+         <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
+            <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-muted-foreground" />
+                <span className="font-headline text-md">Meetup</span>
+            </div>
+            <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto">
+                {meetupOptionMap[logisticsPreferences.defaultMeetupOption] || logisticsPreferences.defaultMeetupOption}
+            </Button>
         </div>
       )}
-      {preferredLocation ? (
-        <div>
-          <h4 className="font-headline text-md flex items-center gap-1.5">
-            {preferredLocation.name.toLowerCase().includes('work') || preferredLocation.name.toLowerCase().includes('office') ? <Briefcase className="h-4 w-4 text-muted-foreground" /> : <Home className="h-4 w-4 text-muted-foreground" />}
-            Preferred Item Location:
-          </h4>
-          <Badge variant="outline" className="text-xs">{preferredLocation.name} ({preferredLocation.address || 'Address not specified'})</Badge>
+       <div className="flex justify-between items-center p-3 border rounded-lg bg-background shadow-sm">
+            <div className="flex items-center gap-2">
+                {preferredLocation ? (
+                    preferredLocation.name.toLowerCase().includes('work') || preferredLocation.name.toLowerCase().includes('office') ? 
+                    <Briefcase className="h-5 w-5 text-muted-foreground" /> : 
+                    <Home className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                    <MapPin className="h-5 w-5 text-muted-foreground" />
+                )}
+                <span className="font-headline text-md">Preferred Item Location</span>
+            </div>
+            <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto max-w-[200px] truncate">
+                {preferredLocation ? `${preferredLocation.name} ${preferredLocation.address ? `(${preferredLocation.address.substring(0,20)}${preferredLocation.address.length > 20 ? '...' : ''})` : '(Address not set)'}` : 
+                (logisticsPreferences?.preferredStoredLocationId ? `ID: ${logisticsPreferences.preferredStoredLocationId}` : 'Not set')}
+            </Button>
         </div>
-      ) : logisticsPreferences?.preferredStoredLocationId ? (
-         <div>
-          <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" />Preferred Item Location:</h4>
-          <Badge variant="outline" className="text-xs">Stored location ID: {logisticsPreferences.preferredStoredLocationId} (Details not found)</Badge>
-        </div>
-      ) : (
-         <div>
-          <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" />Preferred Item Location:</h4>
-          <Badge variant="outline" className="text-xs">Not set</Badge>
-        </div>
-      )}
+
       {isOwnProfile && (
-        <Button variant="outline" size="sm" className="mt-4">
-          <Edit3 className="mr-2 h-4 w-4" /> Edit Default Logistics
+        <Button variant="outline" size="sm" className="mt-4 w-full md:w-auto" disabled>
+          <Edit3 className="mr-2 h-4 w-4" /> Edit Logistics Preferences
         </Button>
       )}
     </CardContent>
@@ -330,16 +339,12 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
         <CardHeader>
           <div className="flex justify-between items-center flex-wrap gap-2">
             <CardTitle className="font-headline text-xl flex items-center gap-3">
-              <Truck className="h-6 w-6 text-primary" />Default Logistics Preferences
+              <Truck className="h-6 w-6 text-primary" />Logistics Preferences
             </CardTitle>
-            {isOwnProfile && (
-               <Button variant="outline" size="sm" disabled> {/* Button is disabled for now */}
-                <Edit3 className="mr-2 h-4 w-4" /> Edit Default Logistics
-              </Button>
-            )}
+            {/* Placeholder for edit button, functionality to be added later */}
           </div>
            <CardDescription className="font-body mt-1">
-            These are {user.name}&apos;s default settings for item location, shipping, and meetups. Items can override these.
+            These are {user.name}&apos;s general settings for item location, shipping, and meetups. Individual items can override these.
           </CardDescription>
         </CardHeader>
         <DefaultLogisticsDisplay 
@@ -361,4 +366,3 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
-
