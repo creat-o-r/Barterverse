@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
 import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -216,3 +216,4 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
+
