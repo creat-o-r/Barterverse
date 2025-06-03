@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference } from '@/types';
+import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference, UserProfilePreferences } from '@/types';
 
 // Define Zod enums based on string literal types from src/types for consistency
 const UserMotivationEnum = z.enum(['help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds']);
@@ -46,22 +46,39 @@ const InferUserPreferencesInputSchema = z.object({
 });
 export type InferUserPreferencesInput = z.infer<typeof InferUserPreferencesInputSchema>;
 
+// This is the schema the AI prompt is asked to output.
+const AIPromptOutputSchema = z.object({
+  suggestedPreferences: z.object({
+    motivations: z.array(UserMotivationEnum).optional(),
+    locationPreference: z.object({
+      isSensitive: z.boolean(),
+      notes: z.string().optional(),
+    }).optional(),
+    tradeTimingPreference: TradeTimingPreferenceEnum.optional(),
+    interestedInThirdPartyFulfillment: z.boolean().optional(),
+  }).describe("The AI's suggested preferences. This field is REQUIRED and MUST be an object, even if empty like {}."),
+  confidence: z.enum(['High', 'Medium', 'Low']).describe("Confidence level in the inferred preferences. This field is REQUIRED."),
+  reasoning: z.string().optional().describe("Brief reasoning for the inferred preferences. This field is optional."),
+});
+
+// This is the final output schema for the flow, including userId and potential errorMessage
 const InferUserPreferencesOutputSchema = z.object({
   userId: z.string(),
   suggestedPreferences: z.object({
-    motivations: z.array(UserMotivationEnum).optional().describe("Inferred trading motivations. Pick 1-2 most dominant if multiple apply."),
+    motivations: z.array(UserMotivationEnum).optional(),
     locationPreference: z.object({
-      isSensitive: z.boolean().describe("True if user seems to care about location, false otherwise."),
-      notes: z.string().optional().describe("Any specific notes about location preference, e.g., 'prefers local pickup'.")
-    }).optional().describe("Inferred location preference."),
-    tradeTimingPreference: TradeTimingPreferenceEnum.optional().describe("Inferred trade timing preference."),
-    interestedInThirdPartyFulfillment: z.boolean().optional().describe("Inferred interest in 3rd party fulfillments. Default to true if unsure or positive sentiment towards flexibility."),
+      isSensitive: z.boolean(),
+      notes: z.string().optional(),
+    }).optional(),
+    tradeTimingPreference: TradeTimingPreferenceEnum.optional(),
+    interestedInThirdPartyFulfillment: z.boolean().optional(),
   }),
-  confidence: z.enum(['High', 'Medium', 'Low']).describe("Confidence level in the inferred preferences."),
-  reasoning: z.string().optional().describe("Brief reasoning for the inferred preferences."),
+  confidence: z.enum(['High', 'Medium', 'Low']),
+  reasoning: z.string().optional(),
   errorMessage: z.string().optional().describe('An error message if preference inference failed.'),
 });
 export type InferUserPreferencesOutput = z.infer<typeof InferUserPreferencesOutputSchema>;
+
 
 export async function inferUserPreferences(input: InferUserPreferencesInput): Promise<InferUserPreferencesOutput> {
   return inferUserPreferencesFlow(input);
@@ -70,7 +87,7 @@ export async function inferUserPreferences(input: InferUserPreferencesInput): Pr
 const prompt = ai.definePrompt({
   name: 'inferUserPreferencesPrompt',
   input: {schema: InferUserPreferencesInputSchema},
-  output: {schema: InferUserPreferencesOutputSchema.omit({ userId: true, errorMessage: true })},
+  output: {schema: AIPromptOutputSchema }, // AI is asked to produce this structure
   prompt: `You are an expert user profiler for a bartering platform. Your task is to infer a user's trading preferences based on their activity data.
 
 User ID: {{{userId}}}
@@ -88,7 +105,7 @@ User has no items currently listed for analysis.
 {{#if currentPreferences}}
 User's Current Explicit Preferences (to consider and refine):
 {{#if currentPreferences.motivations}} - Motivations: {{#each currentPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
-{{#if currentPreferences.locationPreference}} - Location: {{#if currentPreferences.locationPreference.isSensitive}}Sensitive (Notes: {{currentPreferences.locationPreference.notes}}){{else}}Flexible{{/if}}{{/if}}
+{{#if currentPreferences.locationPreference}} - Location: {{#if currentPreferences.locationPreference.isSensitive}}Sensitive (Notes: {{#if currentPreferences.locationPreference.notes}}"{{currentPreferences.locationPreference.notes}}"{{else}}Not specified{{/if}}){{else}}Flexible{{/if}}{{/if}}
 {{#if currentPreferences.tradeTimingPreference}} - Timing: {{{currentPreferences.tradeTimingPreference}}}{{/if}}
 {{#if currentPreferences.interestedInThirdPartyFulfillment}} - 3rd Party Fulfillment: Open{{else if currentPreferences.interestedInThirdPartyFulfillment === false}} - 3rd Party Fulfillment: Prefers Direct{{/if}}
 {{else}}
@@ -146,6 +163,14 @@ const inferUserPreferencesFlow = ai.defineFlow(
     const flowName = 'inferUserPreferencesFlow';
     console.log(`[${flowName}] Called with input for userId: ${input.userId}`);
 
+    // Initialize default values for the return structure for robustness
+    const defaultInferredPreferences: InferredUserPreferences = {
+      locationPreference: { isSensitive: false } as UserProfileLocationPreference, // Ensure locationPreference is always an object
+      tradeTimingPreference: 'flexible' as TradeTimingPreference,
+      interestedInThirdPartyFulfillment: true,
+      motivations: undefined,
+    };
+
     try {
       const processedInput = {
         ...input,
@@ -154,63 +179,56 @@ const inferUserPreferencesFlow = ai.defineFlow(
           description: item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : undefined,
         })),
       };
-      console.log(`[${flowName}] Processed input:`, JSON.stringify(processedInput, null, 2));
-
+      // console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
 
       const {output} = await prompt(processedInput);
-      console.log(`[${flowName}] Raw output from prompt:`, JSON.stringify(output, null, 2));
+      console.log(`[${flowName}] Raw output received from prompt:`, JSON.stringify(output, null, 2));
 
-
-      // Initialize default values for the return structure
-      let finalSuggestedPreferences: InferredUserPreferences = {
-        locationPreference: { isSensitive: false } as UserProfileLocationPreference,
-        tradeTimingPreference: 'flexible' as TradeTimingPreference,
-        interestedInThirdPartyFulfillment: true,
-        motivations: undefined,
-      };
+      // Initialize with defaults, to be overridden by valid AI output
+      let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
-      let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values have been applied for some preferences.";
+      let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values may have been applied.";
       let errorMessage: string | undefined = undefined;
 
       if (!output) {
         console.warn(`${flowName}: Prompt returned a null or undefined output object.`);
         baseReasoning = "AI failed to generate a response for preference inference. The model may be temporarily unavailable or did not provide data.";
-        errorMessage = "The AI assistant did not return a valid response. This might be due to a model issue or temporary service problem.";
+        errorMessage = "The AI assistant did not return a valid response object. This might be due to a model issue or temporary service problem.";
       } else {
         // Process suggestedPreferences carefully
         if (output.suggestedPreferences && typeof output.suggestedPreferences === 'object') {
           finalSuggestedPreferences.motivations = Array.isArray(output.suggestedPreferences.motivations) 
             ? output.suggestedPreferences.motivations.filter((m: any) => UserMotivationEnum.safeParse(m).success) as UserMotivation[]
-            : undefined;
+            : defaultInferredPreferences.motivations;
 
           if (output.suggestedPreferences.locationPreference && typeof output.suggestedPreferences.locationPreference === 'object') {
             finalSuggestedPreferences.locationPreference = {
-              isSensitive: typeof output.suggestedPreferences.locationPreference.isSensitive === 'boolean' ? output.suggestedPreferences.locationPreference.isSensitive : false,
-              notes: typeof output.suggestedPreferences.locationPreference.notes === 'string' ? output.suggestedPreferences.locationPreference.notes : undefined,
+              isSensitive: typeof output.suggestedPreferences.locationPreference.isSensitive === 'boolean' ? output.suggestedPreferences.locationPreference.isSensitive : (defaultInferredPreferences.locationPreference as UserProfileLocationPreference).isSensitive,
+              notes: typeof output.suggestedPreferences.locationPreference.notes === 'string' ? output.suggestedPreferences.locationPreference.notes : (defaultInferredPreferences.locationPreference as UserProfileLocationPreference).notes,
             };
           } else {
-            finalSuggestedPreferences.locationPreference = { isSensitive: false } as UserProfileLocationPreference;
+            finalSuggestedPreferences.locationPreference = defaultInferredPreferences.locationPreference;
             if (output.suggestedPreferences.locationPreference !== undefined) { 
-                errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for location preference was malformed.";
+                errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for location preference was malformed; using default.";
             }
           }
 
           finalSuggestedPreferences.tradeTimingPreference = TradeTimingPreferenceEnum.safeParse(output.suggestedPreferences.tradeTimingPreference).success
             ? output.suggestedPreferences.tradeTimingPreference
-            : 'flexible';
+            : defaultInferredPreferences.tradeTimingPreference;
           
           if (typeof output.suggestedPreferences.interestedInThirdPartyFulfillment === 'boolean') {
             finalSuggestedPreferences.interestedInThirdPartyFulfillment = output.suggestedPreferences.interestedInThirdPartyFulfillment;
           } else {
-            // Keep default of true if it's undefined or not a boolean
+            finalSuggestedPreferences.interestedInThirdPartyFulfillment = defaultInferredPreferences.interestedInThirdPartyFulfillment;
             if (output.suggestedPreferences.interestedInThirdPartyFulfillment !== undefined) {
-                 errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for third-party fulfillment was malformed.";
+                 errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for third-party fulfillment was malformed; using default.";
             }
           }
         } else {
           console.warn(`${flowName}: Prompt output was missing 'suggestedPreferences' or it was not an object. Output received:`, JSON.stringify(output, null, 2));
           errorMessage = (errorMessage ? errorMessage + " " : "") + "The AI's response for preferences was malformed or incomplete. Default preferences have been applied.";
-          baseReasoning = "AI response for preferences was malformed. Using default values.";
+          baseReasoning = "AI response for preferences was malformed or missing. Using default values.";
         }
 
         // Process confidence
@@ -237,47 +255,53 @@ const inferUserPreferencesFlow = ai.defineFlow(
     } catch (error: any) {
       console.error(`${flowName} - Caught Error Name: ${error.name || 'N/A'}, Message: ${error.message || 'N/A'}`);
       
-      try {
-        const errorDetails: Record<string, any> = {
-          name: error.name,
-          message: error.message,
-          stack: error.stack?.substring(0, 500), 
-          cause: error.cause,
-        };
-        if (typeof error === 'object' && error !== null) {
+      const errorDetails: Record<string, any> = {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.substring(0, 500), // Limit stack trace length
+        cause: error.cause, // Include the cause if available
+      };
+      if (typeof error === 'object' && error !== null) {
           if ('isGenkitError' in error) errorDetails.isGenkitError = (error as any).isGenkitError;
-          if ('details' in error) errorDetails.details = (error as any).details;
-          if ('statusCode' in error) errorDetails.statusCode = (error as any).statusCode;
-        }
+          if ('details' in error) errorDetails.details = (error as any).details; // Often contains more specific info from Genkit/Google
+          if ('status' in error && !('statusCode' in errorDetails)) errorDetails.status = (error as any).status; // Genkit errors might have 'status'
+          if ('code' in error && !('statusCode' in errorDetails)) errorDetails.code = (error as any).code; // Or 'code'
+          if ('statusCode' in error) errorDetails.statusCode = (error as any).statusCode; // For HTTP-like errors
+      }
+      try {
         console.error(`Detailed error object in ${flowName}:`, JSON.stringify(errorDetails, null, 2));
       } catch (e) {
-        console.error(`Could not stringify detailed error object in ${flowName}. Raw error object:`, error);
+        console.error(`Could not stringify detailed error object in ${flowName}. Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
+        console.error(`Original error object in ${flowName} (if stringify failed):`, error);
       }
 
-      let userMessage = "An unexpected error occurred while trying to infer user preferences.";
+      let userMessage = "An unexpected error occurred while trying to infer user preferences. Please check server logs for more details.";
       const lowerErrorMessage = String(error.message || "").toLowerCase();
 
-      if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
+      if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota') || errorDetails.status === 'RESOURCE_EXHAUSTED' || errorDetails.code === 8) {
         userMessage = "The preference inference service has reached its current usage limit.";
-      } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
-        userMessage = "The preference inference service is temporarily overloaded.";
+      } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded') || errorDetails.status === 'UNAVAILABLE' || errorDetails.code === 14) {
+        userMessage = "The preference inference service is temporarily overloaded or unavailable.";
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
-        userMessage = "Could not infer preferences due to content restrictions.";
+        userMessage = "Could not infer preferences due to content restrictions or safety settings.";
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
         userMessage = "The AI's response for preferences was not in the expected format. This might indicate a schema validation issue.";
+      } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status) {
+        // More generic message if it's a Genkit/model error not covered above
+        userMessage = "The AI model encountered an issue processing the request for preference inference. Please check server logs for specific details.";
+        if (error.message && !lowerErrorMessage.includes('unexpected') && !lowerErrorMessage.includes('internal') && !lowerErrorMessage.includes('unknown')) {
+            // Append Genkit's error message if it seems informative
+            userMessage += ` (Details: ${error.message.substring(0,150)}${error.message.length > 150 ? "..." : ""})`;
+        }
       }
       
-      console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${error.name || 'Error'}: ${error.message || 'No message available'}".`);
+      console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${errorDetails.name || 'Error'}: ${errorDetails.message || 'No message available'}".`);
 
       return {
-        userId: input.userId, // Ensure userId is present even in error returns
-        suggestedPreferences: {
-            locationPreference: { isSensitive: false} as UserProfileLocationPreference,
-            tradeTimingPreference: 'flexible' as TradeTimingPreference,
-            interestedInThirdPartyFulfillment: true,
-        },
+        userId: input.userId,
+        suggestedPreferences: { ...defaultInferredPreferences }, // Return defaults on error
         confidence: 'Low',
-        reasoning: "Failed to infer preferences due to a system error. Default preferences applied.",
+        reasoning: "Failed to infer preferences due to a system error. Default preferences applied. Please check server logs for detailed error information.",
         errorMessage: userMessage
       };
     }
