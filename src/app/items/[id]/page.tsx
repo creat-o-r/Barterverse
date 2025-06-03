@@ -38,7 +38,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
   if (!itemDetails) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8"> {/* Removed container classes, relying on layout's container */}
         <Card>
           <CardHeader><CardTitle className="text-center font-headline">Item Not Found</CardTitle></CardHeader>
           <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}</p></CardContent>
@@ -54,17 +54,17 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   // console.log(`[ItemDetailsDisplay] Successfully fetched and rendering item: ${item.name}`);
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="space-y-8"> {/* Removed container classes, relying on layout's container. Kept space-y-8 */}
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted"> {/* Added bg-muted */}
+          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted">
             <Image
               src={item.imageUrl || 'https://placehold.co/600x400.png'}
               alt={item.name}
               fill
               className="object-cover"
               data-ai-hint={item.dataAiHint || "item image"}
-              priority // Prioritize loading the main item image
+              priority
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           </div>
@@ -85,7 +85,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
             </CardHeader>
 
             <CardContent className="p-0 flex-grow">
-              <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap break-words mb-4">{item.description}</p> {/* Added break-words */}
+              <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap break-words mb-4">{item.description}</p>
               <Separator className="my-4" />
               <div className="space-y-3">
                 <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
@@ -130,7 +130,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
 function ItemPageLoadingState() {
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8 animate-pulse">
+    <div className="space-y-8 animate-pulse"> {/* Removed container classes */}
       <Card className="overflow-hidden shadow-lg">
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Image Skeleton */}
@@ -217,13 +217,13 @@ function SuggestedMatchesLoadingState() {
 // Main page wrapper component
 export default function ItemDetailPageWrapper({ params: paramsProp }: { params: { id: string } }) {
   // console.log('[ItemDetailPageWrapper] Received paramsProp:', paramsProp);
-  const params = use(paramsProp); // This is where 'use' hook is correctly used for params
+  const params = use(paramsProp); 
   // console.log('[ItemDetailPageWrapper] Resolved params by `use`:', params);
 
   if (!params || !params.id) {
     // console.error('[ItemDetailPageWrapper] Params or params.id is missing.');
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8"> {/* Removed container classes */}
         <Card className="border-destructive">
           <CardHeader><CardTitle className="text-destructive font-headline">Error: Missing Item ID</CardTitle></CardHeader>
           <CardContent><p className="font-body">The item ID was not provided in the request.</p></CardContent>
@@ -239,4 +239,3 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
     </Suspense>
   );
 }
-
