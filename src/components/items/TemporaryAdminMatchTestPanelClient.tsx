@@ -150,8 +150,18 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
             {!testLoading && (testSuggestions.length > 0 || testReasoning || testModeUsed) && (
               <div className="mt-4 space-y-3">
                 <h4 className="font-headline text-md">Test Results:</h4>
-                {testModeUsed && <p className="text-xs text-muted-foreground">Actual AI Matching Mode Used: <Badge variant={testModeUsed === 'advanced' ? "default" : "secondary"} className="capitalize">{testModeUsed}</Badge></p>}
-                {testPrefsConsidered !== undefined && <p className="text-xs text-muted-foreground">Actual AI Preferences Considered: <Badge variant={testPrefsConsidered ? "default" : "secondary"}>{testPrefsConsidered ? 'Yes' : 'No'}</Badge></p>}
+                {testModeUsed && 
+                  <div className="text-xs text-muted-foreground">
+                    <span>Actual AI Matching Mode Used: </span>
+                    <Badge variant={testModeUsed === 'advanced' ? "default" : "secondary"} className="capitalize">{testModeUsed}</Badge>
+                  </div>
+                }
+                {testPrefsConsidered !== undefined && 
+                  <div className="text-xs text-muted-foreground">
+                    <span>Actual AI Preferences Considered: </span>
+                    <Badge variant={testPrefsConsidered ? "default" : "secondary"}>{testPrefsConsidered ? 'Yes' : 'No'}</Badge>
+                  </div>
+                }
                 {testReasoning && <p className="text-xs italic text-muted-foreground">AI Reasoning: {testReasoning}</p>}
                 
                 {testSuggestions.length > 0 ? (
@@ -167,5 +177,3 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
     </Card>
   );
 }
-
-    
