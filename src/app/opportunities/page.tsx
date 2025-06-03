@@ -85,6 +85,8 @@ export default function OpportunityMatchPage() {
   const searchParams = useSearchParams();
   const mainItemIdQuery = searchParams.get('mainItemId');
   const suggestedItemIdQuery = searchParams.get('suggestedItemId');
+  const matchScoreQuery = searchParams.get('score');
+
 
   const [mainItemDetails, setMainItemDetails] = useState<{ item: Item; owner: User } | null>(null);
   const [suggestedItemDetails, setSuggestedItemDetails] = useState<{ item: Item; owner: User } | null>(null);
@@ -92,6 +94,7 @@ export default function OpportunityMatchPage() {
   const [opportunityReasoning, setOpportunityReasoning] = useState<string | null>(null);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null); 
+  const [matchScore, setMatchScore] = useState<string | null>(null);
 
   const currentUserId = dummyUsers[0].id; 
 
@@ -100,6 +103,8 @@ export default function OpportunityMatchPage() {
       setLoading(true);
       setOpportunityReasoning(null);
       setInsightsError(null); 
+      setMatchScore(matchScoreQuery); // Set score from query param
+
       const mainD = await getItemAndOwner(mainItemIdQuery);
       const suggestedD = await getItemAndOwner(suggestedItemIdQuery);
 
@@ -157,7 +162,7 @@ export default function OpportunityMatchPage() {
         setLoading(false); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainItemIdQuery, suggestedItemIdQuery]);
+  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery]); // Added matchScoreQuery to dependencies
 
   if (loading) {
     return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><ArrowRightLeft className="h-5 w-5 animate-spin" /> Loading opportunity details...</div>;
@@ -241,23 +246,45 @@ export default function OpportunityMatchPage() {
           <div className="mt-6 pt-6 border-t">
             {loadingReasoning && (
                 <div className="text-center text-muted-foreground font-body py-3 flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Reasoning...
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Insights...
                 </div>
             )}
-            {!loadingReasoning && opportunityReasoning && (
+            {!loadingReasoning && (opportunityReasoning || matchScore || insightsError) && (
                 <Card className={insightsError ? "border-destructive/50 bg-destructive/5" : "bg-muted/50 border-primary/30"}>
                     <CardHeader className="pb-2 pt-3">
-                        <CardTitle className={`font-headline text-base flex items-center gap-2 ${insightsError ? 'text-destructive-foreground' : 'text-primary'}`}>
-                            {insightsError ? <AlertCircle className="h-4 w-4"/> : <FileText className="h-4 w-4"/>}
-                            AI's Rationale for this Match
+                        <CardTitle className={`font-headline text-lg flex items-center gap-2 ${insightsError ? 'text-destructive-foreground' : 'text-primary'}`}>
+                            {insightsError && !opportunityReasoning ? <AlertCircle className="h-5 w-5"/> : <FileText className="h-5 w-5"/>}
+                            AI Insights
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-0">
-                        <p className={`text-sm font-body ${insightsError ? 'text-destructive-foreground/90' : 'text-muted-foreground italic'}`}>{opportunityReasoning}</p>
+                    <CardContent className="pt-0 space-y-3">
+                        {matchScore && !insightsError && (
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm">Match Score: </span>
+                                <Badge variant={
+                                    matchScore.toLowerCase() === 'high' ? 'default' :
+                                    matchScore.toLowerCase() === 'medium' ? 'secondary' :
+                                    'outline' 
+                                } className="capitalize text-sm py-1 px-2.5">
+                                    {matchScore}
+                                </Badge>
+                            </div>
+                        )}
+                        {opportunityReasoning && (
+                             <div>
+                                <span className="font-semibold text-sm">Rationale: </span>
+                                <p className={`text-sm font-body ${insightsError ? 'text-destructive-foreground/90' : 'text-muted-foreground'}`}>{opportunityReasoning}</p>
+                             </div>
+                        )}
+                         {!opportunityReasoning && insightsError && !matchScore && ( // Only show this if ONLY an error and no other info
+                            <p className="text-sm font-body text-destructive-foreground/90">{insightsError}</p>
+                        )}
+                         {!opportunityReasoning && !insightsError && !matchScore && ( // Fallback if nothing loaded
+                            <p className="text-sm font-body text-muted-foreground">No AI insights available for this specific pairing.</p>
+                        )}
                     </CardContent>
                 </Card>
             )}
-            {/* Redundant error display covered by the condition above */}
           </div>
           
           <Separator className="my-6 md:my-8" />
@@ -287,4 +314,3 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
-

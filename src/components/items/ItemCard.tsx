@@ -24,7 +24,17 @@ function getMatchScoreColorStyles(score?: string): string {
 
 export default function ItemCard({ item, matchScore, opportunityContextItemId }: ItemCardProps) {
   const linkHref = `/items/${item.id}`;
-  const opportunityLink = opportunityContextItemId ? `/opportunities?mainItemId=${opportunityContextItemId}&suggestedItemId=${item.id}` : null;
+  
+  let opportunityLink: string | null = null;
+  if (opportunityContextItemId) {
+    const opportunityLinkParams = new URLSearchParams();
+    opportunityLinkParams.set('mainItemId', opportunityContextItemId);
+    opportunityLinkParams.set('suggestedItemId', item.id);
+    if (matchScore) {
+        opportunityLinkParams.set('score', matchScore);
+    }
+    opportunityLink = `/opportunities?${opportunityLinkParams.toString()}`;
+  }
 
   return (
     <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl group">
