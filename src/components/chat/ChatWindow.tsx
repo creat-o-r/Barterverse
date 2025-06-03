@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -7,21 +8,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Send, User, Bot, Loader2 } from 'lucide-react';
 import type { Item, ChatMessage } from '@/types';
-import { tradeNegotiationChat } from '@/ai/flows/trade-negotiation-chat'; // Adjust path as necessary
+import { tradeNegotiationChat } from '@/ai/flows/trade-negotiation-chat';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
+import { dummyUsers } from '@/lib/dummy-data'; // For currentUserId simulation
 
 interface ChatWindowProps {
-  currentItem: Item; // The item the current user is offering (or context item)
-  requestedItemInitial?: Item | null; // Item initially requested, if any
+  currentItem: Item; // Item that forms the primary context from *other user's* side (e.g., what they offer, or what they want of yours)
+  requestedItemInitial?: Item | null; // Item that forms primary context from *current user's* side (e.g., what you offer, or what you want of theirs)
   otherUserId: string;
   otherUserName: string;
-  tradeId: string; // To scope chat history if persisted
+  tradeId: string; // To scope chat history if persisted AND determine trade initiator
 }
 
 export default function ChatWindow({
-  currentItem,
-  requestedItemInitial,
+  currentItem, // From other user's perspective for the negotiation (e.g. their offer, or their want that is your item)
+  requestedItemInitial, // From current user's perspective (e.g. your offer, or your want that is their item)
   otherUserId,
   otherUserName,
   tradeId,
@@ -32,21 +34,41 @@ export default function ChatWindow({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Initial message from AI to set context
+  const currentUserId = dummyUsers[0].id; // Simulate current user
+
+  // Determine who initiated the trade interest based on tradeId
+  // tradeId format: trade-${INITIATOR_ID}-wants-${WANTED_ITEM_ID}-from-${WANTED_ITEM_OWNER_ID}
+  const tradeIdParts = tradeId.split('-');
+  const initiatorId = tradeIdParts.length > 1 ? tradeIdParts[1] : null;
+  const isCurrentUserInitiator = currentUserId === initiatorId;
+
   useEffect(() => {
+    let initialAiText = `Hi! I'm here to help you negotiate with ${otherUserName}. `;
+    if (isCurrentUserInitiator) {
+      initialAiText += `You're interested in their "${currentItem.name}". What would you like to propose?`;
+      if (requestedItemInitial) {
+        initialAiText += ` You could offer your "${requestedItemInitial.name}".`;
+      }
+    } else {
+      initialAiText += `${otherUserName} is interested in your "${requestedItemInitial?.name || 'item'}". What are your thoughts?`;
+      if (currentItem) {
+         initialAiText += ` They might offer their "${currentItem.name}".`;
+      }
+    }
+
     setMessages([
       {
         id: 'initial-ai-message',
         senderId: 'llm',
-        text: `Hi! I'm here to help you negotiate a trade for "${currentItem.name}" with ${otherUserName}. What would you like to propose or discuss? ${requestedItemInitial ? `They have listed "${requestedItemInitial.name}".` : ''}`,
+        text: initialAiText,
         timestamp: new Date(),
         isAIMessage: true,
       },
     ]);
-  }, [currentItem, otherUserName, requestedItemInitial]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentItem, otherUserName, requestedItemInitial, isCurrentUserInitiator]); // Added isCurrentUserInitiator
 
   useEffect(() => {
-    // Scroll to bottom when new messages are added
     if (scrollAreaRef.current) {
       const scrollViewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
       if (scrollViewport) {
@@ -60,8 +82,8 @@ export default function ChatWindow({
     if (!newMessage.trim()) return;
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(), // Temporary ID
-      senderId: 'user', // Assuming 'user1' is the current user
+      id: Date.now().toString(),
+      senderId: currentUserId, // Use actual currentUserId
       text: newMessage,
       timestamp: new Date(),
     };
@@ -70,17 +92,36 @@ export default function ChatWindow({
     setIsLoading(true);
 
     try {
-      const chatHistory = messages.map(msg => `${msg.senderId === 'llm' ? 'AI' : 'User'}: ${msg.text}`).join('\n');
+      const chatHistory = messages.map(msg => `${msg.senderId === 'llm' ? 'AI' : (msg.senderId === currentUserId ? 'User' : 'OtherUser')}: ${msg.text}`).join('\n');
+      
+      let itemOfferedForFlowDesc = "Not specified";
+      let itemWantedForFlowDesc = "Not specified";
+
+      if (isCurrentUserInitiator) {
+        // Current user wants `currentItem` (from other user) and offers `requestedItemInitial` (their own)
+        itemOfferedForFlowDesc = requestedItemInitial 
+          ? `${requestedItemInitial.name}: ${requestedItemInitial.description}` 
+          : "User's offer is being discussed.";
+        itemWantedForFlowDesc = `${currentItem.name}: ${currentItem.description}`;
+      } else {
+        // Other user wants `requestedItemInitial` (current user's item) and offers `currentItem` (their own)
+        itemOfferedForFlowDesc = currentItem 
+          ? `${currentItem.name}: ${currentItem.description}`
+          : "Other user's offer is being discussed.";
+        itemWantedForFlowDesc = requestedItemInitial
+          ? `${requestedItemInitial.name}: ${requestedItemInitial.description}`
+          : "Item wanted is being discussed.";
+      }
       
       const aiResponse = await tradeNegotiationChat({
-        itemOfferedDescription: `${currentItem.name}: ${currentItem.description}`,
-        itemWantedDescription: requestedItemInitial ? `${requestedItemInitial.name}: ${requestedItemInitial.description}` : 'User has not specified an item yet.',
-        chatHistory: chatHistory + `\nUser: ${userMessage.text}`, // Append current message to history for AI
+        itemOfferedDescription: itemOfferedForFlowDesc,
+        itemWantedDescription: itemWantedForFlowDesc,
+        chatHistory: chatHistory + `\nUser (${currentUserId}): ${userMessage.text}`,
         userMessage: userMessage.text,
       });
 
       const aiMessage: ChatMessage = {
-        id: Date.now().toString() + '-ai', // Temporary ID
+        id: Date.now().toString() + '-ai',
         senderId: 'llm',
         text: aiResponse.response,
         timestamp: new Date(),
@@ -94,7 +135,6 @@ export default function ChatWindow({
         description: "Could not get a response from the negotiation assistant. Please try again.",
         variant: "destructive",
       });
-      // Optionally add an error message to chat
       const errorMessage: ChatMessage = {
         id: Date.now().toString() + '-err',
         senderId: 'llm',
@@ -116,10 +156,10 @@ export default function ChatWindow({
             key={message.id}
             className={cn(
               'flex items-end gap-2 mb-4',
-              message.senderId === 'user' ? 'justify-end' : 'justify-start'
+              message.senderId === currentUserId ? 'justify-end' : 'justify-start'
             )}
           >
-            {message.senderId !== 'user' && (
+            {message.senderId !== currentUserId && (
               <Avatar className="h-8 w-8">
                 <AvatarFallback><Bot size={18}/></AvatarFallback>
               </Avatar>
@@ -127,7 +167,7 @@ export default function ChatWindow({
             <div
               className={cn(
                 'max-w-[70%] p-3 rounded-lg text-sm font-body',
-                message.senderId === 'user'
+                message.senderId === currentUserId
                   ? 'bg-primary text-primary-foreground rounded-br-none'
                   : 'bg-muted text-muted-foreground rounded-bl-none'
               )}
@@ -135,15 +175,16 @@ export default function ChatWindow({
               <p className="whitespace-pre-wrap">{message.text}</p>
               <p className={cn(
                 "text-xs mt-1",
-                message.senderId === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground/70',
-                message.senderId === 'user' ? 'text-right' : 'text-left'
+                message.senderId === currentUserId ? 'text-primary-foreground/70' : 'text-muted-foreground/70',
+                message.senderId === currentUserId ? 'text-right' : 'text-left'
               )}>
                 {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
-            {message.senderId === 'user' && (
+            {message.senderId === currentUserId && (
               <Avatar className="h-8 w-8">
-                <AvatarFallback><User size={18}/></AvatarFallback>
+                 {/* Add user avatar image if available, otherwise fallback to initial */}
+                <AvatarFallback>{dummyUsers.find(u=>u.id === currentUserId)?.name.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
             )}
           </div>
