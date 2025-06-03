@@ -10,25 +10,25 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-
 interface SuggestedMatchesProps {
   currentItem: Item;
 }
 
 export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps) {
-  const [suggestedItemsWithScores, setSuggestedItemsWithScores] = useState<(Item & { matchScore: string; isThirdPartyFulfillment?: boolean })[]>([]);
+  const [suggestedItems, setSuggestedItems] = useState<Item[]>([]); // Changed from suggestedItemsWithScores
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
   const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
-
+  // If you need to display scores separately, you can maintain another state:
+  // const [matchScores, setMatchScores] = useState<Array<{itemId: string, score: string}>>([]);
 
   useEffect(() => {
     async function fetchSuggestions() {
       setLoading(true);
       setFetchError(null);
       setAiReasoning(null);
-      setSuggestedItemsWithScores([]); 
+      setSuggestedItems([]); 
       setPreferencesWereConsidered(false);
 
       if (!currentItem?.id) {
@@ -64,7 +64,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         if (otherAvailableItems.length === 0) {
             const noItemsReasoning = `No other items currently available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'this item'} "${currentItem.name}".`;
             setAiReasoning(noItemsReasoning);
-            setSuggestedItemsWithScores([]);
+            setSuggestedItems([]);
             setLoading(false);
             return;
         }
@@ -87,24 +87,12 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         
         setPreferencesWereConsidered(result.preferencesConsidered || false);
 
-        const augmentedMatchedItems = (result.suggestedMatches || []).map(match => {
-          const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-          if (!itemDetails) return null;
+        // Simplified: just get the Item objects
+        const plainMatchedItems = (result.suggestedMatches || []).map(match => {
+          return dummyItems.find(dItem => dItem.id === match.itemId);
+        }).filter(Boolean) as Item[];
 
-          let isThirdPartyFulfillment = false;
-          if (
-            currentItem.listingType === 'want' && 
-            itemDetails.listingType === 'offer' && 
-            match.ownerId !== viewingUser.id && 
-            match.ownerId !== currentItem.ownerId 
-          ) {
-            isThirdPartyFulfillment = true;
-          }
-
-          return { ...itemDetails, matchScore: match.matchScore, isThirdPartyFulfillment };
-        }).filter(Boolean) as (Item & { matchScore: string; isThirdPartyFulfillment?: boolean })[];
-
-        setSuggestedItemsWithScores(augmentedMatchedItems);
+        setSuggestedItems(plainMatchedItems);
         setAiReasoning(result.reasoning || null);
         
         const reasoningIsErrorOrSystemMessage = result.reasoning && (
@@ -116,7 +104,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             result.reasoning.toLowerCase().includes('no other items available')
         );
 
-        if (augmentedMatchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
+        if (plainMatchedItems.length === 0 && result.reasoning && !reasoningIsErrorOrSystemMessage) {
              setAiReasoning(result.reasoning || (currentItem.listingType === 'offer' ? "No specific AI-powered matches found for this item right now." : "No specific AI-powered fulfillments found for this want right now."));
         } else if (result.reasoning && reasoningIsErrorOrSystemMessage) {
             setFetchError(result.reasoning);
@@ -186,7 +174,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
     );
   }
   
-  if (suggestedItemsWithScores.length === 0) {
+  if (suggestedItems.length === 0) {
      return (
       <Card className="border-border border-dashed">
         <CardHeader>
@@ -225,7 +213,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
            )}
       </CardHeader>
       <CardContent>
-          <ItemList items={suggestedItemsWithScores} mainContextItemId={currentItem.id} />
+          <ItemList items={suggestedItems} />
       </CardContent>
       </Card>
   );

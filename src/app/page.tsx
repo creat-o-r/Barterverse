@@ -15,11 +15,12 @@ import { Badge } from '@/components/ui/badge';
 
 interface UserItemSuggestion {
   userItem: Item;
-  suggestedMatches: (Item & { matchScore: string })[];
+  suggestedMatches: Item[]; // Changed from (Item & { matchScore: string })[]
   reasoning: string | null;
   isLoading: boolean;
   error: string | null;
   preferencesConsidered?: boolean;
+  matchScores?: { itemId: string, score: string }[]; // Store scores separately if needed for display outside ItemCard
 }
 
 export default function HomePage() {
@@ -30,7 +31,6 @@ export default function HomePage() {
   const allAvailableOrPendingItemsFromOtherUsers = dummyItems.filter(item => 
     (item.status === 'available' || item.status === 'pending') && item.ownerId !== dummyUsers[0].id // Simulate current user is dummyUsers[0]
   );
-
 
   useEffect(() => {
     async function fetchAllUserItemMatches() {
@@ -61,6 +61,7 @@ export default function HomePage() {
         isLoading: true,
         error: null,
         preferencesConsidered: false,
+        matchScores: [],
       }));
       setUserItemSuggestions(initialSuggestions);
       setOverallLoading(false); 
@@ -129,18 +130,20 @@ export default function HomePage() {
           if (settledResult.status === 'fulfilled') {
             const { index, success, data, error: promiseError } = settledResult.value;
             if (success && data) {
-              const matchedItems = (data.suggestedMatches || []).map(match => {
-                const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-                return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
-              }).filter(Boolean) as (Item & { matchScore: string })[];
+              const plainItems = (data.suggestedMatches || []).map(match => {
+                return dummyItems.find(dItem => dItem.id === match.itemId);
+              }).filter(Boolean) as Item[];
               
+              const scores = (data.suggestedMatches || []).map(match => ({itemId: match.itemId, score: match.matchScore}));
+
               newSuggestions[index] = {
                 ...newSuggestions[index],
-                suggestedMatches: matchedItems,
-                reasoning: data.reasoning || (matchedItems.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
+                suggestedMatches: plainItems,
+                reasoning: data.reasoning || (plainItems.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
                 isLoading: false,
                 error: null,
                 preferencesConsidered: data.preferencesConsidered,
+                matchScores: scores,
               };
             } else {
               newSuggestions[index] = {
@@ -263,7 +266,7 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 ? (
-                  <ItemList items={itemSuggestion.suggestedMatches} mainContextItemId={itemSuggestion.userItem.id} />
+                  <ItemList items={itemSuggestion.suggestedMatches} />
                 ) : !itemSuggestion.error && (
                   <p className="text-muted-foreground font-body text-center py-4">{itemSuggestion.reasoning || "No specific AI suggestions found for this item at the moment."}</p>
                 )}
