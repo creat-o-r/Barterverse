@@ -144,6 +144,8 @@ const inferUserPreferencesFlow = ai.defineFlow(
   },
   async (input: InferUserPreferencesInput): Promise<InferUserPreferencesOutput> => {
     const flowName = 'inferUserPreferencesFlow';
+    console.log(`[${flowName}] Called with input for userId: ${input.userId}`);
+
     try {
       const processedInput = {
         ...input,
@@ -152,8 +154,12 @@ const inferUserPreferencesFlow = ai.defineFlow(
           description: item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : undefined,
         })),
       };
+      console.log(`[${flowName}] Processed input:`, JSON.stringify(processedInput, null, 2));
+
 
       const {output} = await prompt(processedInput);
+      console.log(`[${flowName}] Raw output from prompt:`, JSON.stringify(output, null, 2));
+
 
       // Initialize default values for the return structure
       let finalSuggestedPreferences: InferredUserPreferences = {
@@ -163,7 +169,6 @@ const inferUserPreferencesFlow = ai.defineFlow(
         motivations: undefined,
       };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
-      // Default reasoning if AI response is problematic
       let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values have been applied for some preferences.";
       let errorMessage: string | undefined = undefined;
 
@@ -184,9 +189,8 @@ const inferUserPreferencesFlow = ai.defineFlow(
               notes: typeof output.suggestedPreferences.locationPreference.notes === 'string' ? output.suggestedPreferences.locationPreference.notes : undefined,
             };
           } else {
-            // If locationPreference is missing or not an object, keep default.
-             finalSuggestedPreferences.locationPreference = { isSensitive: false } as UserProfileLocationPreference;
-            if (output.suggestedPreferences.locationPreference !== undefined) { // only add error if it was present but malformed
+            finalSuggestedPreferences.locationPreference = { isSensitive: false } as UserProfileLocationPreference;
+            if (output.suggestedPreferences.locationPreference !== undefined) { 
                 errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for location preference was malformed.";
             }
           }
@@ -195,14 +199,18 @@ const inferUserPreferencesFlow = ai.defineFlow(
             ? output.suggestedPreferences.tradeTimingPreference
             : 'flexible';
           
-          finalSuggestedPreferences.interestedInThirdPartyFulfillment = typeof output.suggestedPreferences.interestedInThirdPartyFulfillment === 'boolean' 
-            ? output.suggestedPreferences.interestedInThirdPartyFulfillment 
-            : true;
+          if (typeof output.suggestedPreferences.interestedInThirdPartyFulfillment === 'boolean') {
+            finalSuggestedPreferences.interestedInThirdPartyFulfillment = output.suggestedPreferences.interestedInThirdPartyFulfillment;
+          } else {
+            // Keep default of true if it's undefined or not a boolean
+            if (output.suggestedPreferences.interestedInThirdPartyFulfillment !== undefined) {
+                 errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for third-party fulfillment was malformed.";
+            }
+          }
         } else {
           console.warn(`${flowName}: Prompt output was missing 'suggestedPreferences' or it was not an object. Output received:`, JSON.stringify(output, null, 2));
           errorMessage = (errorMessage ? errorMessage + " " : "") + "The AI's response for preferences was malformed or incomplete. Default preferences have been applied.";
           baseReasoning = "AI response for preferences was malformed. Using default values.";
-          // Confidence will remain 'Low' as initialized
         }
 
         // Process confidence
@@ -215,7 +223,6 @@ const inferUserPreferencesFlow = ai.defineFlow(
             errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for confidence was missing or invalid.";
         }
         
-        // Process reasoning (if provided and valid, otherwise use the baseReasoning)
         baseReasoning = typeof output.reasoning === 'string' && output.reasoning.trim() !== '' ? output.reasoning : baseReasoning;
       }
       
@@ -228,20 +235,20 @@ const inferUserPreferencesFlow = ai.defineFlow(
       };
 
     } catch (error: any) {
-      // Log basic error info first, as stringify can fail
-      console.error(`${flowName} - Caught Error Name: ${error.name}, Message: ${error.message}`);
+      console.error(`${flowName} - Caught Error Name: ${error.name || 'N/A'}, Message: ${error.message || 'N/A'}`);
       
-      // Then attempt detailed logging
       try {
-        const errorDetails = {
+        const errorDetails: Record<string, any> = {
           name: error.name,
           message: error.message,
           stack: error.stack?.substring(0, 500), 
           cause: error.cause,
-          isGenkitError: error.isGenkitError,
-          details: error.isGenkitError ? error.details : undefined,
-          statusCode: error.isGenkitError ? error.statusCode : undefined,
         };
+        if (typeof error === 'object' && error !== null) {
+          if ('isGenkitError' in error) errorDetails.isGenkitError = (error as any).isGenkitError;
+          if ('details' in error) errorDetails.details = (error as any).details;
+          if ('statusCode' in error) errorDetails.statusCode = (error as any).statusCode;
+        }
         console.error(`Detailed error object in ${flowName}:`, JSON.stringify(errorDetails, null, 2));
       } catch (e) {
         console.error(`Could not stringify detailed error object in ${flowName}. Raw error object:`, error);
@@ -260,10 +267,10 @@ const inferUserPreferencesFlow = ai.defineFlow(
         userMessage = "The AI's response for preferences was not in the expected format. This might indicate a schema validation issue.";
       }
       
-      console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${error.name} - ${error.message || 'N/A'}".`);
+      console.error(`${flowName} is returning an error to the client. User-facing message: "${userMessage}". Original error: "${error.name || 'Error'}: ${error.message || 'No message available'}".`);
 
       return {
-        userId: input.userId,
+        userId: input.userId, // Ensure userId is present even in error returns
         suggestedPreferences: {
             locationPreference: { isSensitive: false} as UserProfileLocationPreference,
             tradeTimingPreference: 'flexible' as TradeTimingPreference,
@@ -276,5 +283,3 @@ const inferUserPreferencesFlow = ai.defineFlow(
     }
   }
 );
-
-    
