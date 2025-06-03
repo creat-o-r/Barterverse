@@ -10,7 +10,7 @@ import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-serv
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2, FileText } from 'lucide-react';
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Handshake, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -24,14 +24,13 @@ async function getUserProfile(userId: string): Promise<User | null> {
   const user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
   user.items = dummyItems.filter(item => item.ownerId === user.id);
-  return JSON.parse(JSON.stringify(user));
+  return JSON.parse(JSON.stringify(user)); // Deep copy to avoid mutation issues with state
 }
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
 const tradeTimingTextMap: Record<TradeTimingPreference, string> = { 'simultaneous': 'Prefers Simultaneous', 'staged': 'Open to Staged Trades', 'flexible': 'Flexible Timing', };
 
 
-// Updated to generate more dynamic summary based on user's current preferences
 const generateMockActivitySummaryForUser = (user: User | null): string => {
   if (!user) return "No user data available to generate activity summary.";
   let summary = `Activity Analysis for ${user.name} (ID: ${user.id}) to refine preferences:\n`;
@@ -112,13 +111,14 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     if (params.userId) {
         loadUserProfile();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.userId, isOwnProfile]); 
 
   const handleLearnPreferences = async () => {
     if (!user) return;
     setIsLearningPreferences(true);
-    const currentActivitySummary = generateMockActivitySummaryForUser(user); // Generate fresh summary
-    setActivitySummaryForAI(currentActivitySummary); // Update for display if collapsible is open
+    const currentActivitySummary = generateMockActivitySummaryForUser(user); 
+    setActivitySummaryForAI(currentActivitySummary); 
 
     try {
       const input: InferUserPreferencesInput = { userId: user.id, activitySummary: currentActivitySummary };
@@ -129,7 +129,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
       } else {
         const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences);
         if (updateSuccess) {
-          const updatedProfile = await getUserProfile(user.id);
+          const updatedProfile = await getUserProfile(user.id); // Re-fetch to get updated user from "dummy DB"
           setUser(updatedProfile); 
           toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
         } else {
@@ -145,7 +145,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
   };
 
   if (loading) {
-    return <div className="text-center py-10 font-body">Loading profile...</div>;
+    return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />Loading profile...</div>;
   }
   if (!user) {
     return <div className="text-center py-10 font-body">User not found.</div>;
@@ -212,7 +212,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
                         <FileText className="h-4 w-4 text-muted-foreground"/>
                         Activity Summary for AI
                     </h4>
-                    <pre className="text-xs font-code whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
+                    <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
                         {activitySummaryForAI || "No activity summary generated yet."}
                     </pre>
                     </div>
@@ -233,3 +233,4 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
+
