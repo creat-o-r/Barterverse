@@ -155,30 +155,45 @@ const inferUserPreferencesFlow = ai.defineFlow(
       };
 
       const {output} = await prompt(processedInput);
-      if (!output || !output.suggestedPreferences) { // Check if suggestedPreferences object exists
+
+      if (!output) { // Check if the entire output object is null/undefined
+        console.warn(`${flowName}: Prompt returned a null/undefined output object.`);
+        return {
+            userId: input.userId,
+            suggestedPreferences: {
+                locationPreference: { isSensitive: false },
+                tradeTimingPreference: 'flexible',
+                interestedInThirdPartyFulfillment: true,
+            },
+            confidence: 'Low',
+            reasoning: "AI failed to generate a response for preference inference. The model may be temporarily unavailable or did not provide data.",
+            errorMessage: "The AI assistant did not return a valid response. This might be due to a model issue or temporary service problem."
+        };
+      }
+      
+      if (!output.suggestedPreferences) { // Check if suggestedPreferences object exists
         console.warn(`${flowName}: Prompt returned null or incomplete output for suggestedPreferences.`);
         return {
             userId: input.userId,
-            suggestedPreferences: { // Ensure a default structure for suggestedPreferences
-                locationPreference: { isSensitive: false}, // Default for nested object
-                tradeTimingPreference: 'flexible', // Default enum
-                interestedInThirdPartyFulfillment: true, // Default boolean
-                // motivations: [], // Default array, can be empty
+            suggestedPreferences: {
+                locationPreference: { isSensitive: false},
+                tradeTimingPreference: 'flexible',
+                interestedInThirdPartyFulfillment: true,
             },
-            confidence: 'Low', // Default enum
-            reasoning: "AI could not reliably infer preferences from the provided data.",
-            errorMessage: "The AI assistant could not infer preferences at this time."
+            confidence: 'Low',
+            reasoning: "AI could not reliably infer preferences from the provided data, or the response structure was incomplete.",
+            errorMessage: "The AI assistant could not infer preferences at this time or the response was malformed."
         };
       }
       return {
         userId: input.userId,
-        suggestedPreferences: { // Ensure all parts of suggestedPreferences are at least defaulted if not present from LLM
+        suggestedPreferences: {
           motivations: output.suggestedPreferences.motivations || undefined,
           locationPreference: output.suggestedPreferences.locationPreference || { isSensitive: false },
           tradeTimingPreference: output.suggestedPreferences.tradeTimingPreference || 'flexible',
           interestedInThirdPartyFulfillment: output.suggestedPreferences.interestedInThirdPartyFulfillment === undefined ? true : output.suggestedPreferences.interestedInThirdPartyFulfillment,
         },
-        confidence: output.confidence, // This should be present if output is valid
+        confidence: output.confidence,
         reasoning: output.reasoning,
       };
     } catch (error: any) {
