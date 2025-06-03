@@ -246,7 +246,7 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4 pt-2">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-2">
           <div>
             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">
               <Filter className="h-4 w-4 text-muted-foreground"/>Minimum Match Rating:
@@ -255,67 +255,77 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
               {effectiveMinimumMatchRating}
             </Badge>
           </div>
-          {user.motivations && user.motivations.length > 0 && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4><div className="flex flex-wrap gap-1.5">{user.motivations.map(motivation => (<Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>))}</div></div>)}
+
+          {user.motivations && user.motivations.length > 0 && (
+            <div>
+              <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {user.motivations.map(motivation => (
+                  <Badge key={motivation} variant="outline" className="text-xs">{motivationTextMap[motivation] || motivation}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div>
             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location &amp; Delivery:</h4>
             <div className="space-y-1 pl-5">
-                <Badge variant={user.locationPreference?.isSensitive ? "secondary" : "outline"} className="text-xs">
-                    {user.locationPreference?.isSensitive ? "Location Sensitive" : "Location Flexible"}
-                </Badge>
-                {user.locationPreference?.isSensitive && user.locationPreference.notes && (<p className="text-xs text-muted-foreground font-body italic">{user.locationPreference.notes}</p>)}
-                
+              <Badge variant={user.locationPreference?.isSensitive ? "secondary" : "outline"} className="text-xs">
+                {user.locationPreference?.isSensitive ? "Location Sensitive" : "Location Flexible"}
+              </Badge>
+              {user.locationPreference?.isSensitive && user.locationPreference.notes && (
+                <p className="text-xs text-muted-foreground font-body italic">{user.locationPreference.notes}</p>
+              )}
+              {preferredLocation && (
                 <div className="flex items-center gap-1.5 text-xs">
-                    {preferredLocationIcon}
-                    <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-auto max-w-full truncate">
-                    {preferredLocation ? `${preferredLocation.name}${preferredLocation.address ? ` (${preferredLocation.address})` : ''}` : 'Preferred spot not set'}
-                    </Badge>
+                  {preferredLocationIcon}
+                  <Badge variant="outline" className="text-xs px-1.5 py-0.5 h-auto max-w-full truncate">
+                    {preferredLocation.name}{preferredLocation.address ? ` (${preferredLocation.address})` : ''}
+                  </Badge>
                 </div>
-                
-                {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 && (
-                    <div className="text-xs pt-0.5">
-                        <div className="flex flex-wrap gap-1">
-                            {user.logisticsPreferences.defaultDeliveryMethods.map(method => (
-                            <Badge key={method} variant="outline" className="text-xs cursor-default py-0.5 px-1.5">
-                                {deliveryMethodDisplayMapConcrete[method] || method}
-                            </Badge>
-                            ))}
-                        </div>
-                    </div>
-                )}
+              )}
+              {user.logisticsPreferences?.defaultDeliveryMethods && user.logisticsPreferences.defaultDeliveryMethods.length > 0 && (
+                <div className="text-xs pt-0.5">
+                  <span className="font-medium text-muted-foreground">Preferred Methods: </span>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {user.logisticsPreferences.defaultDeliveryMethods.map(method => (
+                      <Badge key={method} variant="outline" className="text-xs cursor-default py-0.5 px-1.5">
+                        {deliveryMethodDisplayMapConcrete[method] || method}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {user.tradeTimingPreference && (<div><h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4><Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge></div>)}
+          {user.tradeTimingPreference && (
+            <div>
+              <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4>
+              <Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge>
+            </div>
+          )}
           
           <div>
-            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              3rd Party Fulfillments:
-            </h4>
-            <Badge
-              variant={user.interestedInThirdPartyFulfillment ? "default" : "secondary"}
-              className="text-xs"
-            >
-              {getThirdPartyFulfillmentSimpleText(user.interestedInThirdPartyFulfillment)}
-            </Badge>
-          </div>
-          
-          <div>
-            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5">
-              <Network className="h-4 w-4 text-muted-foreground" />
-              Chain Delivery:
-            </h4>
-            <Badge
-              variant="outline"
-              className="text-xs"
-            >
-              {user.logisticsPreferences?.openToChainDelivery === true ? "Yes" : user.logisticsPreferences?.openToChainDelivery === false ? "No" : "Not Specified"}
-            </Badge>
+            <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>Fulfillment Options:</h4>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5">
+                <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">3rd Party:</span>
+                    <Badge variant={user.interestedInThirdPartyFulfillment ? "default" : (user.interestedInThirdPartyFulfillment === false ? "secondary" : "outline")} className="text-xs">
+                        {getThirdPartyFulfillmentSimpleText(user.interestedInThirdPartyFulfillment)}
+                    </Badge>
+                </div>
+                <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Chain Delivery:</span>
+                    <Badge variant="outline" className="text-xs">
+                        {user.logisticsPreferences?.openToChainDelivery === true ? "Yes" : user.logisticsPreferences?.openToChainDelivery === false ? "No" : "Not Specified"}
+                    </Badge>
+                </div>
+            </div>
           </div>
           
           {isOwnProfile && allowAutoPreferenceInference && (
-            <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4">
+            <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4 md:col-span-2">
                  <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="w-full flex justify-between items-center text-left text-xs text-muted-foreground hover:text-foreground">
                         <span>{showActivityForAI ? 'Hide' : 'Show'} Data Sent to AI for Preference Update</span>
