@@ -2,26 +2,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Item, User } from '@/types';
-import { suggestMatchingItems, type ItemMatchOutput, type UserProfilePreferences } from '@/ai/flows/item-match-flow';
+import type { Item } from '@/types'; // UserProfilePreferences removed
+import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+// Badge removed as preferencesConsidered badge is removed
 
 interface SuggestedMatchesProps {
   currentItem: Item;
 }
 
 export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps) {
-  const [suggestedItems, setSuggestedItems] = useState<Item[]>([]); // Changed from suggestedItemsWithScores
+  const [suggestedItems, setSuggestedItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [aiReasoning, setAiReasoning] = useState<string | null>(null);
-  const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
-  // If you need to display scores separately, you can maintain another state:
-  // const [matchScores, setMatchScores] = useState<Array<{itemId: string, score: string}>>([]);
+  // preferencesWereConsidered state removed
 
   useEffect(() => {
     async function fetchSuggestions() {
@@ -29,7 +27,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setFetchError(null);
       setAiReasoning(null);
       setSuggestedItems([]); 
-      setPreferencesWereConsidered(false);
+      // setPreferencesWereConsidered(false); // Removed
 
       if (!currentItem?.id) {
           setLoading(false);
@@ -39,14 +37,10 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           return;
       }
       
-      const viewingUser = dummyUsers[0]; // Simulate current user is dummyUsers[0]
+      const viewingUser = dummyUsers[0]; 
 
-      const viewingUserPreferences: UserProfilePreferences = {
-        motivations: viewingUser.motivations,
-        locationPreference: viewingUser.locationPreference,
-        tradeTimingPreference: viewingUser.tradeTimingPreference,
-        interestedInThirdPartyFulfillment: viewingUser.interestedInThirdPartyFulfillment,
-      };
+      // viewingUserPreferences removed as it's not passed to the simplified flow
+      // const viewingUserPreferences: UserProfilePreferences = { ... };
 
       try {
         const otherAvailableItems = dummyItems.filter(
@@ -80,14 +74,13 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             listingType: currentItem.listingType,
           },
           availableItems: otherAvailableItems,
-          triggeringUserPreferences: viewingUserPreferences, 
+          // triggeringUserPreferences: viewingUserPreferences, // REMOVED
         };
 
         const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
         
-        setPreferencesWereConsidered(result.preferencesConsidered || false);
+        // setPreferencesWereConsidered(result.preferencesConsidered || false); // Removed
 
-        // Simplified: just get the Item objects
         const plainMatchedItems = (result.suggestedMatches || []).map(match => {
           return dummyItems.find(dItem => dItem.id === match.itemId);
         }).filter(Boolean) as Item[];
@@ -183,7 +176,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
               <Sparkles className="h-6 w-6 text-muted-foreground" />
               {cardTitleText}
             </CardTitle>
-            {preferencesWereConsidered && <Badge variant="outline" className="text-xs">Preferences Used</Badge>}
+            {/* Removed preferencesWereConsidered badge */}
           </div>
           {aiReasoning && (
             <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>
@@ -206,7 +199,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
                 <Sparkles className="h-6 w-6 text-primary" />
                 {cardTitleText}
             </CardTitle>
-            {preferencesWereConsidered && <Badge variant="outline" className="text-xs">Preferences Used</Badge>}
+             {/* Removed preferencesWereConsidered badge */}
           </div>
            {aiReasoning && (
               <CardDescription className="font-body text-sm mt-1">{aiReasoning}</CardDescription>

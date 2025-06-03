@@ -5,8 +5,8 @@ import { useState, useEffect } from 'react';
 import ItemList from '@/components/items/ItemList';
 import SearchBar from '@/components/items/SearchBar';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User } from '@/types';
-import { suggestMatchingItems, type ItemMatchOutput, type UserProfilePreferences } from '@/ai/flows/item-match-flow';
+import type { Item } from '@/types'; // UserProfilePreferences removed as it's not used here anymore
+import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -15,12 +15,12 @@ import { Badge } from '@/components/ui/badge';
 
 interface UserItemSuggestion {
   userItem: Item;
-  suggestedMatches: Item[]; // Changed from (Item & { matchScore: string })[]
+  suggestedMatches: Item[]; 
   reasoning: string | null;
   isLoading: boolean;
   error: string | null;
-  preferencesConsidered?: boolean;
-  matchScores?: { itemId: string, score: string }[]; // Store scores separately if needed for display outside ItemCard
+  // preferencesConsidered removed
+  matchScores?: { itemId: string, score: string }[];
 }
 
 export default function HomePage() {
@@ -60,18 +60,13 @@ export default function HomePage() {
         reasoning: null,
         isLoading: true,
         error: null,
-        preferencesConsidered: false,
         matchScores: [],
       }));
       setUserItemSuggestions(initialSuggestions);
       setOverallLoading(false); 
 
-      const currentUserPreferences: UserProfilePreferences = {
-        motivations: currentUser.motivations,
-        locationPreference: currentUser.locationPreference,
-        tradeTimingPreference: currentUser.tradeTimingPreference,
-        interestedInThirdPartyFulfillment: currentUser.interestedInThirdPartyFulfillment,
-      };
+      // User preferences are no longer passed to the simplified flow
+      // const currentUserPreferences: UserProfilePreferences = { ... };
 
       const suggestionPromises = userOfferItems.map(async (userItem, index) => {
         const otherItemsForMatching = dummyItems.filter(
@@ -92,8 +87,7 @@ export default function HomePage() {
             data: {
               suggestedMatches: [],
               reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
-              preferencesConsidered: false, 
-            },
+            } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning'>, // Match simplified output type
           };
         }
         
@@ -109,7 +103,7 @@ export default function HomePage() {
               listingType: userItem.listingType,
             },
             availableItems: otherItemsForMatching,
-            triggeringUserPreferences: currentUserPreferences,
+            // triggeringUserPreferences: currentUserPreferences, // REMOVED
           });
           return { index, success: true, data: result };
         } catch (error) {
@@ -142,7 +136,6 @@ export default function HomePage() {
                 reasoning: data.reasoning || (plainItems.length === 0 ? `We couldn't find specific AI matches for your "${newSuggestions[index].userItem.name}" right now.` : null),
                 isLoading: false,
                 error: null,
-                preferencesConsidered: data.preferencesConsidered,
                 matchScores: scores,
               };
             } else {
@@ -237,9 +230,7 @@ export default function HomePage() {
                     itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` : 
                     `AI Matches for your ${itemSuggestion.userItem.name}`}
                     </CardTitle>
-                    {!itemSuggestion.isLoading && !itemSuggestion.error && itemSuggestion.preferencesConsidered && (
-                        <Badge variant="outline" className="text-xs ml-2">Preferences Used</Badge>
-                    )}
+                    {/* Removed preferencesConsidered badge as it's always false now */}
                 </div>
                 {!itemSuggestion.isLoading && itemSuggestion.reasoning && !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 && (
                   <p className="text-sm text-muted-foreground mt-1 font-body">{itemSuggestion.reasoning}</p>
