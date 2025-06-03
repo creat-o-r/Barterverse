@@ -11,7 +11,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Repeat, Link2, ArrowRightLeft, Info, Eye, Gift, Search, Package, Star, PackageSearch, PackagePlus, Handshake } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Package, Star, PackageSearch, PackagePlus, Handshake } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
@@ -43,7 +43,7 @@ function findReciprocalItems(
           item.listingType === 'want' &&
           item.category === contextItem.category &&
           item.status === 'available' &&
-          item.id !== contextItem.id // Don't match item with itself
+          item.id !== contextItem.id 
       )
     );
   } else { // contextItem.listingType === 'want'
@@ -116,8 +116,8 @@ function OpportunityItemCard({
     <Card className="flex flex-col h-full">
       <CardHeader>
         <div className="flex items-center gap-2 mb-1">
-            {item.listingType === 'offer' ? <Gift className="h-6 w-6 text-green-600" /> : <Search className="h-6 w-6 text-blue-600" />}
-            <CardTitle className="font-headline text-xl">{item.name}</CardTitle>
+            {item.listingType === 'offer' ? <Gift className="h-5 w-5 text-green-600" /> : <Search className="h-5 w-5 text-blue-600" />}
+            <CardTitle className="font-headline text-xl line-clamp-2">{item.name}</CardTitle>
         </div>
         <Badge variant="secondary" className="text-sm font-body py-1 px-1.5 inline-block self-start">{label}</Badge>
       </CardHeader>
@@ -148,7 +148,7 @@ function OpportunityItemCard({
         <ReciprocalItemDisplay 
             items={reciprocalItems} 
             contextUserName={reciprocalContextUserName}
-            itemPerspective={item.listingType} // If main item is 'offer', other user reciprocates with 'want' items
+            itemPerspective={item.listingType} 
         />
         <Button asChild variant="outline" size="sm" className="mt-3">
           <Link href={`/items/${item.id}`}><Eye className="mr-2 h-4 w-4" /> View Full Details</Link>
@@ -167,7 +167,7 @@ export default function OpportunityMatchPage() {
   const [suggestedItemDetails, setSuggestedItemDetails] = useState<{ item: Item; owner: User; reciprocalItems: Item[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const currentUserId = dummyUsers[0].id; // Simulated current user
+  const currentUserId = dummyUsers[0].id; 
 
   useEffect(() => {
     async function fetchData() {
@@ -243,12 +243,8 @@ export default function OpportunityMatchPage() {
   }
   else if (mainItem.ownerId !== currentUserId && mainItem.listingType === 'offer' &&
            suggestedItem.ownerId !== currentUserId && suggestedItem.listingType === 'want') {
-    // Check if mainItem can fulfill suggestedItem (a 'want')
     tradeId = `trade-${suggestedItem.ownerId}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
     chatButtonText = `Suggest ${mainItemOwner.name}'s "${mainItem.name}" for ${suggestedItemOwner.name}'s Want`;
-    // This scenario implies the current user might be acting as a 'connector'.
-    // The button could open a chat with EITHER mainItemOwner or suggestedItemOwner depending on UI choice,
-    // or pre-fill a message. For now, it focuses on the want fulfillment.
   }
   else {
       negotiationContextValid = false;
@@ -267,7 +263,12 @@ export default function OpportunityMatchPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6 items-start">
+          {/* Centered Arrow for Desktop, hidden on mobile */}
+          <div className="hidden md:flex items-center justify-center my-2 md:my-4">
+              <ArrowRightLeft className="h-10 w-10 text-muted-foreground" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 items-start">
             <OpportunityItemCard 
                 item={mainItem} 
                 owner={mainItemOwner} 
@@ -275,11 +276,7 @@ export default function OpportunityMatchPage() {
                 reciprocalItems={mainReciprocal}
                 reciprocalContextUserName={suggestedItemOwner.name}
             />
-            <div className="hidden md:flex flex-col items-center justify-center h-full pt-16">
-                <ArrowRightLeft className="h-12 w-12 text-muted-foreground my-4" />
-                <Badge variant="secondary">Potential Match</Badge>
-            </div>
-            <div className="md:hidden my-4"> <Separator /> </div>
+            
             <OpportunityItemCard 
                 item={suggestedItem} 
                 owner={suggestedItemOwner} 
@@ -288,7 +285,7 @@ export default function OpportunityMatchPage() {
                 reciprocalContextUserName={mainItemOwner.name}
             />
           </div>
-          <Separator />
+          <Separator className="my-6 md:my-8" />
           <div className="text-center">
             <h3 className="font-headline text-xl mb-2">Next Steps</h3>
             {negotiationContextValid && tradeId ? (
