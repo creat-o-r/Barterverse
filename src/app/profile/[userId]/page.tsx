@@ -28,8 +28,7 @@ async function getUserProfile(userId: string): Promise<User | null> {
     user.minimumMatchRating = 'Low';
   }
   if (user.logisticsPreferences && !user.logisticsPreferences.defaultDeliveryMethods) {
-    // @ts-ignore
-    user.logisticsPreferences.defaultDeliveryMethods = [user.logisticsPreferences.defaultDeliveryMethod || 'pickup_only'];
+    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only'];
   }
 
 
@@ -155,12 +154,12 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
                 ) : (
                     <MapPin className="h-5 w-5 text-muted-foreground" />
                 )}
-                <span className="font-headline text-md">Item Location</span>
+                <span className="font-headline text-md">Preferred Item Location</span>
             </div>
-            <Button variant="outline" size="sm" disabled className="cursor-default text-xs px-2 py-1 h-auto max-w-[200px] truncate">
+            <Badge variant="outline" className="text-xs px-2 py-1 h-auto max-w-[200px] truncate cursor-default">
                 {preferredLocation ? `${preferredLocation.name} ${preferredLocation.address ? `(${preferredLocation.address.substring(0,20)}${preferredLocation.address.length > 20 ? '...' : ''})` : '(Address not set)'}` : 
                 (logisticsPreferences?.preferredStoredLocationId ? `ID: ${logisticsPreferences.preferredStoredLocationId}` : 'Not set')}
-            </Button>
+            </Badge>
         </div>
         
       {logisticsPreferences?.openToChainDelivery !== undefined && (
@@ -169,7 +168,7 @@ const DefaultLogisticsDisplay = ({ logisticsPreferences, locations, isOwnProfile
               <Network className="h-5 w-5 text-muted-foreground" />
               <span className="font-headline text-md">Chain Delivery</span>
            </div>
-            <Badge variant={logisticsPreferences.openToChainDelivery ? "default" : "secondary"} className="text-xs">
+            <Badge variant={logisticsPreferences.openToChainDelivery ? "default" : "secondary"} className="text-xs cursor-default">
                 {logisticsPreferences.openToChainDelivery ? "Yes" : "No"}
             </Badge>
         </div>
@@ -376,3 +375,4 @@ export default function UserProfilePage({ params: paramsProp }: { params: { user
     </div>
   );
 }
+
