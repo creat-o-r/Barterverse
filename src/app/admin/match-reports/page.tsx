@@ -194,14 +194,14 @@ export default function MatchReportsPage() {
             <Button onClick={fetchReports} disabled={isLoadingReports} variant="outline" size="sm"><RefreshCw className={`mr-2 h-4 w-4 ${isLoadingReports ? 'animate-spin' : ''}`} />Refresh Logs</Button>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col max-h-[70vh]"> {/* CardContent controls max height and is a flex column */}
+        <CardContent className="flex flex-col max-h-[70vh] p-0">
           {isLoadingReports ? (
              <div className="p-6 text-center py-12 text-muted-foreground font-body flex items-center justify-center gap-2"><RefreshCw className="h-5 w-5 animate-spin" /> Loading suggestion logs...</div>
           ) : reports.length === 0 ? (
             <div className="p-6 text-center text-muted-foreground font-body py-12">No match suggestions have been logged yet.</div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-auto"> {/* This div takes up available space and handles scrolling */}
-              <Table className="min-w-full"> {/* Removed flex-1 from Table, relies on parent for sizing and scrolling context */}
+            <div className="flex-1 min-h-0 overflow-auto p-6 pt-0">
+              <Table className="min-w-full">
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="w-[180px]">Timestamp</TableHead>
@@ -212,8 +212,7 @@ export default function MatchReportsPage() {
                     <TableHead className="min-w-[400px]">Suggested Items (ID, (Owner ID), Score)</TableHead>
                     <TableHead className="min-w-[300px]">Reasoning</TableHead>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
+                </TableHeader><TableBody>
                   {reports.map((report, index) => (
                     <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
                       <TableCell className="font-mono text-xs">{new Date(report.timestamp).toLocaleString()}</TableCell>
