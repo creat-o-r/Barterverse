@@ -165,7 +165,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
     // Initialize default values for the return structure for robustness
     const defaultInferredPreferences: InferredUserPreferences = {
-      locationPreference: { isSensitive: false } as UserProfileLocationPreference, // Ensure locationPreference is always an object
+      locationPreference: { isSensitive: false } as UserProfileLocationPreference,
       tradeTimingPreference: 'flexible' as TradeTimingPreference,
       interestedInThirdPartyFulfillment: true,
       motivations: undefined,
@@ -179,10 +179,10 @@ const inferUserPreferencesFlow = ai.defineFlow(
           description: item.description ? item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '') : undefined,
         })),
       };
-      // console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
+      console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
 
       const {output} = await prompt(processedInput);
-      console.log(`[${flowName}] Raw output received from prompt:`, JSON.stringify(output, null, 2));
+      // console.log(`[${flowName}] Raw output received from prompt:`, JSON.stringify(output, null, 2));
 
       // Initialize with defaults, to be overridden by valid AI output
       let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
@@ -195,7 +195,6 @@ const inferUserPreferencesFlow = ai.defineFlow(
         baseReasoning = "AI failed to generate a response for preference inference. The model may be temporarily unavailable or did not provide data.";
         errorMessage = "The AI assistant did not return a valid response object. This might be due to a model issue or temporary service problem.";
       } else {
-        // Process suggestedPreferences carefully
         if (output.suggestedPreferences && typeof output.suggestedPreferences === 'object') {
           finalSuggestedPreferences.motivations = Array.isArray(output.suggestedPreferences.motivations) 
             ? output.suggestedPreferences.motivations.filter((m: any) => UserMotivationEnum.safeParse(m).success) as UserMotivation[]
@@ -208,9 +207,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
             };
           } else {
             finalSuggestedPreferences.locationPreference = defaultInferredPreferences.locationPreference;
-            if (output.suggestedPreferences.locationPreference !== undefined) { 
-                errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for location preference was malformed; using default.";
-            }
+            // Do not add error message if AI simply omits an optional field.
           }
 
           finalSuggestedPreferences.tradeTimingPreference = TradeTimingPreferenceEnum.safeParse(output.suggestedPreferences.tradeTimingPreference).success
@@ -221,9 +218,6 @@ const inferUserPreferencesFlow = ai.defineFlow(
             finalSuggestedPreferences.interestedInThirdPartyFulfillment = output.suggestedPreferences.interestedInThirdPartyFulfillment;
           } else {
             finalSuggestedPreferences.interestedInThirdPartyFulfillment = defaultInferredPreferences.interestedInThirdPartyFulfillment;
-            if (output.suggestedPreferences.interestedInThirdPartyFulfillment !== undefined) {
-                 errorMessage = (errorMessage ? errorMessage + " " : "") + "AI response for third-party fulfillment was malformed; using default.";
-            }
           }
         } else {
           console.warn(`${flowName}: Prompt output was missing 'suggestedPreferences' or it was not an object. Output received:`, JSON.stringify(output, null, 2));
@@ -231,7 +225,6 @@ const inferUserPreferencesFlow = ai.defineFlow(
           baseReasoning = "AI response for preferences was malformed or missing. Using default values.";
         }
 
-        // Process confidence
         if (output.confidence && ['High', 'Medium', 'Low'].includes(output.confidence)) {
             confidence = output.confidence;
         } else {
@@ -258,39 +251,42 @@ const inferUserPreferencesFlow = ai.defineFlow(
       const errorDetails: Record<string, any> = {
         name: error.name,
         message: error.message,
-        stack: error.stack?.substring(0, 500), // Limit stack trace length
-        cause: error.cause, // Include the cause if available
+        stack: error.stack?.substring(0, 500), 
+        cause: error.cause, 
       };
       if (typeof error === 'object' && error !== null) {
           if ('isGenkitError' in error) errorDetails.isGenkitError = (error as any).isGenkitError;
-          if ('details' in error) errorDetails.details = (error as any).details; // Often contains more specific info from Genkit/Google
-          if ('status' in error && !('statusCode' in errorDetails)) errorDetails.status = (error as any).status; // Genkit errors might have 'status'
-          if ('code' in error && !('statusCode' in errorDetails)) errorDetails.code = (error as any).code; // Or 'code'
-          if ('statusCode' in error) errorDetails.statusCode = (error as any).statusCode; // For HTTP-like errors
+          if ('details' in error) errorDetails.details = (error as any).details; 
+          if ('status' in error) errorDetails.status = (error as any).status; 
+          if ('code' in error && !('status' in errorDetails)) errorDetails.code = (error as any).code;
       }
       try {
-        console.error(`Detailed error object in ${flowName}:`, JSON.stringify(errorDetails, null, 2));
+        console.error(`Detailed error object in ${flowName}:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } catch (e) {
-        console.error(`Could not stringify detailed error object in ${flowName}. Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
-        console.error(`Original error object in ${flowName} (if stringify failed):`, error);
+        console.error(`Could not stringify full error object in ${flowName}. Error properties: Name: ${errorDetails.name}, Message: ${errorDetails.message}, Genkit Details: ${errorDetails.details ? JSON.stringify(errorDetails.details) : 'N/A'}`);
+        console.error(`Original error object was:`, error);
       }
 
-      let userMessage = "An unexpected error occurred while trying to infer user preferences. Please check server logs for more details.";
+      let userMessage = "An unexpected error occurred while trying to infer user preferences. Default preferences applied. Please check server logs for details.";
       const lowerErrorMessage = String(error.message || "").toLowerCase();
 
-      if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota') || errorDetails.status === 'RESOURCE_EXHAUSTED' || errorDetails.code === 8) {
+      if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
         userMessage = "The preference inference service has reached its current usage limit.";
-      } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded') || errorDetails.status === 'UNAVAILABLE' || errorDetails.code === 14) {
+      } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = "The preference inference service is temporarily overloaded or unavailable.";
+      } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
+        userMessage = "Authentication error with the AI preference service. Please check API key configuration.";
+      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
+        userMessage = `The preference inference service received a bad request. This might be due to problematic input data (User ID: ${input.userId}) or an issue with the prompt structure. Please check server logs for details on the input.`;
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
         userMessage = "Could not infer preferences due to content restrictions or safety settings.";
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
-        userMessage = "The AI's response for preferences was not in the expected format. This might indicate a schema validation issue.";
+        userMessage = "The AI's response for preferences was not in the expected format. This might indicate a schema validation issue with the AI model's output.";
+      } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
+        userMessage = "The AI preference service reported an internal error. Please try again later.";
       } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status) {
-        // More generic message if it's a Genkit/model error not covered above
-        userMessage = "The AI model encountered an issue processing the request for preference inference. Please check server logs for specific details.";
+        userMessage = "The AI model encountered an issue processing the request for preference inference. Default preferences applied. Please check server logs for specific details.";
         if (error.message && !lowerErrorMessage.includes('unexpected') && !lowerErrorMessage.includes('internal') && !lowerErrorMessage.includes('unknown')) {
-            // Append Genkit's error message if it seems informative
             userMessage += ` (Details: ${error.message.substring(0,150)}${error.message.length > 150 ? "..." : ""})`;
         }
       }
@@ -299,7 +295,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
       return {
         userId: input.userId,
-        suggestedPreferences: { ...defaultInferredPreferences }, // Return defaults on error
+        suggestedPreferences: { ...defaultInferredPreferences }, 
         confidence: 'Low',
         reasoning: "Failed to infer preferences due to a system error. Default preferences applied. Please check server logs for detailed error information.",
         errorMessage: userMessage
@@ -307,3 +303,5 @@ const inferUserPreferencesFlow = ai.defineFlow(
     }
   }
 );
+
+    
