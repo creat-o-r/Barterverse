@@ -36,7 +36,7 @@ const itemFormSchema = z.object({
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']),
+  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']), // No longer optional in schema, will default from profile
   isGiftItForward: z.boolean().optional(),
   // Logistics fields
   locationType: z.custom<ItemLogisticsLocationType>(
@@ -60,7 +60,7 @@ const itemFormSchema = z.object({
   }
   return true;
 }, {
-  message: "Please select a stored address.",
+  message: "Please select a stored address if 'Use one of my stored addresses' is chosen.",
   path: ["selectedUserStoredLocationId"],
 }).refine(data => {
   if (data.locationType === 'item_specific_location' && (!data.itemSpecificAddress || data.itemSpecificAddress.length < 5)) {
@@ -68,11 +68,23 @@ const itemFormSchema = z.object({
   }
   return true;
 }, {
-  message: "Please enter a valid specific address (min 5 characters).",
+  message: "Please enter a valid specific address (min 5 characters) if 'Enter a specific address' is chosen.",
   path: ["itemSpecificAddress"],
 });
 
 type ItemFormValues = z.infer<typeof itemFormSchema>;
+
+const shippingOptionMap: Record<Exclude<ItemLogisticsShippingOption, 'profile_default_shipping'>, string> = {
+  pickup_only: "Local Pickup Only",
+  ship_domestic: "Willing to Ship (Domestic)",
+  ship_international: "Willing to Ship (International)",
+};
+
+const meetupOptionMap: Record<Exclude<ItemLogisticsMeetupOption, 'profile_default_meetup'>, string> = {
+  public_meetup: "Public Meetup Preferred",
+  flexible: "Flexible Meetup",
+};
+
 
 export default function NewItemPage() {
   const { toast } = useToast();
@@ -80,66 +92,72 @@ export default function NewItemPage() {
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Simulate fetching current user. In a real app, this would come from auth context.
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   useEffect(() => {
-    // Simulate fetching user data
-    const user = dummyUsers.find(u => u.id === 'user1'); // Assuming user1 is the current user
+    const user = dummyUsers.find(u => u.id === 'user1'); 
     setCurrentUser(user || null);
   }, []);
 
-
   const currentUserProfileRating = currentUser?.minimumMatchRating || 'Low';
-  const defaultUserLocationId = currentUser?.logisticsPreferences?.preferredStoredLocationId || currentUser?.locations?.[0]?.id;
-  const defaultUserShipping = currentUser?.logisticsPreferences?.defaultShippingOption || 'ship_domestic';
-  const defaultUserMeetup = currentUser?.logisticsPreferences?.defaultMeetupOption || 'public_meetup';
-
-
+  
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
-    defaultValues: {
+    defaultValues: { // Initial minimal defaults, useEffect will populate based on currentUser
       name: '',
       description: '',
       category: '',
       imageUrl: '',
       listingType: 'offer',
-      minimumMatchRatingOverride: currentUserProfileRating,
+      minimumMatchRatingOverride: currentUserProfileRating, // Default to user's profile rating
       isGiftItForward: false,
-      locationType: 'profile_default_location',
-      selectedUserStoredLocationId: '',
+      locationType: 'profile_default_location', // Will be updated by useEffect
+      selectedUserStoredLocationId: '', // Will be updated by useEffect
       itemSpecificAddress: '',
-      shippingOption: 'profile_default_shipping',
-      meetupOption: 'profile_default_meetup',
+      shippingOption: 'profile_default_shipping', // Will be updated by useEffect
+      meetupOption: 'profile_default_meetup', // Will be updated by useEffect
       logisticsNotes: '',
     },
   });
   
   useEffect(() => {
     if (currentUser) {
+        let defaultLocationType: ItemLogisticsLocationType = 'profile_default_location';
+        let defaultSelectedStoredLocationId = '';
+
+        if (currentUser.logisticsPreferences?.preferredStoredLocationId && currentUser.locations?.find(l => l.id === currentUser.logisticsPreferences?.preferredStoredLocationId)) {
+            defaultLocationType = 'profile_stored_location';
+            defaultSelectedStoredLocationId = currentUser.logisticsPreferences.preferredStoredLocationId;
+        } else if (currentUser.locations && currentUser.locations.length > 0) {
+            // If no preferred, but has locations, default to the first one as 'profile_stored_location' for the form
+            // defaultLocationType = 'profile_stored_location';
+            // defaultSelectedStoredLocationId = currentUser.locations[0].id;
+            // Keeping profile_default_location as default if no explicit preference for a stored one
+        }
+
+
         form.reset({
-            name: '',
-            description: '',
-            category: '',
-            imageUrl: '',
-            listingType: 'offer',
+            name: form.getValues('name') || '', // Preserve already typed values if any
+            description: form.getValues('description') || '',
+            category: form.getValues('category') || '',
+            imageUrl: form.getValues('imageUrl') || '',
+            listingType: form.getValues('listingType') || 'offer',
             minimumMatchRatingOverride: currentUser.minimumMatchRating || 'Low',
-            isGiftItForward: false,
-            locationType: 'profile_default_location',
-            selectedUserStoredLocationId: '',
+            isGiftItForward: form.getValues('isGiftItForward') || false,
+            
+            locationType: defaultLocationType,
+            selectedUserStoredLocationId: defaultSelectedStoredLocationId,
             itemSpecificAddress: '',
-            shippingOption: 'profile_default_shipping',
-            meetupOption: 'profile_default_meetup',
-            logisticsNotes: '',
+            shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'profile_default_shipping',
+            meetupOption: currentUser.logisticsPreferences?.defaultMeetupOption || 'profile_default_meetup',
+            logisticsNotes: form.getValues('logisticsNotes') || '',
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, form.reset]);
-
+  }, [currentUser, form.reset]); // form.reset added to dependency array
 
   const listingType = form.watch('listingType');
-  const locationType = form.watch('locationType');
+  const locationTypeWatch = form.watch('locationType');
 
   const handleAiSuggestions = useCallback(async () => {
     const name = form.getValues('name');
@@ -208,7 +226,32 @@ export default function NewItemPage() {
         title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
         description: `${data.name} has been successfully posted.`,
       });
-      form.reset();
+      // Reset form to initial defaults derived from current user after successful submission
+      if (currentUser) {
+        let defaultLocationType: ItemLogisticsLocationType = 'profile_default_location';
+        let defaultSelectedStoredLocationId = '';
+        if (currentUser.logisticsPreferences?.preferredStoredLocationId && currentUser.locations?.find(l => l.id === currentUser.logisticsPreferences?.preferredStoredLocationId)) {
+            defaultLocationType = 'profile_stored_location';
+            defaultSelectedStoredLocationId = currentUser.logisticsPreferences.preferredStoredLocationId;
+        }
+        form.reset({
+            name: '', 
+            description: '',
+            category: '',
+            imageUrl: '',
+            listingType: 'offer',
+            minimumMatchRatingOverride: currentUser.minimumMatchRating || 'Low',
+            isGiftItForward: false,
+            locationType: defaultLocationType,
+            selectedUserStoredLocationId: defaultSelectedStoredLocationId,
+            itemSpecificAddress: '',
+            shippingOption: currentUser.logisticsPreferences?.defaultShippingOption || 'profile_default_shipping',
+            meetupOption: currentUser.logisticsPreferences?.defaultMeetupOption || 'profile_default_meetup',
+            logisticsNotes: '',
+        });
+      } else {
+        form.reset(); // Fallback reset
+      }
       router.push(`/items/${addedItem.id}`);
     } catch (error: any) {
         toast({ title: "Submission Error", description: error.message || "Could not post item.", variant: "destructive" });
@@ -223,6 +266,10 @@ export default function NewItemPage() {
   if (!currentUser) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Loading user data...</div>;
   }
+  
+  const currentProfileShipping = shippingOptionMap[currentUser.logisticsPreferences?.defaultShippingOption as Exclude<ItemLogisticsShippingOption, 'profile_default_shipping'>] || currentUser.logisticsPreferences?.defaultShippingOption.replace(/_/g, ' ') || 'Not Set';
+  const currentProfileMeetup = meetupOptionMap[currentUser.logisticsPreferences?.defaultMeetupOption as Exclude<ItemLogisticsMeetupOption, 'profile_default_meetup'>] || currentUser.logisticsPreferences?.defaultMeetupOption.replace(/_/g, ' ') || 'Not Set';
+
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -233,7 +280,7 @@ export default function NewItemPage() {
             List an Item
           </CardTitle>
           <CardDescription className="font-body">
-            Tell us about your item. Our AI can help with category and listing type.
+            Tell us about your item. Our AI can help with category and listing type. Fields default to your profile settings where applicable.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -247,8 +294,7 @@ export default function NewItemPage() {
                 <FormField control={form.control} name="listingType" render={({ field }) => (<FormItem className="space-y-3"><FormLabel className="font-headline flex items-center gap-2">Listing Type {isInferringListingType && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><RadioGroup onValueChange={(value) => { field.onChange(value); form.setValue('listingType', value as 'offer' | 'want', {shouldDirty: true}); }} value={field.value} className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4" disabled={isLoadingOverall}><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="offer" id="offer" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="offer" className="font-normal flex items-center gap-2"><Gift className="h-5 w-5 text-green-600" /> Offering an item</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="want" id="want" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="want" className="font-normal flex items-center gap-2"><Search className="h-5 w-5 text-blue-600" /> Looking for an item</FormLabel></FormItem></RadioGroup></FormControl><FormDescription className="font-body">AI may suggest this.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="category" render={({ field }) => (<FormItem><FormLabel className="font-headline flex items-center gap-2">Category {isSuggestingCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isSuggestingCategory && form.formState.dirtyFields.category && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><Input placeholder={isSuggestingCategory ? "AI suggesting..." : "e.g., Books"} {...field} onChange={(e) => { field.onChange(e); form.setValue('category', e.target.value, {shouldDirty: true});}} disabled={isLoadingOverall} /></FormControl><FormDescription className="font-body">AI may suggest. Type to override.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="imageUrl" render={({ field }) => (<FormItem><FormLabel className="font-headline">Image URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="https://placehold.co/600x400.png" {...field} disabled={isLoadingOverall}/></FormControl><FormDescription className="font-body">Link to an image. Use placeholder if needed.</FormDescription><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="minimumMatchRatingOverride" render={({ field }) => (<FormItem><FormLabel className="font-headline">Minimum Match Rating</FormLabel><Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoadingOverall}><FormControl><SelectTrigger disabled={isLoadingOverall}><SelectValue placeholder={`Using profile default: ${currentUser?.minimumMatchRating || 'Low'}`} /></SelectTrigger></FormControl><SelectContent><SelectItem value="Low">Low</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="High">High</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                {listingType === 'offer' && (<FormField control={form.control} name="isGiftItForward" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoadingOverall} id="isGiftItForward"/></FormControl><div className="space-y-1 leading-none"><FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2"><HeartHandshake className="h-5 w-5 text-pink-500" />Gift It Forward</FormLabel><FormDescription className="font-body">Offer this item freely, no direct trade expected.</FormDescription></div></FormItem>)} />)}
+                <FormField control={form.control} name="minimumMatchRatingOverride" render={({ field }) => (<FormItem><FormLabel className="font-headline">Minimum Match Rating</FormLabel><Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoadingOverall}><FormControl><SelectTrigger disabled={isLoadingOverall}><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Low">Low</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="High">High</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
               </section>
 
               <Separator />
@@ -269,7 +315,7 @@ export default function NewItemPage() {
                   </FormItem>
                 )} />
 
-                {locationType === 'profile_stored_location' && (
+                {locationTypeWatch === 'profile_stored_location' && (
                   <FormField control={form.control} name="selectedUserStoredLocationId" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="font-headline">Select Stored Address</FormLabel>
@@ -286,11 +332,11 @@ export default function NewItemPage() {
                   )} />
                 )}
 
-                {locationType === 'item_specific_location' && (
+                {locationTypeWatch === 'item_specific_location' && (
                   <FormField control={form.control} name="itemSpecificAddress" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="font-headline">Specific Item Address</FormLabel>
-                      <FormControl><Input placeholder="e.g., 123 Item Location St" {...field} disabled={isLoadingOverall} /></FormControl>
+                      <FormControl><Input placeholder="e.g., 123 Item Location St" {...field} value={field.value ?? ""} disabled={isLoadingOverall} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -300,9 +346,9 @@ export default function NewItemPage() {
                   <FormItem>
                     <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Shipping Preference</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select shipping option" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="profile_default_shipping">Use profile default (Currently: {currentUser.logisticsPreferences?.defaultShippingOption.replace(/_/g, ' ') || 'Not Set'})</SelectItem>
+                        <SelectItem value="profile_default_shipping">Profile Default (Currently: {currentProfileShipping})</SelectItem>
                         <SelectItem value="pickup_only">Local Pickup Only</SelectItem>
                         <SelectItem value="ship_domestic">Willing to Ship (Domestic)</SelectItem>
                         <SelectItem value="ship_international">Willing to Ship (International)</SelectItem>
@@ -316,9 +362,9 @@ export default function NewItemPage() {
                   <FormItem>
                     <FormLabel className="font-headline flex items-center gap-2"><Users2 className="h-5 w-5 text-muted-foreground" />Meetup Preference</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select meetup option" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="profile_default_meetup">Use profile default (Currently: {currentUser.logisticsPreferences?.defaultMeetupOption.replace(/_/g, ' ') || 'Not Set'})</SelectItem>
+                        <SelectItem value="profile_default_meetup">Profile Default (Currently: {currentProfileMeetup})</SelectItem>
                         <SelectItem value="public_meetup">Public Meetup Preferred</SelectItem>
                         <SelectItem value="flexible">Flexible Meetup</SelectItem>
                       </SelectContent>
@@ -347,6 +393,8 @@ export default function NewItemPage() {
                 />
               </section>
               
+              {listingType === 'offer' && (<FormField control={form.control} name="isGiftItForward" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoadingOverall} id="isGiftItForward"/></FormControl><div className="space-y-1 leading-none"><FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2"><HeartHandshake className="h-5 w-5 text-pink-500" />Gift It Forward</FormLabel><FormDescription className="font-body">Offer this item freely, no direct trade expected.</FormDescription></div></FormItem>)} />)}
+              
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
                 {isLoadingOverall ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting...' : (isInferringListingType ? 'Inferring...' : 'Loading...'))}</>) : (`Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`)}
               </Button>
@@ -357,3 +405,5 @@ export default function NewItemPage() {
     </div>
   );
 }
+
+    
