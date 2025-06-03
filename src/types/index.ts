@@ -11,6 +11,7 @@ export type Item = {
   status: 'available' | 'traded' | 'pending';
   listingType: 'offer' | 'want'; // New field
   isThirdPartyFulfillment?: boolean; // Flag for UI hint
+  minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High'; // New: Item-specific minimum match rating
 };
 
 export type UserMotivation = 'help-others' | 'maximize-trades' | 'convenience-focused' | 'community-building' | 'unique-finds';
@@ -25,7 +26,8 @@ export type UserProfilePreferences = {
   motivations?: UserMotivation[];
   locationPreference?: UserProfileLocationPreference;
   tradeTimingPreference?: TradeTimingPreference;
-  interestedInThirdPartyFulfillment?: boolean; 
+  interestedInThirdPartyFulfillment?: boolean;
+  minimumMatchRating?: 'Low' | 'Medium' | 'High'; // New: User's global minimum match rating
 };
 
 export type User = {
@@ -79,6 +81,7 @@ export type InferredUserPreferences = {
   };
   tradeTimingPreference?: TradeTimingPreference;
   interestedInThirdPartyFulfillment?: boolean;
+  minimumMatchRating?: 'Low' | 'Medium' | 'High'; // Also add here if AI might infer it
 };
 
 export type InferUserPreferencesOutput = {

@@ -1,5 +1,5 @@
 
-import type { Item, User, UserMotivation, TradeTimingPreference } from '@/types';
+import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences } from '@/types';
 import type { InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow'; // Import the type for clarity
 
 export const dummyUsers: User[] = [
@@ -16,6 +16,7 @@ export const dummyUsers: User[] = [
     motivations: ['unique-finds', 'community-building'] as UserMotivation[],
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
+    minimumMatchRating: 'Medium', // Alice prefers at least Medium matches
   },
   {
     id: 'user2',
@@ -30,6 +31,7 @@ export const dummyUsers: User[] = [
     motivations: ['maximize-trades'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Prefers trades within the city for larger items.' },
     tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
+    minimumMatchRating: 'Low', // Bob is open to Low matches globally
   },
   {
     id: 'user3',
@@ -44,6 +46,7 @@ export const dummyUsers: User[] = [
     motivations: ['help-others', 'convenience-focused'] as UserMotivation[],
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'staged' as TradeTimingPreference,
+    // No global minimumMatchRating, will accept any if item doesn't override
   },
   {
     id: 'user4',
@@ -58,6 +61,7 @@ export const dummyUsers: User[] = [
     motivations: ['unique-finds'] as UserMotivation[],
     locationPreference: { isSensitive: true, notes: 'Willing to ship smaller items.' },
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
+    minimumMatchRating: 'High', // Diana is very picky
   },
   {
     id: 'user5',
@@ -72,6 +76,7 @@ export const dummyUsers: User[] = [
     motivations: ['maximize-trades', 'convenience-focused'] as UserMotivation[],
     locationPreference: { isSensitive: false },
     tradeTimingPreference: 'simultaneous' as TradeTimingPreference,
+    minimumMatchRating: 'Medium',
   },
 ];
 
@@ -87,6 +92,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'offer',
+    minimumMatchRatingOverride: 'High', // This specific journal requires High matches
   },
   {
     id: 'item2',
@@ -99,6 +105,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Bob Barterer',
     status: 'available',
     listingType: 'offer',
+    // No override, will use Bob's global 'Low'
   },
   {
     id: 'item3',
@@ -111,6 +118,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'offer',
+    // No override, will use Alice's global 'Medium'
   },
   {
     id: 'item4',
@@ -159,6 +167,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'want',
+    minimumMatchRatingOverride: 'Medium', // Wants for this must be at least medium
   },
   {
     id: 'item8',
@@ -284,6 +293,9 @@ export function updateUserPreferencesInDummyData(
   if (newPreferences.interestedInThirdPartyFulfillment !== undefined) {
     userToUpdate.interestedInThirdPartyFulfillment = newPreferences.interestedInThirdPartyFulfillment;
   }
+  if (newPreferences.minimumMatchRating !== undefined) { // Added for new preference
+    userToUpdate.minimumMatchRating = newPreferences.minimumMatchRating;
+  }
   
   dummyUsers[userIndex] = userToUpdate;
   // console.log(`[DummyData] Updated preferences for user ${userId}:`, newPreferences);
@@ -309,6 +321,7 @@ export function addNewItemToDummyData(
     // Basic dataAiHint generation from name
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`
+    // minimumMatchRatingOverride will be undefined by default unless passed in itemData
   };
 
   dummyItems.push(newItem);

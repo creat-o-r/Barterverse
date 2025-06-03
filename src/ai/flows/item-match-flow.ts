@@ -3,7 +3,7 @@
 /**
  * @fileOverview Suggests matching items for a given item based on LLM analysis.
  * Supports simple keyword-based matching and an advanced mode considering
- * reciprocity and user preferences.
+ * reciprocity, user preferences, and minimum match ratings.
  *
  * - suggestMatchingItems - A function that suggests trade matches.
  * - ItemMatchInput - The input type for the suggestMatchingItems function.
@@ -25,6 +25,7 @@ const ItemBriefSchema = z.object({
   category: z.string(),
   ownerId: z.string(),
   listingType: z.enum(['offer', 'want']),
+  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional().describe("Item-specific minimum match rating requirement."),
 });
 
 // Schema for user preferences to be passed to the advanced prompt
@@ -36,13 +37,14 @@ const UserPreferencesSchema = z.object({
   }).optional(),
   tradeTimingPreference: z.enum(['simultaneous', 'staged', 'flexible']).optional(),
   interestedInThirdPartyFulfillment: z.boolean().optional(),
+  minimumMatchRating: z.enum(['Low', 'Medium', 'High']).optional().describe("User's global minimum match rating preference."),
 }).describe("The triggering user's trading preferences.");
 
 
 // Base Input Schema
 const BaseItemMatchInputSchema = z.object({
   triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
-  currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches."),
+  currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches. It may have its own 'minimumMatchRatingOverride'."),
   availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform."),
 });
 
@@ -69,13 +71,13 @@ const PromptOutputSchema = z.object({
       matchScore: z.enum(["High", "Medium", "Low"]),
     })
   ),
-  reasoning: z.string().optional(), // Allow AI to omit reasoning if it truly has none, flow will provide default
+  reasoning: z.string().optional(), 
 });
 
 
 // Final Output Schema for the flow
 const ItemMatchOutputSchema = z.object({
-  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores and ownerIds. Can be empty if no good matches are found."),
+  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores and ownerIds. Can be empty if no good matches are found or if they don't meet minimum rating criteria."),
   reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
   usedMatchingMode: z.enum(['simple', 'advanced']).describe("The matching mode that was used."),
   preferencesConsidered: z.boolean().describe("Whether user profile preferences were considered.")
@@ -98,6 +100,9 @@ Description: {{{currentItem.description}}}
 Category: {{{currentItem.category}}}
 Owner ID: {{{currentItem.ownerId}}}
 Listing Type: {{{currentItem.listingType}}}
+{{#if currentItem.minimumMatchRatingOverride}}
+Minimum Acceptable Match Score for THIS ITEM: {{{currentItem.minimumMatchRatingOverride}}} (You MUST NOT suggest items with a score lower than this for the 'Current Item').
+{{/if}}
 
 Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: Description):
 {{#each availableItems}}
@@ -105,36 +110,25 @@ Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: Des
 {{/each}}
 
 For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low".
-- "High":
-    - Strong direct relevance.
-    - Item categories are very similar or highly complementary.
-    - Key terms in name/description show a clear overlap or direct fulfillment of a need.
-    - If Current Item is 'offer' and Available Item is 'want': Available Item's want description is well-matched by Current Item's offer.
-    - If Current Item is 'want' and Available Item is 'offer': Available Item's offer directly addresses Current Item's want description.
-    - If both are 'offer' or both are 'want': Highly desirable items within the same niche or for similar purposes.
-- "Medium":
-    - Good general relevance.
-    - Categories are related or could appeal to similar users.
-    - Some overlap in keywords or purpose, or one item broadly fits the type of the other.
-    - A plausible trade scenario even if not a perfect keyword match.
-- "Low":
-    - Possible, but less direct, relevance.
-    - Categories might be different but could have niche appeal or indirect connection.
-    - Loose association by theme or potential utility not immediately obvious from keywords.
-    - Could be interesting for users with broad interests or unstated needs.
+- "High": Strong direct relevance, very similar categories, clear keyword overlap.
+- "Medium": Good general relevance, related categories, some keyword overlap.
+- "Low": Possible but less direct relevance, different categories with niche appeal.
+
+{{#if currentItem.minimumMatchRatingOverride}}
+IMPORTANT: The 'Current Item' has a specific minimum match rating requirement of '{{{currentItem.minimumMatchRatingOverride}}}'. When suggesting matches, your assigned score for any suggested item MUST be '{{{currentItem.minimumMatchRatingOverride}}}' or higher (e.g., if min is 'Medium', you can suggest 'Medium' or 'High', but not 'Low').
+{{/if}}
 
 Do not suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}) as direct matches for their own items.
 
 Respond with a list of suggested matches, each including the 'itemId' and its 'matchScore'.
-If no good matches are found, return an empty list for 'suggestedMatches' AND provide a brief reasoning like "No direct matches found based on strong keyword or category overlap, but users might explore items based on broader interests."
+If no good matches are found (or none meet the minimum rating if specified), return an empty list for 'suggestedMatches' AND provide a brief reasoning.
 Optionally, if matches are found, provide a brief (1-2 sentences) overall reasoning for your suggestions.
-Identify several relevant matches if possible, covering different scenarios or levels of relevance if applicable.
   `,
 });
 
-// ADVANCED PROMPT (New)
+// ADVANCED PROMPT
 const advancedItemMatchPrompt = ai.definePrompt({
   name: 'advancedItemMatchPrompt',
   input: {schema: AdvancedItemMatchPromptInputSchema},
@@ -147,6 +141,9 @@ Name: "{{{currentItem.name}}}"
 Description: "{{{currentItem.description}}}"
 Category: "{{{currentItem.category}}}"
 Listed As: {{{currentItem.listingType}}} (by user {{{currentItem.ownerId}}})
+{{#if currentItem.minimumMatchRatingOverride}}
+This Item's Specific Minimum Match Requirement: '{{{currentItem.minimumMatchRatingOverride}}}' (Overrides user's global preference for this item).
+{{/if}}
 
 {{#if triggeringUserPreferences}}
 The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the following preferences:
@@ -154,7 +151,12 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the followin
 {{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
 {{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else}} - Open to 3rd Party Fulfillment: No{{/if}}
-Consider these preferences when evaluating match quality. For example, if the user is 'convenience-focused', items requiring complex shipping might be lower priority unless highly desired.
+{{#if triggeringUserPreferences.minimumMatchRating}}
+{{#unless currentItem.minimumMatchRatingOverride}}
+ - User's Global Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}'
+{{/unless}}
+{{/if}}
+Consider these preferences when evaluating match quality.
 {{else}}
 No specific preferences provided for the triggering user (ID: {{{triggeringUserId}}}). Focus on general item compatibility and mutual benefit.
 {{/if}}
@@ -166,6 +168,17 @@ Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: L
 
 Analyze the "Current Item" against the "Available Items" to find potential trades. A good match involves RECIPROCAL interest or clear fulfillment of needs.
 
+Match Score Assignment: Assign "High", "Medium", or "Low" based on factors like direct fulfillment, complementarity, and alignment with user preferences.
+
+MINIMUM MATCH SCORE RULE:
+{{#if currentItem.minimumMatchRatingOverride}}
+The 'Current Item' REQUIRES suggestions to have a match score of at least '{{{currentItem.minimumMatchRatingOverride}}}'. Do NOT suggest any items you score lower than this.
+{{else if triggeringUserPreferences.minimumMatchRating}}
+The triggering user generally PREFERS suggestions with a match score of at least '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize these, and only suggest items below this if no better options exist and they are still at least 'Low'.
+{{else}}
+No specific minimum match score is set. Use your best judgment for relevance.
+{{/if}}
+
 Prioritize:
 1.  Direct Fulfillment:
     *   If 'currentItem' is 'offer': Find 'want' items from 'availableItems' that 'currentItem' directly satisfies.
@@ -173,30 +186,17 @@ Prioritize:
 2.  Strong Complementary Offers: If 'currentItem' is 'offer', find 'offer' items from 'availableItems' that would make a compelling direct swap.
 
 Assign a match score ("High", "Medium", "Low") based on:
-- "High":
-    -   Excellent direct fulfillment: 'currentItem' (Offer) clearly satisfies an 'availableItem' (Want), OR 'currentItem' (Want) is clearly satisfied by an 'availableItem' (Offer).
-        This forms one strong leg of a trade.
-        *Consider it an even stronger "High" match if*: The owner of this 'availableItem' (User B) also has other 'Offer' items listed in 'Available Items' that seem highly relevant to you (the 'triggeringUser', User A), based on your 'currentItem''s category/description or your explicit 'triggeringUserPreferences'. This suggests a potential for a full reciprocal trade where User B's offer might fulfill one of your other (unstated) wants. If you see this potential, briefly note it in your reasoning.
-    -   Highly complementary 'offer'-'offer' swap: 'currentItem' (Offer) and 'availableItem' (Offer, from User B) are a natural pair (e.g., same category, similar perceived value, strong thematic link).
-        *Consider it an even stronger "High" match if*: The descriptions or categories suggest strong mutual interest (e.g., your 'currentItem' description hints at needing something like User B's 'availableItem', or vice-versa). This also suggests a potential for a full reciprocal trade. If you see this, briefly note it in your reasoning.
-    -   Strong alignment of the 'availableItem' with 'triggeringUser''s explicit preferences (e.g., a 'unique-find' motivation perfectly met).
-- "Medium":
-    -   Good potential for mutual benefit. One item generally addresses the type/category of the other.
-    -   Two 'offer' items that are related and could make a fair trade.
-    -   Some alignment with user preferences, or no strong misalignment.
-- "Low":
-    -   Plausible but less direct connection. Items might be in different categories but could have niche appeal.
-    -   A more speculative trade, perhaps relying on broader user interests or unstated needs. Even a low match can be interesting if nothing stronger is found.
-    -   May partially align with preferences or have some conflicting aspects (e.g., 'convenience-focused' user but item is far).
+- "High": Excellent direct fulfillment OR highly complementary 'offer'-'offer' swap with strong mutual interest. Strong alignment with explicit preferences.
+- "Medium": Good potential for mutual benefit. One item generally addresses the type/category of the other. Some alignment with preferences.
+- "Low": Plausible but less direct connection. More speculative. May partially align with preferences.
 
 Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
-Return a list of 'suggestedMatches' (itemId, matchScore).
-If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach or key finds, especially if you identified potential for a fuller reciprocal trade.
-If NO suitable matches are found, return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why no strong reciprocal matches were identified (e.g., "Could not find direct want fulfillments or highly complementary offers for '[Current Item Name]' from the available items. Users might need to browse more broadly.").
-Aim for quality over quantity, but try to find at least one or two "Low" matches if nothing better is available, rather than nothing.
+Return a list of 'suggestedMatches' (itemId, matchScore), ensuring ALL suggested items meet the applicable minimum match score rule mentioned above.
+If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach.
+If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
   `,
 });
 
@@ -211,13 +211,12 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     let preferencesConsidered = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
-    let finalInputForPrompt: any = { ...input }; // Copy input to avoid modifying the original
+    let finalInputForPrompt: any = { ...input }; 
 
     const currentMatchingMode = await getAIMatchingMode();
     const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
     let usedMatchingMode: 'simple' | 'advanced' = currentMatchingMode;
 
-    // Filter out the current item and items by the same owner from availableItems
     const itemsToConsider = input.availableItems.filter(item =>
         item.id !== input.currentItem.id && item.ownerId !== input.currentItem.ownerId
     );
@@ -230,7 +229,7 @@ const itemMatchFlow = ai.defineFlow(
             usedMatchingMode: usedMatchingMode,
             preferencesConsidered: false,
         };
-        logMatchSuggestion({ // Not awaited
+        logMatchSuggestion({ 
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
@@ -242,22 +241,26 @@ const itemMatchFlow = ai.defineFlow(
         return output;
     }
 
-    finalInputForPrompt.availableItems = itemsToConsider; // Use the filtered list
+    finalInputForPrompt.availableItems = itemsToConsider;
+    // Ensure currentItem includes its potential minimumMatchRatingOverride
+    finalInputForPrompt.currentItem = {
+        ...input.currentItem,
+        minimumMatchRatingOverride: input.currentItem.minimumMatchRatingOverride,
+    };
+
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
       if (usePrefsInMatchingGlobal) {
-        // Attempt to fetch user preferences for the triggeringUserId
         const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
         if (userProfile) {
-          // Construct preferences object based on User type
           const userPrefs: UserProfilePreferences = {
             motivations: userProfile.motivations,
             locationPreference: userProfile.locationPreference,
             tradeTimingPreference: userProfile.tradeTimingPreference,
             interestedInThirdPartyFulfillment: userProfile.interestedInThirdPartyFulfillment,
+            minimumMatchRating: userProfile.minimumMatchRating, // Include minimumMatchRating
           };
-          // Check if any preference is actually set before adding to prompt input
           if (Object.values(userPrefs).some(val => val !== undefined && (!Array.isArray(val) || val.length > 0))) {
              finalInputForPrompt.triggeringUserPreferences = userPrefs;
              preferencesConsidered = true;
@@ -265,16 +268,20 @@ const itemMatchFlow = ai.defineFlow(
         }
       }
     } else {
-      usedMatchingMode = 'simple'; // Ensure usedMatchingMode reflects simple mode if not advanced
+      usedMatchingMode = 'simple';
+       // For simple mode, ensure currentItem's override is still passed
+      finalInputForPrompt.currentItem = {
+        ...input.currentItem,
+        minimumMatchRatingOverride: input.currentItem.minimumMatchRatingOverride,
+      };
     }
 
     try {
       console.log(`[${flowName}] (${usedMatchingMode} mode) Calling prompt with input:`, JSON.stringify(finalInputForPrompt, null, 2));
       const { output: promptOutput } = await promptToUse(finalInputForPrompt);
 
-      // Define default reasoning based on context
       let defaultReasoning = `AI (${usedMatchingMode} mode) did not find strong matches for "${input.currentItem.name}" based on the current criteria. Users might explore other items or categories.`;
-      if (itemsToConsider.length < 3) { // If very few items were available to match against
+      if (itemsToConsider.length < 3) { 
           defaultReasoning = `AI (${usedMatchingMode} mode) had limited options to find strong matches for "${input.currentItem.name}". More items from other users might yield better suggestions.`;
       }
 
@@ -287,7 +294,7 @@ const itemMatchFlow = ai.defineFlow(
               usedMatchingMode,
               preferencesConsidered,
           };
-          logMatchSuggestion({ // Not awaited
+          logMatchSuggestion({ 
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
@@ -299,18 +306,16 @@ const itemMatchFlow = ai.defineFlow(
           return errorOutput;
       }
 
-      // Augment suggestedMatches with ownerId from the original availableItems list
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
           ...aiSuggestion,
-          ownerId: originalItem?.ownerId || 'unknown_owner', // Add ownerId
+          ownerId: originalItem?.ownerId || 'unknown_owner', 
         };
-      }).filter(match => match.ownerId !== 'unknown_owner'); // Filter out any where ownerId couldn't be found (should not happen)
+      }).filter(match => match.ownerId !== 'unknown_owner'); 
 
 
-      // Determine final reasoning: use AI's if provided and sensible, otherwise use default
-      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning) // No matches AND no AI reasoning
+      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning) 
                                ? defaultReasoning
                                : promptOutput.reasoning || (augmentedMatches.length > 0 ? `Found some potential matches for "${input.currentItem.name}".` : defaultReasoning);
 
@@ -321,7 +326,7 @@ const itemMatchFlow = ai.defineFlow(
         preferencesConsidered,
       };
 
-      logMatchSuggestion({ // Not awaited
+      logMatchSuggestion({ 
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
@@ -333,19 +338,16 @@ const itemMatchFlow = ai.defineFlow(
       return validatedOutput;
 
     } catch (error: any) {
-      // Enhanced error logging
       const errorDetails: Record<string, any> = {
         name: error.name,
         message: error.message,
-        stack: error.stack?.substring(0, 500), // Truncate stack for brevity
-        cause: error.cause, // Include cause if available
+        stack: error.stack?.substring(0, 500), 
+        cause: error.cause, 
       };
       if (typeof error === 'object' && error !== null) {
-          // Check for Genkit specific properties
           if ('isGenkitError' in error) errorDetails.isGenkitError = (error as any).isGenkitError;
-          if ('details' in error) errorDetails.details = (error as any).details; // Often contains structured error info from Genkit/Google AI
-          if ('status' in error) errorDetails.status = (error as any).status; // HTTP status if it's an API error
-          // For gRPC style codes that might come via details or other properties
+          if ('details' in error) errorDetails.details = (error as any).details; 
+          if ('status' in error) errorDetails.status = (error as any).status; 
           if ('code' in error && !('status' in errorDetails)) errorDetails.code = (error as any).code;
       }
       try {
@@ -361,11 +363,11 @@ const itemMatchFlow = ai.defineFlow(
 
       if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue with its request structure (likely template formatting for item ID: ${input.currentItem.id}). Please check server logs for details.`;
-      } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT from gRPC/Google AI */) {
+      } else if (errorDetails.status === 400 || errorDetails.code === 3 ) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) received a bad request. This might be due to problematic input data (Item ID: ${input.currentItem.id}) or an issue with the prompt structure. Please check server logs for details on the input.`;
-      } else if (errorDetails.status === 429 || errorDetails.code === 8 /* RESOURCE_EXHAUSTED */ || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
+      } else if (errorDetails.status === 429 || errorDetails.code === 8 || lowerErrorMessage.includes('quota') || lowerErrorMessage.includes('resource_exhausted')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) has reached its current usage limit. Please try again later.`;
-      } else if (errorDetails.status === 503 || errorDetails.code === 14 /* UNAVAILABLE */ || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
+      } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) is temporarily overloaded or unavailable. Please try again.`;
       } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
         userMessage = `Authentication error with the AI service (${usedMatchingMode} mode). Please check API key configuration.`;
@@ -376,19 +378,16 @@ const itemMatchFlow = ai.defineFlow(
       } else if (errorDetails.status === 500 || lowerErrorMessage.includes('internal server error')) {
         userMessage = `The AI service (${usedMatchingMode} mode) reported an internal error. Please try again later.`;
       } else if (errorDetails.isGenkitError || errorDetails.details || errorDetails.status ) {
-        // Catch-all for other Genkit/Google AI errors that have structured details
         userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue interpreting the request structure. This is often due to template formatting. Please check server logs.`;
-        // Append specific model message if it's not too generic
         if (error.message && !lowerErrorMessage.includes('unexpected') && !lowerErrorMessage.includes('internal') && !lowerErrorMessage.includes('unknown') && !lowerErrorMessage.includes('parse error')) {
             userMessage += ` (Details: ${error.message.substring(0,150)}${error.message.length > 150 ? "..." : ""})`;
         }
       }
 
-
-      logAIDiagnostic({ // Not awaited
+      logAIDiagnostic({ 
         flowName: flowName,
         triggeringUserId: input.triggeringUserId,
-        input: finalInputForPrompt, // Log the actual input sent to the prompt
+        input: finalInputForPrompt, 
         error: {
           name: errorDetails.name,
           message: errorDetails.message,
@@ -408,7 +407,7 @@ const itemMatchFlow = ai.defineFlow(
         usedMatchingMode,
         preferencesConsidered,
       };
-      logMatchSuggestion({ // Not awaited
+      logMatchSuggestion({ 
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
@@ -425,7 +424,3 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
-
-
-    
-
