@@ -37,7 +37,7 @@ const UserPreferencesSchema = z.object({
   }).optional(),
   tradeTimingPreference: z.enum(['simultaneous', 'staged', 'flexible']).optional(),
   interestedInThirdPartyFulfillment: z.boolean().optional(),
-  minimumMatchRating: z.enum(['Low', 'Medium', 'High']).describe("User's global minimum match rating preference. This will always be set, defaulting to 'Low' if user hasn't specified one."), // Now required, defaults to 'Low' at data level
+  minimumMatchRating: z.enum(['Low', 'Medium', 'High']).describe("User's global minimum match rating preference. This will always be set, defaulting to 'Low' if user hasn't specified one."),
 }).describe("The triggering user's trading preferences.");
 
 
@@ -54,7 +54,7 @@ export type ItemMatchInput = z.infer<typeof ItemMatchFlowInputSchema>;
 
 // Input schema for the advanced prompt, including user preferences (minimumMatchRating is now always present)
 const AdvancedItemMatchPromptInputSchema = BaseItemMatchInputSchema.extend({
-  triggeringUserPreferences: UserPreferencesSchema, // Now required because minimumMatchRating is always present
+  triggeringUserPreferences: UserPreferencesSchema,
 });
 
 const SuggestedItemWithScoreSchema = z.object({
@@ -71,7 +71,7 @@ const PromptOutputSchema = z.object({
       matchScore: z.enum(["High", "Medium", "Low"]),
     })
   ),
-  reasoning: z.string().optional(), 
+  reasoning: z.string().optional(),
 });
 
 
@@ -88,7 +88,7 @@ export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 // SIMPLE PROMPT (existing)
 const simpleItemMatchPrompt = ai.definePrompt({
   name: 'simpleItemMatchPrompt',
-  input: {schema: BaseItemMatchInputSchema}, 
+  input: {schema: BaseItemMatchInputSchema},
   output: {schema: PromptOutputSchema},
   prompt: `You are an AI assistant helping users find items to trade on a barter platform.
 Given a 'Current Item' and a list of 'Available Items' from other users, identify items from the 'Available Items' list that could be a good trade. Focus on general relevance, category similarity, and keyword matches in descriptions.
@@ -149,7 +149,7 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}) has the followin
 {{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
 {{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
-{{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else}} - Open to 3rd Party Fulfillment: No{{/if}}
+{{#if triggeringUserPreferences.interestedInThirdPartyFulfillment}} - Open to 3rd Party Fulfillment: Yes{{else if triggeringUserPreferences.interestedInThirdPartyFulfillment === false}} - Open to 3rd Party Fulfillment: No{{else}}<!-- No explicit 3rd party fulfillment preference set -->{{/if}}
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
 
 Consider these preferences when evaluating match quality and potential for reciprocal trades.
@@ -203,7 +203,7 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     let preferencesConsideredBeyondDefaultMinRating = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
-    let finalInputForPrompt: any = { ...input }; 
+    let finalInputForPrompt: any = { ...input };
 
     const currentMatchingMode = await getAIMatchingMode();
     const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
@@ -221,7 +221,7 @@ const itemMatchFlow = ai.defineFlow(
             usedMatchingMode: usedMatchingMode,
             preferencesConsidered: false,
         };
-        logMatchSuggestion({ 
+        logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
@@ -243,7 +243,6 @@ const itemMatchFlow = ai.defineFlow(
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
       const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
-      // User profile minimumMatchRating is now required and defaults to 'Low' at data level.
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
       const userPrefsForPrompt: UserProfilePreferences = {
@@ -251,20 +250,24 @@ const itemMatchFlow = ai.defineFlow(
         locationPreference: userProfile?.locationPreference,
         tradeTimingPreference: userProfile?.tradeTimingPreference,
         interestedInThirdPartyFulfillment: userProfile?.interestedInThirdPartyFulfillment,
-        minimumMatchRating: effectiveUserMinRating, // Always present
+        minimumMatchRating: effectiveUserMinRating,
       };
-      
+
       finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
 
       if (usePrefsInMatchingGlobal) {
-        // Check if any meaningful preference beyond the default minimum rating was considered
-        const hasOtherMeaningfulPrefs = 
-          userProfile?.motivations || 
-          userProfile?.locationPreference || 
-          userProfile?.tradeTimingPreference || 
-          userProfile?.interestedInThirdPartyFulfillment !== undefined ||
-          (userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low'); // Considered if not the absolute default
-        preferencesConsideredBeyondDefaultMinRating = hasOtherMeaningfulPrefs;
+        const hasMeaningfulMotivations = !!(userProfile?.motivations && userProfile.motivations.length > 0);
+        const hasMeaningfulLocationPref = !!(userProfile?.locationPreference && (userProfile.locationPreference.isSensitive || (userProfile.locationPreference.notes && userProfile.locationPreference.notes.trim() !== '')));
+        const hasMeaningfulTimingPref = !!userProfile?.tradeTimingPreference;
+        const hasMeaningful3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
+        const hasNonDefaultMinRating = !!(userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low');
+
+        preferencesConsideredBeyondDefaultMinRating =
+          hasMeaningfulMotivations ||
+          hasMeaningfulLocationPref ||
+          hasMeaningfulTimingPref ||
+          hasMeaningful3rdPartyPref ||
+          hasNonDefaultMinRating;
       } else {
         preferencesConsideredBeyondDefaultMinRating = false; // Global setting is off
       }
@@ -279,7 +282,7 @@ const itemMatchFlow = ai.defineFlow(
       const { output: promptOutput } = await promptToUse(finalInputForPrompt);
 
       let defaultReasoning = `AI (${usedMatchingMode} mode) did not find strong matches for '${input.currentItem.name}' based on the current criteria. Users might explore other items or categories.`;
-      if (itemsToConsider.length < 3) { 
+      if (itemsToConsider.length < 3) {
           defaultReasoning = `AI (${usedMatchingMode} mode) had limited options to find strong matches for '${input.currentItem.name}'. More items from other users might yield better suggestions.`;
       }
 
@@ -292,7 +295,7 @@ const itemMatchFlow = ai.defineFlow(
               usedMatchingMode,
               preferencesConsidered: preferencesConsideredBeyondDefaultMinRating,
           };
-          logMatchSuggestion({ 
+          logMatchSuggestion({
             triggeringUserId: input.triggeringUserId,
             currentItemId: input.currentItem.id,
             currentItemName: input.currentItem.name,
@@ -308,12 +311,12 @@ const itemMatchFlow = ai.defineFlow(
         const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
           ...aiSuggestion,
-          ownerId: originalItem?.ownerId || 'unknown_owner', 
+          ownerId: originalItem?.ownerId || 'unknown_owner',
         };
-      }).filter(match => match.ownerId !== 'unknown_owner'); 
+      }).filter(match => match.ownerId !== 'unknown_owner');
 
 
-      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning) 
+      const finalReasoning = (augmentedMatches.length === 0 && !promptOutput.reasoning)
                                ? defaultReasoning
                                : promptOutput.reasoning || (augmentedMatches.length > 0 ? `Found some potential matches for '${input.currentItem.name}'.` : defaultReasoning);
 
@@ -324,7 +327,7 @@ const itemMatchFlow = ai.defineFlow(
         preferencesConsidered: preferencesConsideredBeyondDefaultMinRating,
       };
 
-      logMatchSuggestion({ 
+      logMatchSuggestion({
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
@@ -339,13 +342,13 @@ const itemMatchFlow = ai.defineFlow(
       const errorDetails: Record<string, any> = {
         name: error.name,
         message: error.message,
-        stack: error.stack?.substring(0, 500), 
-        cause: error.cause, 
+        stack: error.stack?.substring(0, 500),
+        cause: error.cause,
       };
       if (typeof error === 'object' && error !== null) {
           if ('isGenkitError' in error) errorDetails.isGenkitError = (error as any).isGenkitError;
-          if ('details' in error) errorDetails.details = (error as any).details; 
-          if ('status' in error) errorDetails.status = (error as any).status; 
+          if ('details' in error) errorDetails.details = (error as any).details;
+          if ('status' in error) errorDetails.status = (error as any).status;
           if ('code' in error && !('status' in errorDetails)) errorDetails.code = (error as any).code;
       }
       try {
@@ -382,10 +385,10 @@ const itemMatchFlow = ai.defineFlow(
         }
       }
 
-      logAIDiagnostic({ 
+      logAIDiagnostic({
         flowName: flowName,
         triggeringUserId: input.triggeringUserId,
-        input: finalInputForPrompt, 
+        input: finalInputForPrompt,
         error: {
           name: errorDetails.name,
           message: errorDetails.message,
@@ -396,7 +399,7 @@ const itemMatchFlow = ai.defineFlow(
         },
         userFacingMessage: userMessage,
       }).catch(diagError => console.error("Error logging diagnostic for itemMatchFlow:", diagError));
-      
+
       console.error(`[${flowName}] (${usedMatchingMode} mode) is returning an error to the client. User-facing message: '${userMessage}'. Original error: '${errorDetails.name || 'Error'}': ${errorDetails.message || 'No message available'}'.`);
 
       const errorOutput: ItemMatchOutput = {
@@ -405,7 +408,7 @@ const itemMatchFlow = ai.defineFlow(
         usedMatchingMode,
         preferencesConsidered: preferencesConsideredBeyondDefaultMinRating,
       };
-      logMatchSuggestion({ 
+      logMatchSuggestion({
         triggeringUserId: input.triggeringUserId,
         currentItemId: input.currentItem.id,
         currentItemName: input.currentItem.name,
