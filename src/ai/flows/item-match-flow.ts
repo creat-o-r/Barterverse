@@ -59,29 +59,29 @@ const AdvancedItemMatchPromptInputSchema = BaseItemMatchInputSchema.extend({
   triggeringUserPreferences: UserPreferencesSchema,
 });
 
-const SuggestedItemWithScoreSchema = z.object({
-  itemId: z.string().describe("The ID of the suggested matching item."),
-  matchScore: z.enum(["High", "Medium", "Low"]).describe("The qualitative match score (High, Medium, or Low)."),
+const SuggestedItemInPromptSchema = z.object({
+    itemId: z.string(),
+    matchScore: z.enum(["High", "Medium", "Low"]),
+    isGiftItForward: z.boolean().optional(),
+    reciprocalItemId: z.string().optional().describe("If this match score is High/Medium due to reciprocity, this is the ID of the item from the suggested item's owner that fulfills a want of the triggering user."),
+});
+
+const SuggestedItemWithScoreSchema = SuggestedItemInPromptSchema.extend({
   ownerId: z.string().describe("The ID of the owner of the suggested item."),
-  isGiftItForward: z.boolean().optional().describe("Indicates if the suggested item is a gift."),
+  // isGiftItForward is already in SuggestedItemInPromptSchema
+  // reciprocalItemId is already in SuggestedItemInPromptSchema
 });
 
 // This is what prompts are expected to return (subset of the flow's final output)
 const PromptOutputSchema = z.object({
-  suggestedMatches: z.array(
-    z.object({
-      itemId: z.string(),
-      matchScore: z.enum(["High", "Medium", "Low"]),
-      isGiftItForward: z.boolean().optional(),
-    })
-  ),
+  suggestedMatches: z.array(SuggestedItemInPromptSchema),
   reasoning: z.string().optional(),
 });
 
 
 // Final Output Schema for the flow
 const ItemMatchOutputSchema = z.object({
-  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores, ownerIds, and gift status. Can be empty if no good matches are found or if they don't meet minimum rating criteria."),
+  suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores, ownerIds, gift status, and potential reciprocal item ID. Can be empty if no good matches are found or if they don't meet minimum rating criteria."),
   reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
   usedMatchingMode: z.enum(['simple', 'advanced']).describe("The matching mode that was used."),
   preferencesConsidered: z.boolean().describe("Whether user profile preferences were considered beyond the default minimum match rating.")
@@ -93,7 +93,7 @@ export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 const simpleItemMatchPrompt = ai.definePrompt({
   name: 'simpleItemMatchPrompt',
   input: {schema: BaseItemMatchInputSchema},
-  output: {schema: PromptOutputSchema},
+  output: {schema: PromptOutputSchema}, // Will now include reciprocalItemId as optional
   prompt: `You are an AI assistant helping users find items to trade on a barter platform.
 Given a 'Current Item' and a list of 'Available Items' from other users, identify items from the 'Available Items' list that could be a good trade. Focus on general relevance, category similarity, and keyword matches in descriptions.
 
@@ -131,7 +131,8 @@ Do not suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}) as direct matches for their own items.
 
-Respond with a list of up to 5 suggested matches if available, each including the 'itemId', its 'matchScore', and 'isGiftItForward' status. Aim for variety if multiple good options exist.
+Respond with a list of up to 5 suggested matches if available, each including the 'itemId', its 'matchScore', and 'isGiftItForward' status. The 'reciprocalItemId' field is generally not applicable for simple matching, so you can omit it or leave it null.
+Aim for variety if multiple good options exist.
 If no good matches are found (or none meet the minimum rating if specified), return an empty list for 'suggestedMatches' AND provide a brief reasoning.
 Optionally, if matches are found, provide a brief (1-2 sentences) overall reasoning for your suggestions.
   `,
@@ -141,7 +142,7 @@ Optionally, if matches are found, provide a brief (1-2 sentences) overall reason
 const advancedItemMatchPrompt = ai.definePrompt({
   name: 'advancedItemMatchPrompt',
   input: {schema: AdvancedItemMatchPromptInputSchema},
-  output: {schema: PromptOutputSchema},
+  output: {schema: PromptOutputSchema}, // Includes reciprocalItemId
   prompt: `You are an expert AI trade facilitator for a bartering platform. Your goal is to identify highly relevant and mutually beneficial trade opportunities by considering reciprocal want fulfillment.
 
 Current Item Details:
@@ -173,20 +174,23 @@ The primary goal is to find items where the 'Current Item' (owned/wanted by {{{t
 
 - "High" Match:
     1. The 'Current Item' ({{{currentItem.listingType}}}) strongly fulfills a complementary 'Available Item' from User B (e.g., your Offer for User B's Want, or your Want for User B's Offer).
-    2. AND, another 'Available Item' (an Offer from that same User B) clearly fulfills an explicit or strongly implied 'want' of the 'triggeringUser' ({{{triggeringUserId}}}). Consider {{{triggeringUserPreferences.motivations}}}, other 'want' items listed by {{{triggeringUserId}}}, or needs inferred from their 'currentItem' context. *Essentially, all explicit wants in a potential 2-way exchange are clearly met.*
+    2. AND, another 'Available Item' (an Offer from that same User B, let's call it Item C) clearly fulfills an explicit or strongly implied 'want' of the 'triggeringUser' ({{{triggeringUserId}}}). Consider {{{triggeringUserPreferences.motivations}}}, other 'want' items listed by {{{triggeringUserId}}}, or needs inferred from their 'currentItem' context. *Essentially, all explicit wants in a potential 2-way exchange are clearly met.*
+    3. If conditions 1 and 2 are met, include Item C's ID as 'reciprocalItemId' in the suggestion for the match between Current Item and User B's initial item.
 
 - "Medium" Match:
     1. The 'Current Item' ({{{currentItem.listingType}}}) fulfills a complementary 'Available Item' from User B.
-    2. AND, another 'Available Item' (an Offer from that same User B) partially fulfills or aligns with some of the 'triggeringUser's' preferences or *potential* wants. *Reciprocal benefit is good, but triggeringUser's wants are not all perfectly or explicitly met by User B's offer.*
+    2. AND, another 'Available Item' (an Offer from that same User B, Item C) partially fulfills or aligns with some of the 'triggeringUser's' preferences or *potential* wants. *Reciprocal benefit is good, but triggeringUser's wants are not all perfectly or explicitly met by User B's offer.*
+    3. If conditions 1 and 2 are met, and Item C is clearly identified as the source of this partial fulfillment, include its ID as 'reciprocalItemId'.
 
 - "Low" Match:
     1. The 'Current Item' ({{{currentItem.listingType}}}) has a plausible connection to a complementary 'Available Item' from User B.
-    2. AND, another 'Available Item' (an Offer from that same User B) might speculatively fulfill an *inferred or less obvious* want of the 'triggeringUser'.
+    2. AND, another 'Available Item' (an Offer from that same User B, Item C) might speculatively fulfill an *inferred or less obvious* want of the 'triggeringUser'.
     Alternatively, the primary match (Current Item to an Available Item) is weaker but still plausible, even if strong reciprocal want fulfillment isn't clear. Or if it's an offer-offer match with general appeal but no clear want fulfillment.
+    4. Only include 'reciprocalItemId' if a specific item from User B strongly contributes to even this speculative fulfillment. Generally, 'Low' matches may not have a 'reciprocalItemId'.
 
 GIFT FULFILLMENT OVERRIDE:
-- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked 'isGiftItForward: true' that clearly fulfills this want, this is a 'High' match, overriding other reciprocity scoring for this specific gift.
-- If 'Current Item' is an 'offer' marked 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a 'High' match.
+- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked 'isGiftItForward: true' that clearly fulfills this want, this is a 'High' match, overriding other reciprocity scoring for this specific gift. Do not set 'reciprocalItemId' in this case, as the gift itself is the primary fulfillment.
+- If 'Current Item' is an 'offer' marked 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a 'High' match. Do not set 'reciprocalItemId'.
 
 MINIMUM MATCH SCORE RULE:
 {{#if currentItem.minimumMatchRatingOverride}}
@@ -199,8 +203,8 @@ Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
-Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status) if available, ensuring ALL suggested items meet the applicable minimum match score rule. Aim for variety and strong reciprocal potential if multiple good options exist.
-If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential or gift fulfillments if significant.
+Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status, and reciprocalItemId if applicable) if available, ensuring ALL suggested items meet the applicable minimum match score rule. Aim for variety and strong reciprocal potential if multiple good options exist.
+If matches are found, optionally provide a brief (1-2 sentences) 'reasoning' for your overall approach, highlighting any reciprocal potential or gift fulfillments if significant. If you identified a `reciprocalItemId` for a match, briefly mention how that item contributes to the overall match quality or reciprocal benefit in your reasoning.
 If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
   `,
 });
@@ -335,9 +339,11 @@ const itemMatchFlow = ai.defineFlow(
       const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
-          ...aiSuggestion,
+          itemId: aiSuggestion.itemId,
+          matchScore: aiSuggestion.matchScore,
           ownerId: originalItem?.ownerId || 'unknown_owner',
           isGiftItForward: aiSuggestion.isGiftItForward || originalItem?.isGiftItForward || false, // Prioritize AI output, fallback to original item
+          reciprocalItemId: aiSuggestion.reciprocalItemId, // Pass through the reciprocalItemId
         };
       }).filter(match => match.ownerId !== 'unknown_owner');
 
@@ -451,3 +457,4 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
+

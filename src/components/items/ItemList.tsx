@@ -3,8 +3,8 @@ import type { Item } from '@/types';
 import ItemCard from './ItemCard';
 
 interface ItemListProps {
-  items: (Item & { matchScore?: string })[]; // Items can now have an optional matchScore
-  mainContextItemId?: string; // ID of the item for which these are suggestions, for opportunity links
+  items: (Item & { matchScore?: string; reciprocalItemId?: string })[]; // Item can now have matchScore and reciprocalItemId
+  mainContextItemId?: string; 
 }
 
 export default function ItemList({ items, mainContextItemId }: ItemListProps) {
@@ -17,12 +17,12 @@ export default function ItemList({ items, mainContextItemId }: ItemListProps) {
       {items.map((item) => (
         <div key={item.id} className="h-full">
           <ItemCard
-            item={item}
-            matchScore={item.matchScore} // Pass the score from the item object
-            opportunityContextItemId={mainContextItemId} // Pass the ID for opportunity context
+            item={item} // Pass the whole item, which includes matchScore and reciprocalItemId
+            opportunityContextItemId={mainContextItemId}
           />
         </div>
       ))}
     </div>
   );
 }
+

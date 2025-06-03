@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Eye, Gift, Search, Link2, HeartHandshake } from 'lucide-react';
 
 interface ItemCardProps {
-  item: Item;
-  matchScore?: string;
+  item: Item & { matchScore?: string; reciprocalItemId?: string }; // Added reciprocalItemId
   opportunityContextItemId?: string; 
 }
 
@@ -22,16 +21,20 @@ function getMatchScoreColorStyles(score?: string): string {
   }
 }
 
-export default function ItemCard({ item, matchScore, opportunityContextItemId }: ItemCardProps) {
+export default function ItemCard({ item, opportunityContextItemId }: ItemCardProps) { // matchScore removed from direct props, it's in item
   const linkHref = `/items/${item.id}`;
+  const matchScore = item.matchScore; // Get matchScore from item object
   
   let opportunityLink: string | null = null;
-  if (opportunityContextItemId && !item.isGiftItForward) { // Only create opportunity link if not a gift
+  if (opportunityContextItemId && !item.isGiftItForward) {
     const opportunityLinkParams = new URLSearchParams();
     opportunityLinkParams.set('mainItemId', opportunityContextItemId);
     opportunityLinkParams.set('suggestedItemId', item.id);
     if (matchScore) {
         opportunityLinkParams.set('score', matchScore);
+    }
+    if (item.reciprocalItemId) { // Add reciprocalItemId to the link
+        opportunityLinkParams.set('reciprocalItemId', item.reciprocalItemId);
     }
     opportunityLink = `/opportunities?${opportunityLinkParams.toString()}`;
   }
@@ -109,3 +112,4 @@ export default function ItemCard({ item, matchScore, opportunityContextItemId }:
     </Card>
   );
 }
+

@@ -11,7 +11,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake, PackagePlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput } from '@/ai/flows/explain-match-rationale-flow';
@@ -35,13 +35,15 @@ function OpportunityItemCard({
     item,
     owner,
     opportunityContextLabel,
+    isReciprocal = false,
 }: {
     item: Item;
     owner: User;
     opportunityContextLabel: string;
+    isReciprocal?: boolean;
 }) {
   return (
-    <Card className="flex flex-col h-full shadow-lg">
+    <Card className={`flex flex-col h-full shadow-lg ${isReciprocal ? 'bg-accent/10 border-accent/50' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
             {item.listingType === 'offer' ? (item.isGiftItForward ? <HeartHandshake className="h-5 w-5 text-pink-500 shrink-0" /> : <Gift className="h-5 w-5 text-green-600 shrink-0" />) : <Search className="h-5 w-5 text-blue-600 shrink-0" />}
@@ -49,7 +51,7 @@ function OpportunityItemCard({
                 {item.name}
             </CardTitle>
         </div>
-        <Badge variant="secondary" className="text-xs py-0.5 px-2 w-fit">{opportunityContextLabel}</Badge>
+        <Badge variant="secondary" className={`text-xs py-0.5 px-2 w-fit ${isReciprocal ? 'bg-accent text-accent-foreground' : ''}`}>{opportunityContextLabel}</Badge>
       </CardHeader>
       <CardContent className="flex-grow space-y-3 pt-0">
         <div className="aspect-video relative w-full rounded-md overflow-hidden border">
@@ -75,7 +77,7 @@ function OpportunityItemCard({
         </div>
       </CardContent>
       <CardFooter className="pt-3 border-t">
-        <Button asChild variant="default" size="sm" className="w-full bg-primary hover:bg-primary/90">
+        <Button asChild variant="default" size="sm" className={`w-full ${isReciprocal ? 'bg-accent hover:bg-accent/90 text-accent-foreground' : 'bg-primary hover:bg-primary/90'}`}>
           <Link href={`/items/${item.id}`}><Eye className="mr-2 h-4 w-4" /> View Full Details</Link>
         </Button>
       </CardFooter>
@@ -93,6 +95,7 @@ const generalMatchScoreCriteria: Record<string, { title: string; points: string[
       "Offer/Want types align well (e.g., an offer fulfilling a specific want).",
       "If both are 'offer' or 'want', they are desirable items in the same niche.",
       "Gift It Forward items fulfilling a want are often high matches.",
+      "Strong reciprocal potential: the other user offers something you likely want.",
     ],
   },
   medium: {
@@ -102,6 +105,7 @@ const generalMatchScoreCriteria: Record<string, { title: string; points: string[
       "Categories are related or appeal to similar users.",
       "Some overlap in keywords or purpose.",
       "A plausible trade scenario, even if not a perfect keyword match.",
+      "Some reciprocal potential: the other user offers something that might interest you.",
     ],
   },
   low: {
@@ -111,6 +115,7 @@ const generalMatchScoreCriteria: Record<string, { title: string; points: string[
       "Categories might be different but could have niche appeal or indirect connection.",
       "Loose association by theme or potential utility not immediately obvious.",
       "Could be interesting for users with broad interests or unstated needs.",
+      "Little to no obvious reciprocal item offered by the other user.",
     ],
   },
 };
@@ -122,10 +127,12 @@ export default function OpportunityMatchPage() {
   const mainItemIdQuery = searchParams.get('mainItemId');
   const suggestedItemIdQuery = searchParams.get('suggestedItemId');
   const matchScoreQuery = searchParams.get('score');
+  const reciprocalItemIdQuery = searchParams.get('reciprocalItemId');
 
 
   const [mainItemDetails, setMainItemDetails] = useState<{ item: Item; owner: User } | null>(null);
   const [suggestedItemDetails, setSuggestedItemDetails] = useState<{ item: Item; owner: User } | null>(null);
+  const [reciprocalItemDetails, setReciprocalItemDetails] = useState<{ item: Item; owner: User } | null>(null);
   const [loading, setLoading] = useState(true);
   const [opportunityReasoning, setOpportunityReasoning] = useState<string | null>(null);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
@@ -139,17 +146,27 @@ export default function OpportunityMatchPage() {
   useEffect(() => {
     async function fetchDataAndReasoning() {
       setLoading(true);
+      setMainItemDetails(null);
+      setSuggestedItemDetails(null);
+      setReciprocalItemDetails(null);
       setOpportunityReasoning(null);
       setInsightsError(null); 
+      
       const scoreFromQuery = matchScoreQuery?.toLowerCase() || null;
       setMatchScore(scoreFromQuery);
 
-      const mainD = await getItemAndOwner(mainItemIdQuery);
-      const suggestedD = await getItemAndOwner(suggestedItemIdQuery);
+      const mainPromise = getItemAndOwner(mainItemIdQuery);
+      const suggestedPromise = getItemAndOwner(suggestedItemIdQuery);
+      const reciprocalPromise = reciprocalItemIdQuery ? getItemAndOwner(reciprocalItemIdQuery) : Promise.resolve(null);
+
+      const [mainD, suggestedD, reciprocalD] = await Promise.all([mainPromise, suggestedPromise, reciprocalPromise]);
 
       if (mainD && suggestedD) {
         setMainItemDetails(mainD);
         setSuggestedItemDetails(suggestedD);
+        if (reciprocalD) {
+          setReciprocalItemDetails(reciprocalD);
+        }
         
         setLoadingReasoning(true);
         try {
@@ -194,6 +211,7 @@ export default function OpportunityMatchPage() {
       } else {
         setMainItemDetails(null);
         setSuggestedItemDetails(null);
+        setReciprocalItemDetails(null);
       }
       setLoading(false);
     }
@@ -203,7 +221,7 @@ export default function OpportunityMatchPage() {
         setLoading(false); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery]);
+  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery, reciprocalItemIdQuery]);
 
   const handleReportScore = async () => {
     if (!matchScore) return;
@@ -277,27 +295,26 @@ export default function OpportunityMatchPage() {
     pageTitle = "Potential Gift Fulfillment";
     pageDescription = `Your gift "${mainItem.name}" could fulfill a want from ${suggestedItemOwner.name}.`;
     chatButtonText = `Contact ${suggestedItemOwner.name} about Gifting`;
-    actionButtonLink = `/profile/${suggestedItemOwner.id}`; // Link to user profile to contact
+    actionButtonLink = `/profile/${suggestedItemOwner.id}`; 
     actionButtonIcon = <HeartHandshake className="mr-2 h-5 w-5" />;
   } else if (mainItem.listingType === 'want' && suggestedIsGiftOffer) {
     pageTitle = "Potential Gift Found!";
     pageDescription = `A gift "${suggestedItem.name}" from ${suggestedItemOwner.name} might fulfill your want!`;
     chatButtonText = `View Gift & Contact ${suggestedItemOwner.name}`;
-    actionButtonLink = `/items/${suggestedItem.id}`; // Link to item page to view details and contact owner
+    actionButtonLink = `/items/${suggestedItem.id}`; 
     actionButtonIcon = <Gift className="mr-2 h-5 w-5" />;
   } else {
-    // Standard trade negotiation
     pageTitle = "Trade Opportunity";
     if (mainItem.ownerId === currentUserId) {
       tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
       chatButtonText = `Negotiate for "${suggestedItem.name}"`;
-    } else { // Assuming suggestedItem.ownerId === currentUserId or a third-party view
+    } else { 
       tradeId = `trade-${currentUserId}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
       chatButtonText = `Negotiate for "${mainItem.name}"`;
     }
     if (mainItem.ownerId === currentUserId && suggestedItem.ownerId === currentUserId) {
-       chatButtonText = "View Items (Cannot trade with self)"; // Should not happen with filtering
-       actionButtonLink = `/items/${mainItem.id}`; // Fallback
+       chatButtonText = "View Items (Cannot trade with self)"; 
+       actionButtonLink = `/items/${mainItem.id}`; 
     } else {
         actionButtonLink = `/trades/${tradeId}`;
     }
@@ -332,6 +349,29 @@ export default function OpportunityMatchPage() {
                 opportunityContextLabel={suggestedItem.ownerId === currentUserId ? `Your ${suggestedItem.listingType}` : `${suggestedItemOwner.name}'s ${suggestedItem.listingType}`}
             />
           </div>
+
+          {reciprocalItemDetails && suggestedItemDetails && (
+            <div className="mt-6 pt-6 border-t">
+              <div className="text-center mb-4">
+                  <h3 className="font-headline text-xl flex items-center justify-center gap-2">
+                    <PackagePlus className="h-6 w-6 text-accent" />
+                    To Sweeten the Deal...
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-body">
+                    {suggestedItemDetails.owner.name} also offers the following, which might complete a 2-way trade for you:
+                  </p>
+              </div>
+              <div className="max-w-md mx-auto">
+                <OpportunityItemCard 
+                  item={reciprocalItemDetails.item}
+                  owner={reciprocalItemDetails.owner}
+                  opportunityContextLabel={`Also Offered by ${reciprocalItemDetails.owner.name}`}
+                  isReciprocal={true}
+                />
+              </div>
+            </div>
+          )}
+
 
           <div className="mt-6 pt-6 border-t">
             {loadingReasoning && (
@@ -436,3 +476,4 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
+

@@ -15,7 +15,7 @@ interface SuggestedMatchesProps {
 }
 
 export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps) {
-  const [suggestedItems, setSuggestedItems] = useState<(Item & { matchScore: string })[]>([]);
+  const [suggestedItems, setSuggestedItems] = useState<(Item & { matchScore: string; reciprocalItemId?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
@@ -53,7 +53,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             ownerId: item.ownerId,
             listingType: item.listingType,
             minimumMatchRatingOverride: item.minimumMatchRatingOverride,
-            isGiftItForward: item.isGiftItForward, // Pass this field
+            isGiftItForward: item.isGiftItForward, 
         }));
 
         if (otherAvailableItems.length === 0) {
@@ -61,7 +61,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             setInternalReasoning(noItemsReasoning);
             setSuggestedItems([]);
             setLoading(false);
-            setMatchModeUsed('simple'); // Or based on actual config default
+            setMatchModeUsed('simple'); 
             return;
         }
 
@@ -75,7 +75,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             ownerId: currentItem.ownerId,
             listingType: currentItem.listingType,
             minimumMatchRatingOverride: currentItem.minimumMatchRatingOverride,
-            isGiftItForward: currentItem.isGiftItForward, // Pass this field
+            isGiftItForward: currentItem.isGiftItForward, 
           },
           availableItems: otherAvailableItems,
         };
@@ -87,9 +87,13 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
         const itemsWithScores = (result.suggestedMatches || []).map(match => {
           const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-           // Ensure isGiftItForward is part of the merged item details for ItemCard
-          return itemDetails ? { ...itemDetails, matchScore: match.matchScore, isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward } : null;
-        }).filter(Boolean) as (Item & { matchScore: string })[];
+          return itemDetails ? { 
+            ...itemDetails, 
+            matchScore: match.matchScore, 
+            isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward,
+            reciprocalItemId: match.reciprocalItemId // Include reciprocalItemId
+          } : null;
+        }).filter(Boolean) as (Item & { matchScore: string; reciprocalItemId?: string })[];
 
         setSuggestedItems(itemsWithScores);
 
@@ -220,3 +224,4 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       </Card>
   );
 }
+

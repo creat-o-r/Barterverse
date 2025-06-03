@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 
 interface UserItemSuggestion {
   userItem: Item;
-  suggestedMatches: (Item & { matchScore: string })[];
+  suggestedMatches: (Item & { matchScore: string; reciprocalItemId?: string })[];
   isLoading: boolean;
   error: string | null;
   preferencesConsidered: boolean;
@@ -76,7 +76,7 @@ export default function HomePage() {
           ownerId: item.ownerId,
           listingType: item.listingType,
           minimumMatchRatingOverride: item.minimumMatchRatingOverride,
-          isGiftItForward: item.isGiftItForward, // Pass this field
+          isGiftItForward: item.isGiftItForward, 
         }));
 
         if (otherItemsForMatching.length === 0) {
@@ -87,7 +87,7 @@ export default function HomePage() {
               suggestedMatches: [],
               reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
               preferencesConsidered: false,
-              usedMatchingMode: 'simple', // Default or determined by config
+              usedMatchingMode: 'simple', 
             } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning' | 'preferencesConsidered' | 'usedMatchingMode'>,
           };
         }
@@ -103,7 +103,7 @@ export default function HomePage() {
               ownerId: userItem.ownerId,
               listingType: userItem.listingType,
               minimumMatchRatingOverride: userItem.minimumMatchRatingOverride,
-              isGiftItForward: userItem.isGiftItForward, // Pass this field
+              isGiftItForward: userItem.isGiftItForward, 
             },
             availableItems: otherItemsForMatching,
           });
@@ -128,9 +128,13 @@ export default function HomePage() {
             if (success && data) {
               const itemsWithScores = (data.suggestedMatches || []).map(match => {
                 const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-                // Ensure isGiftItForward is part of the merged item details for ItemCard
-                return itemDetails ? { ...itemDetails, matchScore: match.matchScore, isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward } : null;
-              }).filter(Boolean) as (Item & { matchScore: string })[];
+                return itemDetails ? { 
+                  ...itemDetails, 
+                  matchScore: match.matchScore, 
+                  isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward,
+                  reciprocalItemId: match.reciprocalItemId // Include reciprocalItemId
+                } : null;
+              }).filter(Boolean) as (Item & { matchScore: string; reciprocalItemId?: string })[];
 
               newSuggestions[index] = {
                 ...newSuggestions[index],
@@ -285,3 +289,4 @@ export default function HomePage() {
     </div>
   );
 }
+
