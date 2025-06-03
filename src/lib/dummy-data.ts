@@ -93,6 +93,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     status: 'available',
     listingType: 'offer',
     minimumMatchRatingOverride: 'High', // This specific journal requires High matches
+    isGiftItForward: false,
   },
   {
     id: 'item2',
@@ -106,11 +107,12 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     status: 'available',
     listingType: 'offer',
     // No override, will use Bob's global 'Low'
+    isGiftItForward: false,
   },
   {
     id: 'item3',
-    name: 'Hand-knitted Scarf',
-    description: 'A cozy and stylish scarf, hand-knitted with high-quality merino wool. Vibrant colors, brand new.',
+    name: 'Hand-knitted Scarf (Gift It Forward!)',
+    description: 'A cozy and stylish scarf, hand-knitted with high-quality merino wool. Vibrant colors, brand new. Happy to gift this to someone who will love it!',
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'knitted scarf',
     category: 'Fashion & Accessories',
@@ -119,6 +121,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     status: 'available',
     listingType: 'offer',
     // No override, will use Alice's global 'Medium'
+    isGiftItForward: true,
   },
   {
     id: 'item4',
@@ -131,6 +134,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Bob Barterer',
     status: 'pending',
     listingType: 'offer',
+    isGiftItForward: false,
   },
   {
     id: 'item5',
@@ -143,6 +147,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Charlie Swapper',
     status: 'available',
     listingType: 'offer',
+    isGiftItForward: false,
   },
   {
     id: 'item6',
@@ -155,6 +160,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Charlie Swapper',
     status: 'traded',
     listingType: 'offer',
+    isGiftItForward: false,
   },
   {
     id: 'item7',
@@ -192,6 +198,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Diana Doodad',
     status: 'available',
     listingType: 'offer',
+    isGiftItForward: false,
   },
   {
     id: 'item10',
@@ -207,8 +214,8 @@ export let dummyItems: Item[] = [ // Changed to let for modification
   },
   {
     id: 'item11',
-    name: '4-Person Camping Tent',
-    description: 'Spacious 4-person dome tent. Used twice, in great condition. Includes rainfly and carrying bag. Perfect for family camping trips.',
+    name: '4-Person Camping Tent (Gift It Forward)',
+    description: 'Spacious 4-person dome tent. Used twice, in great condition. Includes rainfly and carrying bag. Perfect for family camping trips. Offering this as a gift to a good home!',
     imageUrl: 'https://placehold.co/600x400.png',
     dataAiHint: 'camping tent',
     category: 'Sporting Goods',
@@ -216,6 +223,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Ethan Exchange',
     status: 'available',
     listingType: 'offer',
+    isGiftItForward: true,
   },
   {
     id: 'item12',
@@ -228,6 +236,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Ethan Exchange',
     status: 'pending',
     listingType: 'offer',
+    isGiftItForward: false,
   },
   {
     id: 'item13',
@@ -240,6 +249,7 @@ export let dummyItems: Item[] = [ // Changed to let for modification
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'offer',
+    isGiftItForward: false,
   },
   {
     id: 'item14',
@@ -320,8 +330,8 @@ export function addNewItemToDummyData(
     status: 'available', // Default status for new items
     // Basic dataAiHint generation from name
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
-    imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`
-    // minimumMatchRatingOverride will be undefined by default unless passed in itemData
+    imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`,
+    isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false, // Only offers can be gifts
   };
 
   dummyItems.push(newItem);

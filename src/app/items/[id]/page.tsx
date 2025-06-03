@@ -7,7 +7,7 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter, HeartHandshake } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
@@ -83,6 +83,11 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                   {item.listingType === 'offer' ? <Gift className="mr-1 h-3 w-3" /> : <Search className="mr-1 h-3 w-3" />}
                   {item.listingType}
                 </Badge>
+                {item.listingType === 'offer' && item.isGiftItForward && (
+                  <Badge variant="default" className="text-xs bg-pink-500 hover:bg-pink-600 text-white">
+                    <HeartHandshake className="mr-1 h-3 w-3" /> Gift It Forward
+                  </Badge>
+                )}
                 {item.minimumMatchRatingOverride && (
                   <Badge variant="outline" className="text-xs border-primary/50 text-primary">
                     <Filter className="mr-1 h-3 w-3" /> Min. Match: {item.minimumMatchRatingOverride}
@@ -113,7 +118,15 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
             <CardFooter className="p-0 pt-6">
               {!isCurrentUserOwner && item.status === 'available' && (
-                <ItemTradeInitiationContent item={item} ownerName={owner.name} ownerId={owner.id} />
+                 item.listingType === 'offer' && item.isGiftItForward ? (
+                    <Button asChild className="w-full bg-pink-500 hover:bg-pink-600 text-white" size="lg">
+                      <Link href={`/profile/${owner.id}`}>
+                        <HeartHandshake className="mr-2 h-5 w-5" /> Express Interest / Contact Gifter
+                      </Link>
+                    </Button>
+                  ) : (
+                    <ItemTradeInitiationContent item={item} ownerName={owner.name} ownerId={owner.id} />
+                  )
               )}
               {isCurrentUserOwner && item.status === 'available' && (
                 <Button variant="outline" className="w-full">Manage Your Listing</Button>
@@ -125,12 +138,12 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
         </div>
       </Card>
 
-      {!isCurrentUserOwner && item.status === 'available' && (
+      {!isCurrentUserOwner && item.status === 'available' && !(item.listingType === 'offer' && item.isGiftItForward) && (
         <Suspense fallback={<SuggestedMatchesLoadingState />}>
           <SuggestedMatches currentItem={item} />
         </Suspense>
       )}
-      <TemporaryAdminMatchTestPanelClient itemToTest={item} />
+      {isCurrentUserOwner && item.status === 'available' && <TemporaryAdminMatchTestPanelClient itemToTest={item} /> }
     </div>
   );
 }

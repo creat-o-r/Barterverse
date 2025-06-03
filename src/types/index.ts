@@ -12,6 +12,7 @@ export type Item = {
   listingType: 'offer' | 'want'; // New field
   isThirdPartyFulfillment?: boolean; // Flag for UI hint
   minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High';
+  isGiftItForward?: boolean; // New field for "Gift It Forward" items
 };
 
 export type UserMotivation = 'help-others' | 'maximize-trades' | 'convenience-focused' | 'community-building' | 'unique-finds';

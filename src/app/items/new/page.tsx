@@ -17,13 +17,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter, HeartHandshake } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
 import { useState, useCallback } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { addNewItemToDummyData } from '@/lib/dummy-data'; 
 import { dummyUsers } from '@/lib/dummy-data'; 
 import { useRouter } from 'next/navigation'; 
@@ -36,6 +37,7 @@ const itemFormSchema = z.object({
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
   minimumMatchRatingOverride: z.enum(['none', 'Low', 'Medium', 'High'])
     .describe("Optional override for the minimum match rating for this specific item. 'none' means no override."),
+  isGiftItForward: z.boolean().optional(),
 });
 
 type ItemFormValues = z.infer<typeof itemFormSchema>;
@@ -49,7 +51,6 @@ export default function NewItemPage() {
 
   const currentUserId = dummyUsers[0]?.id;
 
-
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
@@ -59,15 +60,17 @@ export default function NewItemPage() {
       imageUrl: '',
       listingType: 'offer',
       minimumMatchRatingOverride: 'none', 
+      isGiftItForward: false,
     },
   });
+
+  const listingType = form.watch('listingType');
 
   const handleAiSuggestions = useCallback(async () => {
     const name = form.getValues('name');
     const description = form.getValues('description');
     console.log('[AI Suggestions] Triggered. Name:', name, 'Description:', description);
     console.log('[AI Suggestions] Dirty fields:', form.formState.dirtyFields);
-
 
     if (name.length < 3 || description.length < 10) {
       console.log('[AI Suggestions] Aborted: Name or description too short.');
@@ -167,6 +170,7 @@ export default function NewItemPage() {
         imageUrl: data.imageUrl || '', 
         ownerId: currentUserId,
         minimumMatchRatingOverride: data.minimumMatchRatingOverride === 'none' ? undefined : data.minimumMatchRatingOverride as 'Low' | 'Medium' | 'High',
+        isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false, // Only 'offer' items can be gifts
       };
       const addedItem = addNewItemToDummyData(newItemData);
       
@@ -290,6 +294,35 @@ export default function NewItemPage() {
                   </FormItem>
                 )}
               />
+              
+              {listingType === 'offer' && (
+                <FormField
+                  control={form.control}
+                  name="isGiftItForward"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isLoadingOverall}
+                          id="isGiftItForward"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2">
+                          <HeartHandshake className="h-5 w-5 text-pink-500" />
+                          Gift It Forward
+                        </FormLabel>
+                        <FormDescription className="font-body">
+                          Check this if you&apos;re offering this item freely, without expecting a direct trade in return.
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
+
 
               <FormField
                 control={form.control}
@@ -350,13 +383,11 @@ export default function NewItemPage() {
                             field.onChange(value);
                             form.setValue('minimumMatchRatingOverride', value as 'none' | 'Low' | 'Medium' | 'High', {shouldDirty: true});
                         }} 
-                        value={field.value} // Ensures the Select is controlled by the form state
+                        value={field.value} 
                         disabled={isLoadingOverall}
                     >
                       <FormControl>
                         <SelectTrigger disabled={isLoadingOverall}>
-                          {/* The placeholder in SelectValue is shown if field.value is undefined.
-                              Since we default to 'none', it will show the "None (use profile default)" item text. */}
                           <SelectValue placeholder="None (use profile default)" />
                         </SelectTrigger>
                       </FormControl>

@@ -5,7 +5,7 @@ import type { Item } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Gift, Search, Link2 } from 'lucide-react';
+import { Eye, Gift, Search, Link2, HeartHandshake } from 'lucide-react';
 
 interface ItemCardProps {
   item: Item;
@@ -26,7 +26,7 @@ export default function ItemCard({ item, matchScore, opportunityContextItemId }:
   const linkHref = `/items/${item.id}`;
   
   let opportunityLink: string | null = null;
-  if (opportunityContextItemId) {
+  if (opportunityContextItemId && !item.isGiftItForward) { // Only create opportunity link if not a gift
     const opportunityLinkParams = new URLSearchParams();
     opportunityLinkParams.set('mainItemId', opportunityContextItemId);
     opportunityLinkParams.set('suggestedItemId', item.id);
@@ -61,7 +61,12 @@ export default function ItemCard({ item, matchScore, opportunityContextItemId }:
               Match: {matchScore}
             </Badge>
           )}
-           {!matchScore && ( 
+          {item.listingType === 'offer' && item.isGiftItForward && (
+            <Badge variant="default" className="absolute bottom-2 right-2 capitalize z-10 text-[10px] md:text-xs bg-pink-500 hover:bg-pink-600 text-white">
+              <HeartHandshake className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" /> Gift
+            </Badge>
+           )}
+           {!matchScore && !(item.listingType === 'offer' && item.isGiftItForward) && ( 
             <Badge
                 variant={item.listingType === 'offer' ? 'default' : 'secondary'}
                 className={`absolute bottom-2 left-2 capitalize z-10 text-[10px] md:text-xs ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
