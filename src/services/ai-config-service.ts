@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export type AIMatchingMode = 'simple' | 'advanced';
-export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro'; // Added new type
+export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview-05-06'; // Added new model
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 
@@ -13,7 +13,7 @@ interface AISettings {
   matchingMode: AIMatchingMode;
   useUserProfilePreferencesInMatching: boolean;
   enableAutomaticPreferenceInference: boolean;
-  preferredModel: AIModelName; // Added new field
+  preferredModel: AIModelName;
 }
 
 // Default settings
@@ -21,8 +21,10 @@ const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
   enableAutomaticPreferenceInference: false,
-  preferredModel: 'gemini-1.5-pro-latest', // Default model
+  preferredModel: 'gemini-2.5-pro-preview-05-06', // Updated default model
 };
+
+const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 async function readSettings(): Promise<AISettings> {
   try {
@@ -37,7 +39,12 @@ async function readSettings(): Promise<AISettings> {
     }
     const parsedSettings = JSON.parse(fileContent);
     // Ensure all fields from defaultSettings are present, especially new ones
-    return { ...defaultSettings, ...parsedSettings };
+    const settingsToReturn = { ...defaultSettings, ...parsedSettings };
+    if (!validModels.includes(settingsToReturn.preferredModel)) {
+        console.warn(`[AI Config Service] Invalid preferredModel ('${settingsToReturn.preferredModel}') in settings, defaulting to '${defaultSettings.preferredModel}'.`);
+        settingsToReturn.preferredModel = defaultSettings.preferredModel;
+    }
+    return settingsToReturn;
   } catch (error: any) {
     if (error.code === 'ENOENT') {
       const writeSuccess = await writeSettings(defaultSettings);
@@ -124,14 +131,16 @@ export async function setEnableAutomaticPreferenceInference(enable: boolean): Pr
   }
 }
 
-// New functions for preferred AI model
 export async function getPreferredAIModel(): Promise<AIModelName> {
   const settings = await readSettings();
-  return settings.preferredModel || 'gemini-1.5-pro-latest'; // Fallback if not set
+  return settings.preferredModel; 
 }
 
 export async function setPreferredAIModel(model: AIModelName): Promise<{success: boolean; message?: string}> {
   try {
+    if (!validModels.includes(model)) {
+        return { success: false, message: `Invalid model name: ${model}.` };
+    }
     const currentSettings = await readSettings();
     currentSettings.preferredModel = model;
     const writeSuccess = await writeSettings(currentSettings);

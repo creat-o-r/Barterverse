@@ -5,15 +5,16 @@ import fs from 'fs'; // Using synchronous fs for startup configuration
 import path from 'path';
 
 // Define types needed for reading settings synchronously at startup
-type AIModelNameForGenkit = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro';
+type AIModelNameForGenkit = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview-05-06';
 interface AISettingsForGenkit {
-  matchingMode?: 'simple' | 'advanced'; // Make fields optional as file might be partial/old
+  matchingMode?: 'simple' | 'advanced'; 
   useUserProfilePreferencesInMatching?: boolean;
   enableAutomaticPreferenceInference?: boolean;
   preferredModel?: AIModelNameForGenkit;
 }
 
-const defaultGenkitModelName: AIModelNameForGenkit = 'gemini-1.5-pro-latest';
+const defaultGenkitModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview-05-06';
+const validGenkitModels: AIModelNameForGenkit[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 function getModelNameForGenkitInit(): AIModelNameForGenkit {
   const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
@@ -21,12 +22,11 @@ function getModelNameForGenkitInit(): AIModelNameForGenkit {
     if (fs.existsSync(SETTINGS_FILE_PATH)) {
       const fileContent = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
       if (fileContent.trim() === '') {
-        // If file is empty, it implies defaults should be used or file is corrupted
         console.warn('[Genkit Init] .ai-settings.json is empty, using default model.');
         return defaultGenkitModelName;
       }
-      const parsedSettings = JSON.parse(fileContent) as AISettingsForGenkit; // Cast to allow partial
-      if (parsedSettings.preferredModel && ['gemini-1.5-pro-latest', 'gemini-1.0-pro'].includes(parsedSettings.preferredModel)) {
+      const parsedSettings = JSON.parse(fileContent) as AISettingsForGenkit;
+      if (parsedSettings.preferredModel && validGenkitModels.includes(parsedSettings.preferredModel)) {
         return parsedSettings.preferredModel;
       } else {
          console.warn(`[Genkit Init] 'preferredModel' not found or invalid in .ai-settings.json, using default model: ${defaultGenkitModelName}. Found: ${parsedSettings.preferredModel}`);

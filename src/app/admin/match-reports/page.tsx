@@ -11,9 +11,9 @@ import {
   setUseUserProfilePreferencesInMatching as setUseUserProfilePreferencesInMatchingService,
   getEnableAutomaticPreferenceInference,
   setEnableAutomaticPreferenceInference as setEnableAutomaticPreferenceInferenceService,
-  getPreferredAIModel, // New import
-  setPreferredAIModel as setPreferredAIModelService, // New import
-  type AIModelName // New import
+  getPreferredAIModel,
+  setPreferredAIModel as setPreferredAIModelService,
+  type AIModelName
 } from '@/services/ai-config-service';
 import { getFeedbackLogContent, clearFeedbackLog as clearFeedbackLogService } from '@/services/feedback-service';
 import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service';
@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
 import AdminAIPreferenceInsights from '@/components/admin/AdminAIPreferenceInsights';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // New import
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +62,7 @@ function getMatchScoreIcon(score?: string) {
 const modelDisplayMap: Record<AIModelName, string> = {
   'gemini-1.5-pro-latest': 'Gemini 1.5 Pro (Latest)',
   'gemini-1.0-pro': 'Gemini 1.0 Pro',
+  'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview (05-06)',
 };
 
 export default function MatchReportsPage() {
@@ -70,11 +71,11 @@ export default function MatchReportsPage() {
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
   const [useUserPrefsInMatching, setUseUserPrefsInMatching] = useState(true);
   const [enableAutoPrefInference, setEnableAutoPrefInference] = useState(false);
-  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-1.5-pro-latest'); // New state
+  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-2.5-pro-preview-05-06');
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
-  const [isUpdatingPreferredModel, setIsUpdatingPreferredModel] = useState(false); // New state
+  const [isUpdatingPreferredModel, setIsUpdatingPreferredModel] = useState(false);
   const [isCopyingFeedbackLog, setIsCopyingFeedbackLog] = useState(false);
   const [isCopyingMatchLog, setIsCopyingMatchLog] = useState(false);
   const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
@@ -103,7 +104,7 @@ export default function MatchReportsPage() {
       setUseUserPrefsInMatching(prefsEnabledMatch);
       const autoPrefEnabled = await getEnableAutomaticPreferenceInference();
       setEnableAutoPrefInference(autoPrefEnabled);
-      const model = await getPreferredAIModel(); // Fetch preferred model
+      const model = await getPreferredAIModel();
       setPreferredModel(model);
     } catch (error) {
       console.error("Failed to fetch AI settings:", error);
@@ -175,7 +176,7 @@ export default function MatchReportsPage() {
       } else { throw new Error(result.message || "Failed to update preferred model server-side."); }
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update preferred AI model.", variant: "destructive" });
-      fetchAdminSettings(); // Re-fetch to ensure UI consistency
+      fetchAdminSettings(); 
     } finally {
       setIsUpdatingPreferredModel(false);
     }
@@ -264,7 +265,7 @@ export default function MatchReportsPage() {
              <div className="text-sm text-muted-foreground p-4 border-l-4 border-accent/50 bg-accent/5 rounded-md space-y-1">
                 <div className="flex items-start gap-2"><Wand2 className="h-5 w-5 text-accent mt-0.5 shrink-0" /><div><strong className="text-foreground">Auto-Inference Enabled:</strong> If enabled, users will see an option on their profile to let AI learn and (mock) update their preferences based on activity. This is experimental.</div></div>
             </div>
-            <Separator /> {/* New Model Selection Section */}
+            <Separator /> 
             <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
                 <div className="flex items-center justify-between">
                     <Label htmlFor="ai-preferred-model" className="font-headline text-lg flex items-center gap-2">
@@ -284,7 +285,7 @@ export default function MatchReportsPage() {
                     <SelectContent>
                         {(Object.keys(modelDisplayMap) as AIModelName[]).map(modelKey => (
                             <SelectItem key={modelKey} value={modelKey}>
-                                {modelDisplayMap[modelKey]}
+                                {modelDisplayMap[modelKey] || modelKey}
                             </SelectItem>
                         ))}
                     </SelectContent>
