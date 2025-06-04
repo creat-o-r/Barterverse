@@ -62,7 +62,7 @@ function getMatchScoreIcon(score?: string) {
 const modelDisplayMap: Record<AIModelName, string> = {
   'gemini-1.5-pro-latest': 'Gemini 1.5 Pro (Latest)',
   'gemini-1.0-pro': 'Gemini 1.0 Pro',
-  'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview (05-06)',
+  'gemini-2.5-pro-preview': 'Gemini 2.5 Pro Preview', // CHANGED
 };
 
 export default function MatchReportsPage() {
@@ -71,7 +71,7 @@ export default function MatchReportsPage() {
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
   const [useUserPrefsInMatching, setUseUserPrefsInMatching] = useState(true);
   const [enableAutoPrefInference, setEnableAutoPrefInference] = useState(false);
-  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-2.5-pro-preview-05-06');
+  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-2.5-pro-preview'); // CHANGED default state
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
@@ -105,7 +105,7 @@ export default function MatchReportsPage() {
       const autoPrefEnabled = await getEnableAutomaticPreferenceInference();
       setEnableAutoPrefInference(autoPrefEnabled);
       const model = await getPreferredAIModel();
-      setPreferredModel(model);
+      setPreferredModel(model); // This will be forced to 'gemini-2.5-pro-preview' by the service
     } catch (error) {
       console.error("Failed to fetch AI settings:", error);
       toast({ title: "Error", description: "Could not load AI settings.", variant: "destructive" });
@@ -166,13 +166,14 @@ export default function MatchReportsPage() {
 
   const handlePreferredModelChange = async (newModelValue: string) => {
     const newModel = newModelValue as AIModelName;
-    if (newModel === preferredModel) return;
+    // No need to check if newModel === preferredModel because the service forces it.
+    // The UI will only show one option if the service's validModels is restricted.
     setIsUpdatingPreferredModel(true);
     try {
-      const result = await setPreferredAIModelService(newModel);
+      const result = await setPreferredAIModelService(newModel); // Service will handle forcing logic
       if (result.success) {
-        setPreferredModel(newModel);
-        toast({ title: "Preferred AI Model Updated", description: result.message || `Preferred model set to ${modelDisplayMap[newModel]}. A restart may be needed for changes to take full effect.` });
+        setPreferredModel('gemini-2.5-pro-preview'); // Reflect the forced model in UI
+        toast({ title: "Preferred AI Model Updated", description: result.message || `Preferred model set to ${modelDisplayMap['gemini-2.5-pro-preview']}. A restart may be needed for changes to take full effect.` });
       } else { throw new Error(result.message || "Failed to update preferred model server-side."); }
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update preferred AI model.", variant: "destructive" });
@@ -283,7 +284,7 @@ export default function MatchReportsPage() {
                         <SelectValue placeholder="Select a model" />
                     </SelectTrigger>
                     <SelectContent>
-                        {(Object.keys(modelDisplayMap) as AIModelName[]).map(modelKey => (
+                        {(Object.keys(modelDisplayMap) as AIModelName[]).filter(modelKey => modelKey === 'gemini-2.5-pro-preview').map(modelKey => ( // Only show the forced model
                             <SelectItem key={modelKey} value={modelKey}>
                                 {modelDisplayMap[modelKey] || modelKey}
                             </SelectItem>
@@ -296,7 +297,7 @@ export default function MatchReportsPage() {
                         <div>
                             <strong className="text-foreground">Model Selection:</strong> Chooses the default model for Genkit flows.
                             <br />
-                            <span className="text-xs italic">Note: Changes to the default model typically require an application restart (or cache clear in some environments) to fully take effect across all backend flows.</span>
+                            <span className="text-xs italic">Note: This configuration forces the model to '{modelDisplayMap['gemini-2.5-pro-preview']}'. Changes to the default model typically require an application restart to fully take effect across all backend flows.</span>
                         </div>
                     </div>
                 </div>
@@ -320,7 +321,8 @@ export default function MatchReportsPage() {
             <div>
                 <CardTitle className="font-headline text-3xl flex items-center gap-3"><ServerCrash className="h-8 w-8 text-accent" />AI Match Suggestion Logs</CardTitle>
                 <CardDescription className="font-body mt-1">
-                  This report shows AI-generated item match suggestions. Use this log to observe how suggestions and their scores change when AI configurations (like the preferred model) are updated. 
+                  This report shows AI-generated item match suggestions. Use this log to observe how suggestions and their scores change when AI configurations (like the preferred model) are updated.
+                  The system is currently configured to use '{modelDisplayMap[preferredModel]}'.
                   Refresh this log after triggering new suggestions on the main site to see entries with the currently active model.
                   <br /><span className="font-semibold text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-sm inline-block my-1 text-xs">Dev Note:</span> React Strict Mode may cause duplicate log entries in development.
                 </CardDescription>
@@ -362,7 +364,7 @@ export default function MatchReportsPage() {
                         {report.modelUsed ? (
                           <Badge variant="outline" className="capitalize text-[10px] py-0.5 px-1.5 flex items-center gap-1">
                             <Cpu className="h-3 w-3" />
-                            {modelDisplayMap[report.modelUsed] || report.modelUsed}
+                            {modelDisplayMap[report.modelUsed as AIModelName] || report.modelUsed}
                           </Badge>
                         ) : (<Badge variant="outline" className="text-[10px] py-0.5 px-1.5">N/A</Badge>)}
                       </TableCell>
@@ -433,3 +435,4 @@ export default function MatchReportsPage() {
     </div>
   );
 }
+

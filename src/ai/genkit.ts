@@ -5,7 +5,7 @@ import fs from 'fs'; // Using synchronous fs for startup configuration
 import path from 'path';
 
 // Define types needed for reading settings synchronously at startup
-type AIModelNameForGenkit = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview-05-06';
+type AIModelNameForGenkit = 'gemini-2.5-pro-preview' | 'gemini-1.5-pro-latest' | 'gemini-1.0-pro'; // Updated available types
 interface AISettingsForGenkit {
   matchingMode?: 'simple' | 'advanced'; 
   useUserProfilePreferencesInMatching?: boolean;
@@ -13,8 +13,8 @@ interface AISettingsForGenkit {
   preferredModel?: AIModelNameForGenkit;
 }
 
-// Force the default and only valid model to gemini-2.5-pro-preview-05-06 for testing
-const forcedModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview-05-06';
+// Force the default and only valid model for this attempt
+const forcedModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview'; // CHANGED
 const defaultGenkitModelName: AIModelNameForGenkit = forcedModelName; 
 const validGenkitModels: AIModelNameForGenkit[] = [forcedModelName];
 
