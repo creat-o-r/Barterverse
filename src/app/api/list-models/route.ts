@@ -1,5 +1,5 @@
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as GoogleGenerativeAI_SDK from "@google/generative-ai";
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -10,12 +10,21 @@ export async function GET() {
     console.error('[API List Models] GOOGLE_API_KEY is not set in the environment variable.');
     return NextResponse.json({ error: "GOOGLE_API_KEY is not set in the environment." }, { status: 500 });
   }
-  // console.log('[API List Models] GOOGLE_API_KEY is present.'); // Avoid logging the key itself
+  // console.log('[API List Models] GOOGLE_API_KEY is present.');
 
   try {
-    console.log('[API List Models] Attempting to instantiate GoogleGenerativeAI.');
-    const genAI = new GoogleGenerativeAI(apiKey);
-    console.log('[API List Models] GoogleGenerativeAI instantiated successfully.');
+    console.log('[API List Models] typeof GoogleGenerativeAI_SDK:', typeof GoogleGenerativeAI_SDK);
+    if (GoogleGenerativeAI_SDK && typeof GoogleGenerativeAI_SDK.GoogleGenerativeAI === 'function') {
+        console.log('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI is a function/constructor.');
+        console.log('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI.prototype keys:', Object.getOwnPropertyNames(GoogleGenerativeAI_SDK.GoogleGenerativeAI.prototype));
+    } else {
+        console.error('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI is NOT a function/constructor. SDK might not be imported correctly.');
+        console.error('[API List Models] Keys of GoogleGenerativeAI_SDK:', GoogleGenerativeAI_SDK ? Object.keys(GoogleGenerativeAI_SDK) : 'GoogleGenerativeAI_SDK is null/undefined');
+    }
+
+    console.log('[API List Models] Attempting to instantiate GoogleGenerativeAI_SDK.GoogleGenerativeAI.');
+    const genAI = new GoogleGenerativeAI_SDK.GoogleGenerativeAI(apiKey);
+    console.log('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI instantiated successfully.');
 
     // Detailed check for listModels method
     if (genAI && typeof genAI.listModels === 'function') {
