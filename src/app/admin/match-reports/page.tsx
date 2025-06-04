@@ -20,7 +20,7 @@ import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu } from 'lucide-react'; // Added Cpu icon
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -176,7 +176,7 @@ export default function MatchReportsPage() {
       } else { throw new Error(result.message || "Failed to update preferred model server-side."); }
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update preferred AI model.", variant: "destructive" });
-      fetchAdminSettings(); 
+      fetchAdminSettings();
     } finally {
       setIsUpdatingPreferredModel(false);
     }
@@ -226,7 +226,7 @@ export default function MatchReportsPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 py-8">
+    <div className="max-w-7xl mx-auto space-y-6 py-8"> {/* Increased max-width */}
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl flex items-center gap-3">
@@ -265,7 +265,7 @@ export default function MatchReportsPage() {
              <div className="text-sm text-muted-foreground p-4 border-l-4 border-accent/50 bg-accent/5 rounded-md space-y-1">
                 <div className="flex items-start gap-2"><Wand2 className="h-5 w-5 text-accent mt-0.5 shrink-0" /><div><strong className="text-foreground">Auto-Inference Enabled:</strong> If enabled, users will see an option on their profile to let AI learn and (mock) update their preferences based on activity. This is experimental.</div></div>
             </div>
-            <Separator /> 
+            <Separator />
             <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
                 <div className="flex items-center justify-between">
                     <Label htmlFor="ai-preferred-model" className="font-headline text-lg flex items-center gap-2">
@@ -334,25 +334,34 @@ export default function MatchReportsPage() {
               <Table className="min-w-full">
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableHead className="w-[180px]">Timestamp</TableHead>
-                    <TableHead className="min-w-[120px]">For User ID</TableHead>
-                    <TableHead className="min-w-[200px]">Current Item</TableHead>
-                    <TableHead className="min-w-[120px]">Matching Mode</TableHead>
-                    <TableHead className="min-w-[100px]">Prefs Used</TableHead>
-                    <TableHead className="min-w-[400px]">Suggested Items (ID, (Owner ID), Score)</TableHead>
-                    <TableHead className="min-w-[300px]">Reasoning</TableHead>
+                    <TableHead className="w-[160px]">Timestamp</TableHead>
+                    <TableHead className="min-w-[100px]">For User</TableHead>
+                    <TableHead className="min-w-[180px]">Current Item</TableHead>
+                    <TableHead className="min-w-[100px]">Matching</TableHead>
+                    <TableHead className="min-w-[80px]">Prefs</TableHead>
+                    <TableHead className="min-w-[120px]">Model Used</TableHead>
+                    <TableHead className="min-w-[350px]">Suggested (ID, (Owner), Score)</TableHead>
+                    <TableHead className="min-w-[250px]">Reasoning</TableHead>
                   </TableRow>
                 </TableHeader><TableBody>
                   {reports.map((report, index) => (
                     <TableRow key={`${report.timestamp}-${report.currentItemId}-${report.triggeringUserId}-${index}-${(report.suggestedMatches || []).map(m => m.itemId).join('-')}`} className={index % 2 === 0 ? 'bg-muted/30' : ''}>
                       <TableCell className="font-mono text-xs">{new Date(report.timestamp).toLocaleString()}</TableCell>
-                      <TableCell className="text-sm">{report.triggeringUserId}</TableCell>
+                      <TableCell className="text-xs">{report.triggeringUserId}</TableCell>
                       <TableCell>
-                          <div className="font-semibold">{report.currentItemName}</div>
+                          <div className="font-semibold text-sm">{report.currentItemName}</div>
                           <div className="text-xs text-muted-foreground"><Link href={`/items/${report.currentItemId}`} className="hover:text-primary hover:underline inline-flex items-center gap-1">View Item <LinkIcon className="h-3 w-3" /></Link></div>
                       </TableCell>
                       <TableCell className="text-xs capitalize">{report.usedMatchingMode ? (<Badge variant={report.usedMatchingMode === 'advanced' ? 'default' : 'secondary'}>{report.usedMatchingMode}</Badge>): (<Badge variant="outline">N/A</Badge>)}</TableCell>
                       <TableCell>{report.preferencesConsidered !== undefined ? (<Badge variant={report.preferencesConsidered ? 'default' : 'outline'} className="text-[10px] py-0.5 px-1.5">{report.preferencesConsidered ? 'Yes' : 'No'}</Badge>) : (<Badge variant="outline" className="text-[10px] py-0.5 px-1.5">N/A</Badge>)}</TableCell>
+                      <TableCell className="text-xs">
+                        {report.modelUsed ? (
+                          <Badge variant="outline" className="capitalize text-[10px] py-0.5 px-1.5 flex items-center gap-1">
+                            <Cpu className="h-3 w-3" />
+                            {modelDisplayMap[report.modelUsed] || report.modelUsed}
+                          </Badge>
+                        ) : (<Badge variant="outline" className="text-[10px] py-0.5 px-1.5">N/A</Badge>)}
+                      </TableCell>
                       <TableCell>
                         {report.suggestedMatches && report.suggestedMatches.length > 0 ? (
                           <div className="flex flex-col gap-1.5">

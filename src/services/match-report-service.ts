@@ -3,51 +3,52 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import type { AIMatchingMode } from './ai-config-service'; // Import the type
+import type { AIMatchingMode, AIModelName } from './ai-config-service'; // Import AIModelName
+import { getPreferredAIModel } from './ai-config-service'; // To fetch the current model
 
 export interface LoggedMatchSuggestion {
   timestamp: string;
   triggeringUserId: string;
   currentItemId: string;
   currentItemName: string;
-  suggestedMatches: Array<{ 
-    itemId: string; 
+  suggestedMatches: Array<{
+    itemId: string;
     matchScore: string;
     ownerId: string;
   }>;
   reasoning?: string;
-  usedMatchingMode?: AIMatchingMode; 
-  preferencesConsidered?: boolean; // Added to log if preferences were used
+  usedMatchingMode?: AIMatchingMode;
+  preferencesConsidered?: boolean;
+  modelUsed?: AIModelName; // Added field for model used
 }
 
 const LOG_FILE_PATH = path.join(process.cwd(), '.match-suggestions.log.json');
 
 async function readLogs(): Promise<LoggedMatchSuggestion[]> {
   try {
-    await fs.access(LOG_FILE_PATH); 
+    await fs.access(LOG_FILE_PATH);
     const fileContent = await fs.readFile(LOG_FILE_PATH, 'utf-8');
     if (fileContent.trim() === '') {
-      return []; 
+      return [];
     }
-    // Make sure to handle new fields gracefully if old logs exist
     const logs = JSON.parse(fileContent) as LoggedMatchSuggestion[];
     return logs.map(log => ({
         ...log,
-        preferencesConsidered: log.preferencesConsidered === undefined ? false : log.preferencesConsidered, // default old logs
+        preferencesConsidered: log.preferencesConsidered === undefined ? false : log.preferencesConsidered,
+        // modelUsed will be undefined for older logs, which is fine
     }));
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      // If file doesn't exist, create it with an empty array
       try {
         await fs.writeFile(LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
         return [];
       } catch (writeError) {
          console.error('[Match Report Service] Error creating log file:', writeError);
-         return []; // Return empty if creation fails
+         return [];
       }
     }
     console.error('[Match Report Service] Error reading log file:', error);
-    return []; 
+    return [];
   }
 }
 
@@ -59,18 +60,20 @@ async function writeLogs(logs: LoggedMatchSuggestion[]): Promise<void> {
   }
 }
 
-export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'timestamp'>): Promise<void> {
+export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'timestamp' | 'modelUsed'>): Promise<void> {
+  const modelUsed = await getPreferredAIModel(); // Get current default model
   const newLog: LoggedMatchSuggestion = {
     ...data,
-    preferencesConsidered: data.preferencesConsidered === undefined ? false : data.preferencesConsidered,
     timestamp: new Date().toISOString(),
+    modelUsed: modelUsed, // Store the model used
+    preferencesConsidered: data.preferencesConsidered === undefined ? false : data.preferencesConsidered,
   };
 
   let currentLogs = await readLogs();
-  currentLogs.unshift(newLog); 
+  currentLogs.unshift(newLog);
 
   if (currentLogs.length > 500) {
-    currentLogs.length = 500; 
+    currentLogs.length = 500;
   }
 
   await writeLogs(currentLogs);
@@ -87,12 +90,13 @@ export async function getMatchSuggestionLogRawContent(): Promise<{ success: bool
     await fs.access(LOG_FILE_PATH);
     const fileContent = await fs.readFile(LOG_FILE_PATH, 'utf-8');
     if (fileContent.trim() === '') {
-      return { success: true, content: "[]" }; // Return empty array string if file is empty
+      return { success: true, content: "[]" };
     }
+    JSON.parse(fileContent);
     return { success: true, content: fileContent };
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      return { success: true, content: "[]" }; // File doesn't exist, treat as empty log
+      return { success: true, content: "[]" };
     }
     console.error('[Match Report Service] Error reading raw match suggestion log content:', error);
     if (error instanceof SyntaxError) {
