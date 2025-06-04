@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export type AIMatchingMode = 'simple' | 'advanced';
-export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview-05-06'; // Added new model
+export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview-05-06';
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 
@@ -21,7 +21,7 @@ const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
   enableAutomaticPreferenceInference: false,
-  preferredModel: 'gemini-2.5-pro-preview-05-06', // Updated default model
+  preferredModel: 'gemini-1.5-pro-latest', // Changed default model
 };
 
 const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
