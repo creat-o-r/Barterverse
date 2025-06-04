@@ -186,9 +186,10 @@ MATCH SCORE ASSIGNMENT ("High", "Medium", "Low"):
 Also indicate if the suggested matched item 'isGiftItForward'.
 
 - "High" Match: THIS SCORE REQUIRES BOTH CONDITIONS BELOW:
-    1.  STRONG PRIMARY OPPOSITE MATCH: The 'Current Item' (User A's {{{currentItem.listingType}}}) must directly and strongly fulfill a complementary 'Available Item' from User B (e.g., User A's 'offer' for User B's 'want', or User A's 'want' for User B's 'offer').
-    2.  AND STRONG RECIPROCAL FULFILLMENT: User B (owner of the 'Available Item' in condition 1) must have *another listed 'offer' item* (Item C from their 'availableItems') that *clearly and directly fulfills an explicit 'want' of User A* (the 'triggeringUser'). This 'want' of User A can be identified from their 'triggeringUserPreferences' (e.g., interest in certain categories), or if User A's 'currentItem' is itself a 'want', Item C could fulfill that.
+    1.  STRONG PRIMARY OPPOSITE MATCH: The 'Current Item' (User A's {{{currentItem.listingType}}}) must directly and strongly fulfill a complementary 'Available Item' from User B (e.g., User A's 'offer' for User B's 'want', or User A's 'want' for User B's 'offer'). This means the items are highly relevant to each other (e.g., similar category, direct functional replacement, clear value proposition for User B based on their item type and description), not just opposite listing types with a weak connection.
+    2.  AND STRONG RECIPROCAL FULFILLMENT: User B (owner of the 'Available Item' in condition 1) must have *another listed 'offer' item* (Item C from their 'availableItems') that *clearly and directly fulfills an explicit or strongly implied want of User A* (the 'triggeringUser'). An 'explicit want' could be User A's 'currentItem' if it's a 'want' type, or a want clearly deductible from User A's 'triggeringUserPreferences' (e.g., specific categories User A is interested in, items User A often searches for or lists as 'want' - consider their motivations). A merely 'nice to have' or generally appealing Item C is not sufficient for a High match's reciprocal component; it must address a demonstrable need or strong interest of User A.
     3.  If both these conditions are met, include Item C's ID as 'reciprocalItemId' in the suggestion for the match between Current Item and User B's initial item.
+    IMPORTANT FOR 'HIGH' SCORE: Both the primary match (Condition 1) and the reciprocal fulfillment (Condition 2) must be strong and clear. If either is weak or highly speculative (e.g., your reasoning describes it as 'not an obvious direct match'), do not assign a 'High' score.
 
 - "Medium" Match:
     1.  GOOD PRIMARY OPPOSITE MATCH: The 'Current Item' fulfills a complementary 'Available Item' from User B (opposite listing types preferred).
@@ -480,5 +481,7 @@ export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemM
   return itemMatchFlow(input);
 }
 
+
+    
 
     
