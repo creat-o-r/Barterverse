@@ -185,11 +185,17 @@ Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: L
 MATCH SCORE ASSIGNMENT ("High", "Medium", "Low"):
 Also indicate if the suggested matched item 'isGiftItForward'.
 
-- "High" Match: THIS SCORE REQUIRES BOTH CONDITIONS BELOW:
-    1.  STRONG PRIMARY OPPOSITE MATCH: The 'Current Item' (User A's {{{currentItem.listingType}}}) must directly and strongly fulfill a complementary 'Available Item' from User B (e.g., User A's 'offer' for User B's 'want', or User A's 'want' for User B's 'offer'). This means the items are highly relevant to each other (e.g., similar category, direct functional replacement, clear value proposition for User B based on their item type and description), not just opposite listing types with a weak connection.
-    2.  AND STRONG RECIPROCAL FULFILLMENT: User B (owner of the 'Available Item' in condition 1) must have *another listed 'offer' item* (Item C from their 'availableItems') that *clearly and directly fulfills an explicit or strongly implied want of User A* (the 'triggeringUser'). An 'explicit want' could be User A's 'currentItem' if it's a 'want' type, or a want clearly deductible from User A's 'triggeringUserPreferences' (e.g., specific categories User A is interested in, items User A often searches for or lists as 'want' - consider their motivations). A merely 'nice to have' or generally appealing Item C is not sufficient for a High match's reciprocal component; it must address a demonstrable need or strong interest of User A.
-    3.  If both these conditions are met, include Item C's ID as 'reciprocalItemId' in the suggestion for the match between Current Item and User B's initial item.
-    IMPORTANT FOR 'HIGH' SCORE: Both the primary match (Condition 1) and the reciprocal fulfillment (Condition 2) must be strong and clear. If either is weak or highly speculative (e.g., your reasoning describes it as 'not an obvious direct match'), do not assign a 'High' score.
+- "High" Match: THIS SCORE REQUIRES ALL CONDITIONS BELOW TO BE MET EXCEPTIONALLY WELL:
+    1.  VERY STRONG & DIRECT PRIMARY OPPOSITE MATCH:
+        -   If 'Current Item' (User A) is 'offer', the 'Available Item' (User B) MUST be a 'want'.
+        -   If 'Current Item' (User A) is 'want', the 'Available Item' (User B) MUST be an 'offer'.
+        -   The fulfillment MUST be direct and obvious (e.g., User A offers a "Blue Widget Model X", User B wants "Blue Widget Model X" or "Widget for specific purpose Y" that Model X clearly satisfies). Cross-category or speculative primary matches DO NOT qualify for "High". The items must be highly relevant with a clear value proposition for User B.
+    2.  AND VERY STRONG & DIRECT RECIPROCAL FULFILLMENT (via Item C):
+        -   User B (owner of the 'Available Item' in condition 1) MUST have *another listed 'offer' item* (Item C from their 'availableItems') that *clearly and directly fulfills an explicit or very strongly implied 'want' of User A* (the 'triggeringUser').
+        -   An 'explicit want' could be User A's 'currentItem' if it's a 'want' type, or a want clearly deductible from User A's triggeringUserPreferences (e.g., User A lists "want: old books", Item C is an "offer: rare vintage book").
+        -   Speculative appeal like "might be of interest" or "could complement" for Item C is NOT sufficient for "High". Item C must address a demonstrable need or very strong, specific interest of User A.
+    3.  AND OVERALL CLARITY: Both the primary match (Condition 1) and the reciprocal fulfillment (Condition 2) must be exceptionally strong and clear. If *either* part is weak, speculative, or not an obvious direct fulfillment of a want, DO NOT assign a "High" score. A "High" match represents an almost perfect, mutually beneficial trade opportunity.
+    4.  If all these conditions are met, include Item C's ID as 'reciprocalItemId'.
 
 - "Medium" Match:
     1.  GOOD PRIMARY OPPOSITE MATCH: The 'Current Item' fulfills a complementary 'Available Item' from User B (opposite listing types preferred).
@@ -419,7 +425,7 @@ const itemMatchFlow = ai.defineFlow(
       const errorStatus = (error as any).status;
 
       if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
-        userMessage = `Authentication error (401/403) with the AI service (${usedMatchingMode} mode). Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.`;
+        userMessage = `Authentication error (401/403) with the AI service. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.`;
       } else if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars') || lowerErrorMessage.includes('got \'equals\'')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue with its request structure (likely template formatting for item ID: ${input.currentItem.id}). Please check server logs for details.`;
       } else if (errorDetails.status === 400 || errorDetails.code === 3 ) {
