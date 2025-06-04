@@ -162,7 +162,7 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}), who owns/wants 
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
  - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
-(Consider these preferences when evaluating if an item from another user fulfills the triggeringUser's wants. Also, consider other 'want' items listed by {{{triggeringUserId}}} if available in 'Available Items'.)
+(Consider these preferences when evaluating if an item from another user fulfills the triggeringUser's wants. Also, consider other 'want' items listed by {{{triggeringUserId}}} if available in 'Available Items' or implied by their current item context.)
 
 Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: IsGift :: Description):
 {{#each availableItems}}
@@ -174,7 +174,7 @@ The primary goal is to find items where the 'Current Item' (owned/wanted by {{{t
 
 - "High" Match:
     1. The 'Current Item' ({{{currentItem.listingType}}}) strongly fulfills a complementary 'Available Item' from User B (e.g., your Offer for User B's Want, or your Want for User B's Offer).
-    2. AND, another 'Available Item' (an Offer from that same User B, let's call it Item C) clearly fulfills an explicit or strongly implied 'want' of the 'triggeringUser' ({{{triggeringUserId}}}). Consider {{{triggeringUserPreferences.motivations}}}, other 'want' items listed by {{{triggeringUserId}}}, or needs inferred from their 'currentItem' context. *Essentially, all explicit wants in a potential 2-way exchange are clearly met.*
+    2. AND, another 'Available Item' (an Offer from that same User B, let's call it Item C) clearly fulfills an explicit 'want' of the 'triggeringUser' ({{{triggeringUserId}}}). This 'want' could be the 'Current Item' itself if it's a 'want' listing, or another 'want' item listed by {{{triggeringUserId}}} (if such items are provided in the 'Available Items' list and owned by them), or a need strongly implied by their preferences. *Essentially, all explicit wants in a potential 2-way exchange are clearly met.*
     3. If conditions 1 and 2 are met, include Item C's ID as 'reciprocalItemId' in the suggestion for the match between Current Item and User B's initial item.
 
 - "Medium" Match:
@@ -204,7 +204,7 @@ Do NOT suggest:
 - Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
 
 Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status, and reciprocalItemId if applicable) if available, ensuring ALL suggested items meet the applicable minimum match score rule. Aim for variety and strong reciprocal potential if multiple good options exist.
-If matches are found, provide a brief (1-2 sentences) 'reasoning' for your overall approach. If any suggested match includes a 'reciprocalItemId', your reasoning MUST specifically address how that reciprocal item enhances the trade potential for the 'triggeringUser'. Highlight direct gift fulfillments as well if significant.
+If matches are found, provide a brief (1-2 sentences) 'reasoning' for your overall approach. If any suggested match includes a 'reciprocalItemId', your reasoning MUST specifically address how that reciprocal item enhances the trade potential by fulfilling a want of the 'triggeringUser'. Highlight direct gift fulfillments as well if significant.
 If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
   `,
 });
@@ -458,6 +458,3 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
-
-
-    

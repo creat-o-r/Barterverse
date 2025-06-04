@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake, PackagePlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { explainMatchRationale, type ExplainMatchRationaleOutput } from '@/ai/flows/explain-match-rationale-flow';
+import { explainMatchRationale, type ExplainMatchRationaleOutput, type ExplainMatchRationaleInput } from '@/ai/flows/explain-match-rationale-flow';
 import { logFeedbackEntry } from '@/services/feedback-service';
 import { useToast } from "@/hooks/use-toast";
 
@@ -170,7 +170,7 @@ export default function OpportunityMatchPage() {
         
         setLoadingReasoning(true);
         try {
-            const inputForRationale = {
+            const inputForRationale: ExplainMatchRationaleInput = {
                 itemA: {
                     name: mainD.item.name,
                     description: mainD.item.description,
@@ -186,6 +186,16 @@ export default function OpportunityMatchPage() {
                     isGiftItForward: !!suggestedD.item.isGiftItForward,
                 }
             };
+
+            if (reciprocalD) {
+                inputForRationale.itemC = {
+                    name: reciprocalD.item.name,
+                    description: reciprocalD.item.description,
+                    category: reciprocalD.item.category,
+                    listingType: reciprocalD.item.listingType,
+                    isGiftItForward: !!reciprocalD.item.isGiftItForward,
+                };
+            }
             
             const rationaleResult: ExplainMatchRationaleOutput = await explainMatchRationale(inputForRationale);
             
@@ -355,10 +365,10 @@ export default function OpportunityMatchPage() {
               <div className="text-center mb-4">
                   <h3 className="font-headline text-xl flex items-center justify-center gap-2">
                     <PackagePlus className="h-6 w-6 text-accent" />
-                    To Sweeten the Deal...
+                    Potential Reciprocal Offer from {suggestedItemDetails.owner.name}
                   </h3>
                   <p className="text-sm text-muted-foreground font-body">
-                    {suggestedItemDetails.owner.name} also offers the following, which might complete a 2-way trade for you:
+                    To potentially make this trade even better for you, {suggestedItemDetails.owner.name} also offers:
                   </p>
               </div>
               <div className="max-w-md mx-auto">
@@ -412,7 +422,7 @@ export default function OpportunityMatchPage() {
                         )}
                         {opportunityReasoning && (
                              <div>
-                                <span className="font-semibold text-sm">AI Rationale for this Specific Match: </span>
+                                <span className="font-semibold text-sm">AI Rationale for this Specific Match{reciprocalItemIdQuery ? " (including reciprocal item)" : ""}: </span>
                                 <p className={`text-sm font-body ${insightsError ? 'text-destructive-foreground/90' : 'text-muted-foreground'}`}>{opportunityReasoning}</p>
                              </div>
                         )}
@@ -476,4 +486,3 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
-
