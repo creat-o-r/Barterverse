@@ -128,6 +128,8 @@ export default function MatchReportsPage() {
     } catch (error) {
       console.error("Failed to fetch AI settings:", error);
       toast({ title: "Error", description: "Could not load AI settings.", variant: "destructive" });
+    } finally {
+      setIsLoadingReports(false);
     }
   };
 
@@ -247,26 +249,23 @@ export default function MatchReportsPage() {
     setIsLoadingListedModels(true);
     setListModelsError(null);
     setListedModels(null);
-    setShowListedModels(true); // Show the section immediately
+    setShowListedModels(true);
     try {
       const response = await fetch('/api/list-models');
       const data = await response.json();
       if (!response.ok) {
         let errorMessage = data.error || `API request failed with status ${response.status}`;
-        if (data.details) {
-            // Special handling for the "listModels on Class.prototype: false" case
-            if (data.details.includes("listModels on Class.prototype: false")) {
-                 errorMessage = `Failed to list models: The Google AI SDK's 'listModels' method is not available in the server environment. This suggests an issue with the SDK installation or a build/bundling problem. Details: ${data.details}`;
-            } else {
-                errorMessage += ` Details: ${data.details}`;
-            }
+        if (data.details && data.details.includes("listModels on Class.prototype: false")) {
+             errorMessage = `Failed to list models: The Google AI SDK's 'listModels' method is not available in the server environment. This suggests an issue with the SDK installation or a build/bundling problem. Details: ${data.details}`;
+        } else if (data.details) {
+            errorMessage += ` Details: ${data.details}`;
         }
         if (data.gaiError) errorMessage += ` Google AI Error: ${data.gaiError}`;
-        // Instead of throwing, set state and toast for cleaner UI
+        
         setListModelsError(errorMessage);
         toast({ title: "Error Listing Models", description: errorMessage, variant: "destructive", duration: 10000 });
-        setListedModels(null); // Ensure no stale data is shown
-        return; // Exit early
+        setListedModels(null);
+        return; 
       }
       setListedModels(data.models);
     } catch (error: any) {
@@ -543,6 +542,5 @@ export default function MatchReportsPage() {
     </div>
   );
 }
-
 
     
