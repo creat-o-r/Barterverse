@@ -16,7 +16,7 @@ export async function GET() {
     console.log('[API List Models] typeof GoogleGenerativeAI_SDK:', typeof GoogleGenerativeAI_SDK);
     if (GoogleGenerativeAI_SDK && typeof GoogleGenerativeAI_SDK.GoogleGenerativeAI === 'function') {
         console.log('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI is a function/constructor.');
-        console.log('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI.prototype keys:', Object.getOwnPropertyNames(GoogleGenerativeAI_SDK.GoogleGenerativeAI.prototype));
+        // console.log('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI.prototype keys:', Object.getOwnPropertyNames(GoogleGenerativeAI_SDK.GoogleGenerativeAI.prototype));
     } else {
         console.error('[API List Models] GoogleGenerativeAI_SDK.GoogleGenerativeAI is NOT a function/constructor. SDK might not be imported correctly.');
         console.error('[API List Models] Keys of GoogleGenerativeAI_SDK:', GoogleGenerativeAI_SDK ? Object.keys(GoogleGenerativeAI_SDK) : 'GoogleGenerativeAI_SDK is null/undefined');
@@ -31,22 +31,24 @@ export async function GET() {
       console.log('[API List Models] genAI.listModels IS a function. Proceeding to call it.');
     } else {
       console.error('[API List Models] CRITICAL: genAI.listModels IS NOT a function.');
-      console.error('[API List Models] typeof genAI.listModels:', typeof genAI?.listModels);
+      let diagnosticDetails = `genAI.listModels is typeof: ${typeof genAI?.listModels}. `;
       if (genAI) {
-        console.error('[API List Models] Inspecting genAI instance. Keys:', Object.keys(genAI));
+        diagnosticDetails += `genAI object keys: [${Object.keys(genAI).join(', ')}]. `;
         try {
             const prototype = Object.getPrototypeOf(genAI);
-            console.error('[API List Models] Prototype of genAI instance:', prototype);
+            diagnosticDetails += `genAI prototype: ${prototype}. `;
             if (prototype) {
-                console.error('[API List Models] Methods on prototype:', Object.getOwnPropertyNames(prototype));
+                diagnosticDetails += `genAI prototype methods: [${Object.getOwnPropertyNames(prototype).join(', ')}].`;
             }
-        } catch (protoError) {
-            console.error('[API List Models] Error inspecting prototype:', protoError);
+        } catch (protoError: any) {
+            diagnosticDetails += `Error inspecting prototype: ${protoError.message}.`;
         }
       } else {
-        console.error('[API List Models] genAI instance is null or undefined.');
+        diagnosticDetails += 'genAI instance is null or undefined.';
       }
-      throw new Error('genAI.listModels is not a function on the GoogleGenerativeAI instance. SDK may not be loaded correctly or method is unavailable.');
+      console.error(`[API List Models] Diagnostics: ${diagnosticDetails}`);
+      // This error will be caught by the outer catch, which then sends it in the JSON response's "details" field.
+      throw new Error(`genAI.listModels is not a function on the GoogleGenerativeAI instance. SDK issue or incorrect import. Diagnostics: ${diagnosticDetails}`);
     }
 
     const result = await genAI.listModels();
@@ -68,19 +70,20 @@ export async function GET() {
         console.log(`[API List Models] Successfully processed ${models.length} models.`);
     } else {
         console.warn("[API List Models] genAI.listModels() returned an unexpected result structure or no models array. Result:", JSON.stringify(result, null, 2));
-        return NextResponse.json({ error: "Failed to list models: SDK returned an unexpected response structure.", details: "Result from listModels did not contain a valid models array." }, { status: 500 });
+        // This specific error within the try block will also be caught and its message put into details
+        throw new Error("SDK's listModels() returned an unexpected response structure. Result did not contain a valid 'models' array.");
     }
 
     return NextResponse.json({ models });
   } catch (error: any) {
     console.error("[API List Models] Error in GET handler:", error.message);
     if (error.stack) {
-        console.error("[API List Models] Stack trace:", error.stack);
+        // console.error("[API List Models] Stack trace:", error.stack); // Keep server-side stack trace for potential later debugging
     }
     
     const errorResponse: { error: string; details?: string; gaiError?: string; stack?: string } = {
-        error: "Failed to list models from Google AI.",
-        details: error.message || "An unknown error occurred within the list-models API.",
+        error: "Failed to list models from Google AI.", // This is the base error message the client sees first.
+        details: error.message || "An unknown error occurred within the list-models API.", // This will now contain the detailed diagnostics from the try block
     };
 
     if (error.cause) { 
@@ -90,10 +93,6 @@ export async function GET() {
             errorResponse.gaiError = "Could not stringify the error cause.";
         }
     }
-    // Optionally include stack in development for easier debugging on the client side if needed
-    // if (process.env.NODE_ENV === 'development' && error.stack) {
-    //     errorResponse.stack = error.stack;
-    // }
     
     return NextResponse.json(errorResponse, { status: 500 });
   }
