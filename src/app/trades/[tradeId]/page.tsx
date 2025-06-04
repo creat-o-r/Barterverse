@@ -141,7 +141,7 @@ export default async function TradeDetailPage({ params }: { params: { tradeId: s
               </CardHeader>
               <CardContent>
                 <div className="relative aspect-video w-full mb-2 rounded-md overflow-hidden">
-                    <Image src={itemOfferedByOther.imageUrl || 'https://placehold.co/600x400.png'} alt={itemOfferedByOther.name} layout="fill" objectFit="cover" data-ai-hint={itemOfferedByOther.dataAiHint || "item offered by other"}/>
+                    <Image src={itemOfferedByOther.imageUrl || 'https://placehold.co/600x400.png'} alt={itemOfferedByOther.name} fill className="object-cover" data-ai-hint={itemOfferedByOther.dataAiHint || "item offered by other"} sizes="(max-width: 768px) 100vw, 50vw"/>
                 </div>
                 <h4 className="font-semibold text-lg">{itemOfferedByOther.name}</h4>
                 <p className="text-sm text-muted-foreground line-clamp-2">{itemOfferedByOther.description}</p>
@@ -162,7 +162,7 @@ export default async function TradeDetailPage({ params }: { params: { tradeId: s
                 {itemCurrentUserMightOffer ? (
                   <>
                     <div className="relative aspect-video w-full mb-2 rounded-md overflow-hidden">
-                        <Image src={itemCurrentUserMightOffer.imageUrl || 'https://placehold.co/600x400.png'} alt={itemCurrentUserMightOffer.name} layout="fill" objectFit="cover" data-ai-hint={itemCurrentUserMightOffer.dataAiHint || "item you might offer"}/>
+                        <Image src={itemCurrentUserMightOffer.imageUrl || 'https://placehold.co/600x400.png'} alt={itemCurrentUserMightOffer.name} fill className="object-cover" data-ai-hint={itemCurrentUserMightOffer.dataAiHint || "item you might offer"} sizes="(max-width: 768px) 100vw, 50vw"/>
                     </div>
                     <h4 className="font-semibold text-lg">{itemCurrentUserMightOffer.name}</h4>
                     <p className="text-sm text-muted-foreground line-clamp-2">{itemCurrentUserMightOffer.description}</p>

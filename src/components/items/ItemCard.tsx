@@ -55,10 +55,10 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
           <Image
             src={item.imageUrl || `https://placehold.co/600x400.png?text=${item.listingType}`}
             alt={item.name}
-            layout="fill"
-            objectFit="cover"
-            className="transition-transform duration-300 ease-in-out group-hover:scale-105"
+            fill
+            className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
             data-ai-hint={item.dataAiHint || "item image"}
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
            {item.status !== 'available' && (
             <Badge

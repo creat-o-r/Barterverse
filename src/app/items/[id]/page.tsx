@@ -307,4 +307,3 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
     </Suspense>
   );
 }
-

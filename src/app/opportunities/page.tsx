@@ -64,6 +64,7 @@ function OpportunityItemCard({
             fill
             className="object-cover"
             data-ai-hint={item.dataAiHint || "opportunity item"}
+            sizes="(max-width: 768px) 100vw, 50vw"
           />
         </div>
         <p className="text-sm text-muted-foreground line-clamp-3 font-body">{item.description}</p>
