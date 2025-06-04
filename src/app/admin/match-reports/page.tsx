@@ -10,14 +10,17 @@ import {
   getUseUserProfilePreferencesInMatching,
   setUseUserProfilePreferencesInMatching as setUseUserProfilePreferencesInMatchingService,
   getEnableAutomaticPreferenceInference,
-  setEnableAutomaticPreferenceInference as setEnableAutomaticPreferenceInferenceService
+  setEnableAutomaticPreferenceInference as setEnableAutomaticPreferenceInferenceService,
+  getPreferredAIModel, // New import
+  setPreferredAIModel as setPreferredAIModelService, // New import
+  type AIModelName // New import
 } from '@/services/ai-config-service';
 import { getFeedbackLogContent, clearFeedbackLog as clearFeedbackLogService } from '@/services/feedback-service';
 import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2 } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -25,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
 import AdminAIPreferenceInsights from '@/components/admin/AdminAIPreferenceInsights';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // New import
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,15 +59,22 @@ function getMatchScoreIcon(score?: string) {
   }
 }
 
+const modelDisplayMap: Record<AIModelName, string> = {
+  'gemini-1.5-pro-latest': 'Gemini 1.5 Pro (Latest)',
+  'gemini-1.0-pro': 'Gemini 1.0 Pro',
+};
+
 export default function MatchReportsPage() {
   const [reports, setReports] = useState<LoggedMatchSuggestion[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
   const [useUserPrefsInMatching, setUseUserPrefsInMatching] = useState(true);
   const [enableAutoPrefInference, setEnableAutoPrefInference] = useState(false);
+  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-1.5-pro-latest'); // New state
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
+  const [isUpdatingPreferredModel, setIsUpdatingPreferredModel] = useState(false); // New state
   const [isCopyingFeedbackLog, setIsCopyingFeedbackLog] = useState(false);
   const [isCopyingMatchLog, setIsCopyingMatchLog] = useState(false);
   const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
@@ -92,6 +103,8 @@ export default function MatchReportsPage() {
       setUseUserPrefsInMatching(prefsEnabledMatch);
       const autoPrefEnabled = await getEnableAutomaticPreferenceInference();
       setEnableAutoPrefInference(autoPrefEnabled);
+      const model = await getPreferredAIModel(); // Fetch preferred model
+      setPreferredModel(model);
     } catch (error) {
       console.error("Failed to fetch AI settings:", error);
       toast({ title: "Error", description: "Could not load AI settings.", variant: "destructive" });
@@ -150,6 +163,25 @@ export default function MatchReportsPage() {
     } finally { setIsUpdatingAutoPrefToggle(false); }
   };
 
+  const handlePreferredModelChange = async (newModelValue: string) => {
+    const newModel = newModelValue as AIModelName;
+    if (newModel === preferredModel) return;
+    setIsUpdatingPreferredModel(true);
+    try {
+      const result = await setPreferredAIModelService(newModel);
+      if (result.success) {
+        setPreferredModel(newModel);
+        toast({ title: "Preferred AI Model Updated", description: result.message || `Preferred model set to ${modelDisplayMap[newModel]}. A restart may be needed for changes to take full effect.` });
+      } else { throw new Error(result.message || "Failed to update preferred model server-side."); }
+    } catch (error: any) {
+      toast({ title: "Update Failed", description: error.message || "Could not update preferred AI model.", variant: "destructive" });
+      fetchAdminSettings(); // Re-fetch to ensure UI consistency
+    } finally {
+      setIsUpdatingPreferredModel(false);
+    }
+  };
+
+
   const copyToClipboard = async (fetchContent: () => Promise<{ success: boolean; content?: string; error?: string }>, setIsCopyingState: (isCopying: boolean) => void, logName: string) => {
     setIsCopyingState(true);
     try {
@@ -201,7 +233,7 @@ export default function MatchReportsPage() {
             AI Configuration
           </CardTitle>
           <CardDescription className="font-body">
-            Control AI behavior for item matching and preference learning. Changes apply globally.
+            Control AI behavior for item matching, preference learning, and model selection. Changes apply globally.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -232,12 +264,49 @@ export default function MatchReportsPage() {
              <div className="text-sm text-muted-foreground p-4 border-l-4 border-accent/50 bg-accent/5 rounded-md space-y-1">
                 <div className="flex items-start gap-2"><Wand2 className="h-5 w-5 text-accent mt-0.5 shrink-0" /><div><strong className="text-foreground">Auto-Inference Enabled:</strong> If enabled, users will see an option on their profile to let AI learn and (mock) update their preferences based on activity. This is experimental.</div></div>
             </div>
+            <Separator /> {/* New Model Selection Section */}
+            <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="ai-preferred-model" className="font-headline text-lg flex items-center gap-2">
+                        <SlidersHorizontal className="h-5 w-5 text-primary" />
+                        Preferred AI Model (Default for Flows)
+                    </Label>
+                    {isUpdatingPreferredModel && <RefreshCw className="h-5 w-5 animate-spin text-primary" />}
+                </div>
+                <Select
+                    value={preferredModel}
+                    onValueChange={handlePreferredModelChange}
+                    disabled={isUpdatingPreferredModel}
+                >
+                    <SelectTrigger id="ai-preferred-model" className="w-full md:w-[300px]">
+                        <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(Object.keys(modelDisplayMap) as AIModelName[]).map(modelKey => (
+                            <SelectItem key={modelKey} value={modelKey}>
+                                {modelDisplayMap[modelKey]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <div className="text-sm text-muted-foreground p-4 border-l-4 border-primary/50 bg-primary/5 rounded-md space-y-1">
+                    <div className="flex items-start gap-2">
+                        <Brain className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                        <div>
+                            <strong className="text-foreground">Model Selection:</strong> Chooses the default model for Genkit flows.
+                            <br />
+                            <span className="text-xs italic">Note: Changes to the default model typically require an application restart (or cache clear in some environments) to fully take effect across all backend flows.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </CardContent>
         <CardFooter>
             <div className="text-xs text-muted-foreground font-body space-x-2">
                 <span>Matching: <Badge variant={currentMatchingMode === 'advanced' ? 'default' : 'secondary'} className="capitalize">{currentMatchingMode}</Badge>.</span>
                 <span>Prefs in Match: <Badge variant={useUserPrefsInMatching ? 'default' : 'secondary'}>{useUserPrefsInMatching ? 'On' : 'Off'}</Badge>.</span>
                 <span>Auto Prefs: <Badge variant={enableAutoPrefInference ? 'default' : 'secondary'}>{enableAutoPrefInference ? 'On' : 'Off'}</Badge>.</span>
+                <span>Model: <Badge variant="outline" className="capitalize">{modelDisplayMap[preferredModel] || preferredModel}</Badge>.</span>
             </div>
         </CardFooter>
       </Card>

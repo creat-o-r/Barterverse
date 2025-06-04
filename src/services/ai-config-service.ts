@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export type AIMatchingMode = 'simple' | 'advanced';
+export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro'; // Added new type
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 
@@ -12,6 +13,7 @@ interface AISettings {
   matchingMode: AIMatchingMode;
   useUserProfilePreferencesInMatching: boolean;
   enableAutomaticPreferenceInference: boolean;
+  preferredModel: AIModelName; // Added new field
 }
 
 // Default settings
@@ -19,6 +21,7 @@ const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
   enableAutomaticPreferenceInference: false,
+  preferredModel: 'gemini-1.5-pro-latest', // Default model
 };
 
 async function readSettings(): Promise<AISettings> {
@@ -26,7 +29,6 @@ async function readSettings(): Promise<AISettings> {
     await fs.access(SETTINGS_FILE_PATH);
     const fileContent = await fs.readFile(SETTINGS_FILE_PATH, 'utf-8');
     if (fileContent.trim() === '') {
-      // If file is empty, write defaults and return them
       const writeSuccess = await writeSettings(defaultSettings);
       if (!writeSuccess) {
         console.error('[AI Config Service] Failed to write default settings to empty file. Using in-memory defaults.');
@@ -34,10 +36,10 @@ async function readSettings(): Promise<AISettings> {
       return defaultSettings;
     }
     const parsedSettings = JSON.parse(fileContent);
+    // Ensure all fields from defaultSettings are present, especially new ones
     return { ...defaultSettings, ...parsedSettings };
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      // If file doesn't exist, create it with defaults
       const writeSuccess = await writeSettings(defaultSettings);
        if (!writeSuccess) {
         console.error('[AI Config Service] Failed to write default settings to new file. Using in-memory defaults.');
@@ -45,7 +47,6 @@ async function readSettings(): Promise<AISettings> {
       return defaultSettings;
     }
     console.error('[AI Config Service] Error reading settings file, using defaults:', error);
-    // For other errors (e.g., malformed JSON), return defaults
     return defaultSettings; 
   }
 }
@@ -53,10 +54,10 @@ async function readSettings(): Promise<AISettings> {
 async function writeSettings(settings: AISettings): Promise<boolean> {
   try {
     await fs.writeFile(SETTINGS_FILE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
-    return true; // Indicate success
+    return true; 
   } catch (error) {
     console.error('[AI Config Service] Error writing settings file:', error);
-    return false; // Indicate failure
+    return false; 
   }
 }
 
@@ -120,5 +121,27 @@ export async function setEnableAutomaticPreferenceInference(enable: boolean): Pr
   } catch (error: any) {
     console.error('[AI Config Service] Unexpected error in setEnableAutomaticPreferenceInference:', error);
     return { success: false, message: 'An unexpected error occurred while updating automatic preference inference setting.' };
+  }
+}
+
+// New functions for preferred AI model
+export async function getPreferredAIModel(): Promise<AIModelName> {
+  const settings = await readSettings();
+  return settings.preferredModel || 'gemini-1.5-pro-latest'; // Fallback if not set
+}
+
+export async function setPreferredAIModel(model: AIModelName): Promise<{success: boolean; message?: string}> {
+  try {
+    const currentSettings = await readSettings();
+    currentSettings.preferredModel = model;
+    const writeSuccess = await writeSettings(currentSettings);
+    if (!writeSuccess) {
+      return { success: false, message: 'Failed to save preferred AI model to the settings file.' };
+    }
+    console.log(`[AI Config Service] Preferred AI Model set to: ${model}`);
+    return { success: true, message: `Preferred AI Model set to ${model}. Note: App restart may be needed for changes to take full effect for the default model.` };
+  } catch (error: any) {
+    console.error('[AI Config Service] Unexpected error in setPreferredAIModel:', error);
+    return { success: false, message: 'An unexpected error occurred while updating the preferred AI model.' };
   }
 }
