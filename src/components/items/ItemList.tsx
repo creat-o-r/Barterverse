@@ -1,13 +1,16 @@
 
 import type { Item } from '@/types';
 import ItemCard from './ItemCard';
+import type { AIMatchingMode } from '@/services/ai-config-service';
 
 interface ItemListProps {
-  items: (Item & { matchScore?: string; reciprocalItemId?: string })[]; // Item can now have matchScore and reciprocalItemId
-  mainContextItemId?: string; 
+  items: (Item & { matchScore?: string; reciprocalItemId?: string })[];
+  mainContextItemId?: string;
+  usedMatchingMode?: AIMatchingMode;
+  preferencesConsidered?: boolean;
 }
 
-export default function ItemList({ items, mainContextItemId }: ItemListProps) {
+export default function ItemList({ items, mainContextItemId, usedMatchingMode, preferencesConsidered }: ItemListProps) {
   if (!items || items.length === 0) {
     return <p className="text-center text-muted-foreground font-body py-8">No items found. Try adjusting your search or filters!</p>;
   }
@@ -17,12 +20,13 @@ export default function ItemList({ items, mainContextItemId }: ItemListProps) {
       {items.map((item) => (
         <div key={item.id} className="h-full">
           <ItemCard
-            item={item} // Pass the whole item, which includes matchScore and reciprocalItemId
+            item={item}
             opportunityContextItemId={mainContextItemId}
+            usedMatchingMode={usedMatchingMode}
+            preferencesConsidered={preferencesConsidered}
           />
         </div>
       ))}
     </div>
   );
 }
-

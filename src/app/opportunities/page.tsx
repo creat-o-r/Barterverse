@@ -2,7 +2,7 @@
 // src/app/opportunities/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -11,12 +11,12 @@ import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake, PackagePlus } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake, PackagePlus, Brain } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput, type ExplainMatchRationaleInput } from '@/ai/flows/explain-match-rationale-flow';
 import { logFeedbackEntry } from '@/services/feedback-service';
-import { getPreferredAIModel, type AIModelName } from '@/services/ai-config-service'; // Import getPreferredAIModel
+import { getPreferredAIModel, type AIModelName, type AIMatchingMode } from '@/services/ai-config-service';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 
@@ -28,7 +28,6 @@ async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; own
   if (!item) return null;
   const owner = dummyUsers.find((u) => u.id === item.ownerId);
   if (!owner) return null;
-  // Ensure isGiftItForward is a boolean for logic downstream
   return { item: { ...item, isGiftItForward: !!item.isGiftItForward }, owner };
 }
 
@@ -124,14 +123,23 @@ const generalMatchScoreCriteria: Record<string, { title: string; points: string[
   },
 };
 
+const modelDisplayMap: Record<AIModelName, string> = {
+  'gemini-1.5-pro-latest': 'Gemini 1.5 Pro',
+  'gemini-1.0-pro': 'Gemini 1.0 Pro',
+  'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview',
+};
+
 
 export default function OpportunityMatchPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
+
   const mainItemIdQuery = searchParams.get('mainItemId');
   const suggestedItemIdQuery = searchParams.get('suggestedItemId');
   const matchScoreQuery = searchParams.get('score');
   const reciprocalItemIdQuery = searchParams.get('reciprocalItemId');
+  const usedMatchingModeQuery = searchParams.get('usedMatchingMode') as AIMatchingMode | null;
+  const preferencesConsideredQuery = searchParams.get('preferencesConsidered');
 
 
   const [mainItemDetails, setMainItemDetails] = useState<{ item: Item; owner: User } | null>(null);
@@ -144,8 +152,12 @@ export default function OpportunityMatchPage() {
   const [matchScore, setMatchScore] = useState<string | null>(null);
   const [isReportingScore, setIsReportingScore] = useState(false);
   const [isReportingReasoning, setIsReportingReasoning] = useState(false);
+  const [currentAiModelForRationale, setCurrentAiModelForRationale] = useState<AIModelName | null>(null);
 
-  const currentUser = dummyUsers[0]; // Simulate current user
+  const currentUser = dummyUsers[0];
+
+  const originalSuggestionMatchingMode = useMemo(() => usedMatchingModeQuery, [usedMatchingModeQuery]);
+  const originalSuggestionPrefsConsidered = useMemo(() => preferencesConsideredQuery === 'true', [preferencesConsideredQuery]);
 
   useEffect(() => {
     async function fetchDataAndReasoning() {
@@ -155,9 +167,18 @@ export default function OpportunityMatchPage() {
       setReciprocalItemDetails(null);
       setOpportunityReasoning(null);
       setInsightsError(null);
+      setCurrentAiModelForRationale(null);
       
       const scoreFromQuery = matchScoreQuery?.toLowerCase() || null;
       setMatchScore(scoreFromQuery);
+
+      try {
+        const modelForRationale = await getPreferredAIModel();
+        setCurrentAiModelForRationale(modelForRationale);
+      } catch (e) {
+        console.error("Failed to get current AI model for rationale:", e);
+        setInsightsError("Could not determine AI model for current rationale.");
+      }
 
       const mainPromise = getItemAndOwner(mainItemIdQuery);
       const suggestedPromise = getItemAndOwner(suggestedItemIdQuery);
@@ -235,14 +256,14 @@ export default function OpportunityMatchPage() {
         setLoading(false); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery, reciprocalItemIdQuery, currentUser.id]);
+  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery, reciprocalItemIdQuery]);
 
   const handleReportScore = async () => {
     if (!matchScore) return;
     setIsReportingScore(true);
     let modelUsedForContext: AIModelName | undefined;
     try {
-      modelUsedForContext = await getPreferredAIModel();
+      modelUsedForContext = await getPreferredAIModel(); // Get current model for context
       const result = await logFeedbackEntry({
         feedbackType: 'match-score',
         reportedValue: matchScore,
@@ -268,7 +289,7 @@ export default function OpportunityMatchPage() {
     setIsReportingReasoning(true);
     let modelUsedForContext: AIModelName | undefined;
     try {
-      modelUsedForContext = await getPreferredAIModel();
+      modelUsedForContext = await getPreferredAIModel(); // Get current model for context
       const result = await logFeedbackEntry({
         feedbackType: 'match-reasoning',
         reportedValue: opportunityReasoning,
@@ -371,7 +392,7 @@ export default function OpportunityMatchPage() {
                 <ArrowRightLeft className="h-8 w-8 text-muted-foreground mx-auto rotate-90" />
             </div>
 
-            <div className="flex flex-col gap-4"> {/* This column now holds suggestedItem and its reciprocal if any */}
+            <div className="flex flex-col gap-4">
               <OpportunityItemCard
                   item={suggestedItem}
                   owner={suggestedItemOwner}
@@ -403,17 +424,36 @@ export default function OpportunityMatchPage() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Insights...
                 </div>
             )}
-            {!loadingReasoning && (opportunityReasoning || matchScore || insightsError) && (
+            {!loadingReasoning && (currentAiModelForRationale || opportunityReasoning || matchScore || insightsError || originalSuggestionMatchingMode !== null) && (
                 <Card className={insightsError ? "border-destructive/50 bg-destructive/5" : "bg-muted/30 border-primary/30"}>
                     <CardHeader className="pb-2 pt-3">
                         <CardTitle className={`font-headline text-lg flex items-center gap-2 ${insightsError ? 'text-destructive-foreground' : 'text-primary'}`}>
                             {insightsError && !opportunityReasoning ? <AlertCircle className="h-5 w-5"/> : <Info className="h-5 w-5"/>}
-                            AI Insights
+                            AI Insights & Context
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0 space-y-3">
+                        {currentAiModelForRationale && (
+                            <div>
+                                <span className="font-semibold text-sm">Rationale AI Model: </span>
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  <Brain className="mr-1.5 h-3.5 w-3.5"/>
+                                  {modelDisplayMap[currentAiModelForRationale] || currentAiModelForRationale}
+                                </Badge>
+                            </div>
+                        )}
+                        {originalSuggestionMatchingMode && (
+                             <div>
+                                <span className="font-semibold text-sm">Original Suggestion Mode: </span>
+                                <Badge variant="outline" className="text-xs capitalize">{originalSuggestionMatchingMode}</Badge>
+                            </div>
+                        )}
+                         <div>
+                            <span className="font-semibold text-sm">Original Prefs Considered: </span>
+                            <Badge variant={originalSuggestionPrefsConsidered ? 'default' : 'secondary'} className="text-xs">{originalSuggestionPrefsConsidered ? 'Yes' : 'No'}</Badge>
+                        </div>
                         {matchScore && !insightsError && (
-                            <div className="mb-3">
+                            <div>
                                 <span className="font-semibold text-sm">Match Score: </span>
                                 <Badge variant={
                                     matchScore.toLowerCase() === 'high' ? 'default' :
@@ -425,9 +465,9 @@ export default function OpportunityMatchPage() {
                             </div>
                         )}
                         {scoreCriteria && !insightsError && (
-                            <div className="mb-3">
-                                <h4 className="font-semibold text-sm mb-1">{scoreCriteria.title}</h4>
-                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5 font-body">
+                            <div className="mt-1">
+                                <h4 className="font-semibold text-xs mb-0.5">{scoreCriteria.title}</h4>
+                                <ul className="list-disc list-inside text-[11px] text-muted-foreground space-y-0.5 font-body">
                                     {scoreCriteria.points.map((point, idx) => (
                                         <li key={idx}>{point}</li>
                                     ))}
@@ -435,15 +475,15 @@ export default function OpportunityMatchPage() {
                             </div>
                         )}
                         {opportunityReasoning && (
-                             <div>
-                                <span className="font-semibold text-sm">AI Rationale for this Specific Match{reciprocalItemIdQuery ? " (including reciprocal item)" : ""}: </span>
+                             <div className="pt-1">
+                                <span className="font-semibold text-sm">AI Rationale for this Match: </span>
                                 <p className={`text-sm font-body ${insightsError ? 'text-destructive-foreground/90' : 'text-muted-foreground'}`}>{opportunityReasoning}</p>
                              </div>
                         )}
                          {!opportunityReasoning && insightsError && !matchScore && ( 
                             <p className="text-sm font-body text-destructive-foreground/90">{insightsError}</p>
                         )}
-                         {!opportunityReasoning && !insightsError && !matchScore && !scoreCriteria && ( 
+                         {!opportunityReasoning && !insightsError && !matchScore && !scoreCriteria && !originalSuggestionMatchingMode && ( 
                             <p className="text-sm font-body text-muted-foreground">No AI insights available for this specific pairing.</p>
                         )}
                     </CardContent>

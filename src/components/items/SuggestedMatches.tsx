@@ -9,6 +9,7 @@ import { dummyItems, dummyUsers } from '@/lib/dummy-data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import type { AIMatchingMode } from '@/services/ai-config-service';
 
 interface SuggestedMatchesProps {
   currentItem: Item;
@@ -19,7 +20,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
-  const [matchModeUsed, setMatchModeUsed] = useState<'simple' | 'advanced' | undefined>(undefined);
+  const [matchModeUsed, setMatchModeUsed] = useState<AIMatchingMode | undefined>(undefined);
   const [internalReasoning, setInternalReasoning] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,7 +92,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             ...itemDetails, 
             matchScore: match.matchScore, 
             isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward,
-            reciprocalItemId: match.reciprocalItemId // Include reciprocalItemId
+            reciprocalItemId: match.reciprocalItemId
           } : null;
         }).filter(Boolean) as (Item & { matchScore: string; reciprocalItemId?: string })[];
 
@@ -219,9 +220,13 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           </div>
       </CardHeader>
       <CardContent>
-          <ItemList items={suggestedItems} mainContextItemId={currentItem.id} />
+          <ItemList 
+            items={suggestedItems} 
+            mainContextItemId={currentItem.id}
+            usedMatchingMode={matchModeUsed}
+            preferencesConsidered={preferencesWereConsidered}
+          />
       </CardContent>
       </Card>
   );
 }
-

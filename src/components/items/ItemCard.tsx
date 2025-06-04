@@ -6,10 +6,13 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Gift, Search, Link2, HeartHandshake } from 'lucide-react';
+import type { AIMatchingMode } from '@/services/ai-config-service';
 
 interface ItemCardProps {
-  item: Item & { matchScore?: string; reciprocalItemId?: string }; // Added reciprocalItemId
-  opportunityContextItemId?: string; 
+  item: Item & { matchScore?: string; reciprocalItemId?: string };
+  opportunityContextItemId?: string;
+  usedMatchingMode?: AIMatchingMode;
+  preferencesConsidered?: boolean;
 }
 
 function getMatchScoreColorStyles(score?: string): string {
@@ -21,10 +24,10 @@ function getMatchScoreColorStyles(score?: string): string {
   }
 }
 
-export default function ItemCard({ item, opportunityContextItemId }: ItemCardProps) { // matchScore removed from direct props, it's in item
+export default function ItemCard({ item, opportunityContextItemId, usedMatchingMode, preferencesConsidered }: ItemCardProps) {
   const linkHref = `/items/${item.id}`;
-  const matchScore = item.matchScore; // Get matchScore from item object
-  
+  const matchScore = item.matchScore;
+
   let opportunityLink: string | null = null;
   if (opportunityContextItemId && !item.isGiftItForward) {
     const opportunityLinkParams = new URLSearchParams();
@@ -33,8 +36,14 @@ export default function ItemCard({ item, opportunityContextItemId }: ItemCardPro
     if (matchScore) {
         opportunityLinkParams.set('score', matchScore);
     }
-    if (item.reciprocalItemId) { // Add reciprocalItemId to the link
+    if (item.reciprocalItemId) {
         opportunityLinkParams.set('reciprocalItemId', item.reciprocalItemId);
+    }
+    if (usedMatchingMode) {
+        opportunityLinkParams.set('usedMatchingMode', usedMatchingMode);
+    }
+    if (preferencesConsidered !== undefined) {
+        opportunityLinkParams.set('preferencesConsidered', String(preferencesConsidered));
     }
     opportunityLink = `/opportunities?${opportunityLinkParams.toString()}`;
   }
@@ -112,4 +121,3 @@ export default function ItemCard({ item, opportunityContextItemId }: ItemCardPro
     </Card>
   );
 }
-
