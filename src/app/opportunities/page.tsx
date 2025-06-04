@@ -36,14 +36,16 @@ function OpportunityItemCard({
     owner,
     opportunityContextLabel,
     isReciprocal = false,
+    cardClassName,
 }: {
     item: Item;
     owner: User;
     opportunityContextLabel: string;
     isReciprocal?: boolean;
+    cardClassName?: string;
 }) {
   return (
-    <Card className={`flex flex-col h-full shadow-lg ${isReciprocal ? 'bg-accent/10 border-accent/50' : ''}`}>
+    <Card className={cn(`flex flex-col h-full shadow-lg ${isReciprocal ? 'bg-accent/10 border-accent/50' : ''}`, cardClassName)}>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
             {item.listingType === 'offer' ? (item.isGiftItForward ? <HeartHandshake className="h-5 w-5 text-pink-500 shrink-0" /> : <Gift className="h-5 w-5 text-green-600 shrink-0" />) : <Search className="h-5 w-5 text-blue-600 shrink-0" />}
@@ -136,12 +138,12 @@ export default function OpportunityMatchPage() {
   const [loading, setLoading] = useState(true);
   const [opportunityReasoning, setOpportunityReasoning] = useState<string | null>(null);
   const [loadingReasoning, setLoadingReasoning] = useState(false);
-  const [insightsError, setInsightsError] = useState<string | null>(null); 
+  const [insightsError, setInsightsError] = useState<string | null>(null);
   const [matchScore, setMatchScore] = useState<string | null>(null);
   const [isReportingScore, setIsReportingScore] = useState(false);
   const [isReportingReasoning, setIsReportingReasoning] = useState(false);
 
-  const currentUserId = dummyUsers[0].id; 
+  const currentUser = dummyUsers[0]; // Simulate current user
 
   useEffect(() => {
     async function fetchDataAndReasoning() {
@@ -150,7 +152,7 @@ export default function OpportunityMatchPage() {
       setSuggestedItemDetails(null);
       setReciprocalItemDetails(null);
       setOpportunityReasoning(null);
-      setInsightsError(null); 
+      setInsightsError(null);
       
       const scoreFromQuery = matchScoreQuery?.toLowerCase() || null;
       setMatchScore(scoreFromQuery);
@@ -231,7 +233,7 @@ export default function OpportunityMatchPage() {
         setLoading(false); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery, reciprocalItemIdQuery]);
+  }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery, reciprocalItemIdQuery, currentUser.id]);
 
   const handleReportScore = async () => {
     if (!matchScore) return;
@@ -242,7 +244,7 @@ export default function OpportunityMatchPage() {
         reportedValue: matchScore,
         mainItemId: mainItemIdQuery,
         suggestedItemId: suggestedItemIdQuery,
-        reportingUserId: currentUserId,
+        reportingUserId: currentUser.id,
       });
       if (result.success) {
         toast({ title: "Score Reported", description: "Thank you for your feedback on the match score!" });
@@ -265,7 +267,7 @@ export default function OpportunityMatchPage() {
         reportedValue: opportunityReasoning,
         mainItemId: mainItemIdQuery,
         suggestedItemId: suggestedItemIdQuery,
-        reportingUserId: currentUserId,
+        reportingUserId: currentUser.id,
       });
       if (result.success) {
         toast({ title: "Reasoning Reported", description: "Thank you for your feedback on the reasoning!" });
@@ -315,16 +317,21 @@ export default function OpportunityMatchPage() {
     actionButtonIcon = <Gift className="mr-2 h-5 w-5" />;
   } else {
     pageTitle = "Trade Opportunity";
-    if (mainItem.ownerId === currentUserId) {
-      tradeId = `trade-${currentUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
+    if (mainItem.ownerId === currentUser.id) { // Current user is viewing their own item as the 'main item' context for the suggestion
+      tradeId = `trade-${currentUser.id}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
       chatButtonText = `Negotiate for "${suggestedItem.name}"`;
-    } else { 
-      tradeId = `trade-${currentUserId}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
+    } else { // Current user is viewing someone else's item ('mainItem') and was suggested one of their own items or another item
+      // This case needs careful tradeId construction. Assume 'mainItem' is what they're viewing (other's),
+      // and 'suggestedItem' is what they might trade for it.
+      // If suggestedItem is THEIRS, then the other person (mainItemOwner) wants suggestedItem.
+      // If suggestedItem is ALSO OTHER'S, it's a more complex suggestion.
+      // For simplicity, if mainItem is NOT current user's, we assume current user WANTS mainItem.
+      tradeId = `trade-${currentUser.id}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
       chatButtonText = `Negotiate for "${mainItem.name}"`;
     }
-    if (mainItem.ownerId === currentUserId && suggestedItem.ownerId === currentUserId) {
+    if (mainItem.ownerId === currentUser.id && suggestedItem.ownerId === currentUser.id) {
        chatButtonText = "View Items (Cannot trade with self)"; 
-       actionButtonLink = `/items/${mainItem.id}`; 
+       actionButtonLink = `/items/${mainItem.id}`; // Or some other sensible link
     } else {
         actionButtonLink = `/trades/${tradeId}`;
     }
@@ -344,43 +351,47 @@ export default function OpportunityMatchPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           
-          <div className="hidden md:flex items-center justify-center my-4">
-            <ArrowRightLeft className="h-8 w-8 text-muted-foreground" />
+          <div className="text-center my-4">
+            <h3 className="font-headline text-2xl text-foreground/90">Proposed Exchange</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-stretch gap-4 md:gap-6">
             <OpportunityItemCard
                 item={mainItem}
                 owner={mainItemOwner}
-                opportunityContextLabel={mainItem.ownerId === currentUserId ? `Your ${mainItem.listingType}` : `${mainItemOwner.name}'s ${mainItem.listingType}`}
+                opportunityContextLabel={mainItem.ownerId === currentUser.id ? `Your ${mainItem.listingType}` : `${mainItemOwner.name}'s ${mainItem.listingType}`}
+                cardClassName="border-primary/30"
             />
-            <OpportunityItemCard
-                item={suggestedItem}
-                owner={suggestedItemOwner}
-                opportunityContextLabel={suggestedItem.ownerId === currentUserId ? `Your ${suggestedItem.listingType}` : `${suggestedItemOwner.name}'s ${suggestedItem.listingType}`}
-            />
-          </div>
-
-          {reciprocalItemDetails && suggestedItemDetails && (
-            <div className="mt-6 pt-6 border-t">
-              <div className="text-center mb-4">
-                  <h3 className="font-headline text-xl flex items-center justify-center gap-2">
-                    <PackagePlus className="h-6 w-6 text-accent" />
-                    Potential Reciprocal Offer from {suggestedItemDetails.owner.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground font-body">
-                    To potentially make this trade even better for you, {suggestedItemDetails.owner.name} also offers:
-                  </p>
-              </div>
-              <div className="max-w-md mx-auto">
-                <OpportunityItemCard 
-                  item={reciprocalItemDetails.item}
-                  owner={reciprocalItemDetails.owner}
-                  opportunityContextLabel={`Also Offered by ${reciprocalItemDetails.owner.name}`}
-                  isReciprocal={true}
-                />
-              </div>
+            <div className="hidden md:flex items-center justify-center">
+                <ArrowRightLeft className="h-10 w-10 text-muted-foreground" />
             </div>
-          )}
+             <div className="block md:hidden text-center my-2">
+                <ArrowRightLeft className="h-8 w-8 text-muted-foreground mx-auto rotate-90" />
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <OpportunityItemCard
+                  item={suggestedItem}
+                  owner={suggestedItemOwner}
+                  opportunityContextLabel={suggestedItem.ownerId === currentUser.id ? `Your ${suggestedItem.listingType}` : `${suggestedItemOwner.name}'s ${suggestedItem.listingType}`}
+                  cardClassName="border-primary/30"
+              />
+              {reciprocalItemDetails && suggestedItemDetails && (
+                <div className="mt-2 p-3 border-l-4 border-accent bg-accent/5 rounded-md shadow-sm">
+                  <h4 className="font-headline text-md text-accent-foreground flex items-center gap-1.5 mb-2">
+                    <PackagePlus className="h-5 w-5" />
+                    Also from {suggestedItemDetails.owner.name} (For You):
+                  </h4>
+                  <OpportunityItemCard
+                    item={reciprocalItemDetails.item}
+                    owner={reciprocalItemDetails.owner}
+                    opportunityContextLabel={`Their Additional Offer`}
+                    isReciprocal={true}
+                    cardClassName="shadow-none border-accent/40"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
 
 
           <div className="mt-6 pt-6 border-t">
@@ -390,7 +401,7 @@ export default function OpportunityMatchPage() {
                 </div>
             )}
             {!loadingReasoning && (opportunityReasoning || matchScore || insightsError) && (
-                <Card className={insightsError ? "border-destructive/50 bg-destructive/5" : "bg-muted/50 border-primary/30"}>
+                <Card className={insightsError ? "border-destructive/50 bg-destructive/5" : "bg-muted/30 border-primary/30"}>
                     <CardHeader className="pb-2 pt-3">
                         <CardTitle className={`font-headline text-lg flex items-center gap-2 ${insightsError ? 'text-destructive-foreground' : 'text-primary'}`}>
                             {insightsError && !opportunityReasoning ? <AlertCircle className="h-5 w-5"/> : <Info className="h-5 w-5"/>}
@@ -486,3 +497,4 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
+
