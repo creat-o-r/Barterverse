@@ -20,7 +20,7 @@ import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu } from 'lucide-react'; // Added Cpu icon
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -226,7 +226,7 @@ export default function MatchReportsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 py-8"> {/* Increased max-width */}
+    <div className="max-w-7xl mx-auto space-y-6 py-8">
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl flex items-center gap-3">
@@ -319,7 +319,11 @@ export default function MatchReportsPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
                 <CardTitle className="font-headline text-3xl flex items-center gap-3"><ServerCrash className="h-8 w-8 text-accent" />AI Match Suggestion Logs</CardTitle>
-                <CardDescription className="font-body mt-1">This report shows AI-generated item match suggestions. <br /><span className="font-semibold text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-sm inline-block my-1 text-xs">Dev Note:</span> React Strict Mode may cause duplicate log entries in development.</CardDescription>
+                <CardDescription className="font-body mt-1">
+                  This report shows AI-generated item match suggestions. Use this log to observe how suggestions and their scores change when AI configurations (like the preferred model) are updated. 
+                  Refresh this log after triggering new suggestions on the main site to see entries with the currently active model.
+                  <br /><span className="font-semibold text-destructive-foreground bg-destructive/80 px-2 py-1 rounded-sm inline-block my-1 text-xs">Dev Note:</span> React Strict Mode may cause duplicate log entries in development.
+                </CardDescription>
             </div>
             <Button onClick={fetchReports} disabled={isLoadingReports} variant="outline" size="sm"><RefreshCw className={`mr-2 h-4 w-4 ${isLoadingReports ? 'animate-spin' : ''}`} />Refresh Logs</Button>
           </div>
