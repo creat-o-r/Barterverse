@@ -426,7 +426,7 @@ const itemMatchFlow = ai.defineFlow(
       } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) is temporarily overloaded or unavailable. Please try again.`;
       } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
-        userMessage = `Authentication error with the AI service (${usedMatchingMode} mode). Please check API key configuration.`;
+        userMessage = `Authentication error (401/403) with the AI service (${usedMatchingMode} mode). Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.`;
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) could not process the request due to content restrictions.`;
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {

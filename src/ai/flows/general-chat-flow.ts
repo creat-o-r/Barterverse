@@ -66,8 +66,11 @@ const generalChatFlow = ai.defineFlow(
 
       let userMessage = "I encountered an unexpected issue. Please try sending your message again.";
       const lowerErrorMessage = error.message?.toLowerCase() || "";
+      const errorStatus = (error as any).status; // Check for status property
 
-      if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
+      if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
+        userMessage = "Authentication error with the AI assistant. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project is properly configured.";
+      } else if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
         userMessage = "The AI assistant has reached its current usage limit. Please try again later.";
       } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
         userMessage = "The AI assistant service is temporarily overloaded. Please try again in a few moments.";
