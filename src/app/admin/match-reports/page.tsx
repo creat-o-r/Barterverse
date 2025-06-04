@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getLoggedMatchSuggestions, getMatchSuggestionLogRawContent, type LoggedMatchSuggestion } from '@/services/match-report-service';
 import {
   getAIMatchingMode,
@@ -20,7 +20,7 @@ import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu, ListTree, AlertCircle as AlertCircleIcon } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu, ListTree, AlertCircle as AlertCircleIcon, PackageSearch } from 'lucide-react'; // Added PackageSearch
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -41,6 +41,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function getMatchScoreColor(score?: string) {
@@ -93,7 +94,7 @@ export default function MatchReportsPage() {
   const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
   const [isClearingFeedbackLog, setIsClearingFeedbackLog] = useState(false);
   const [showClearFeedbackDialog, setShowClearFeedbackDialog] = useState(false);
-  
+
   const [listedModels, setListedModels] = useState<ListedModel[] | null>(null);
   const [isLoadingListedModels, setIsLoadingListedModels] = useState(false);
   const [listModelsError, setListModelsError] = useState<string | null>(null);
@@ -251,13 +252,16 @@ export default function MatchReportsPage() {
       const response = await fetch('/api/list-models');
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || `API request failed with status ${response.status}`);
+        let errorMessage = data.error || `API request failed with status ${response.status}`;
+        if (data.details) errorMessage += ` Details: ${data.details}`;
+        if (data.gaiError) errorMessage += ` Google AI Error: ${data.gaiError}`;
+        throw new Error(errorMessage);
       }
       setListedModels(data.models);
     } catch (error: any) {
       console.error("Failed to list models:", error);
       setListModelsError(error.message || "Could not fetch model list from API.");
-      toast({ title: "Error Listing Models", description: error.message || "Could not fetch model list.", variant: "destructive" });
+      toast({ title: "Error Listing Models", description: error.message || "Could not fetch model list.", variant: "destructive", duration: 10000 });
     } finally {
       setIsLoadingListedModels(false);
     }
@@ -351,15 +355,15 @@ export default function MatchReportsPage() {
       </Card>
 
       <Separator />
-      
+
       <Card>
         <CardHeader>
             <CardTitle className="font-headline text-xl flex items-center gap-3">
-                <ListTree className="h-6 w-6 text-primary" />
+                <PackageSearch className="h-6 w-6 text-primary" /> {/* Changed icon */}
                 Google AI Model Diagnostics
             </CardTitle>
             <CardDescription className="font-body">
-                List models available to your GOOGLE_API_KEY via the Google AI SDK.
+                List models available to your GOOGLE_API_KEY via the Google AI SDK. Helps diagnose API key or model access issues.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -372,9 +376,9 @@ export default function MatchReportsPage() {
                     <CollapsibleContent>
                         {isLoadingListedModels && <p className="text-muted-foreground font-body">Loading models...</p>}
                         {listModelsError && (
-                            <div className="p-3 my-2 border border-destructive bg-destructive/10 rounded-md text-destructive text-sm flex items-center gap-2">
-                                <AlertCircleIcon className="h-4 w-4 shrink-0" />
-                                <p>Error listing models: {listModelsError}</p>
+                            <div className="p-3 my-2 border border-destructive bg-destructive/10 rounded-md text-destructive text-sm flex items-start gap-2">
+                                <AlertCircleIcon className="h-4 w-4 shrink-0 mt-0.5" />
+                                <p className="whitespace-pre-wrap break-all">{listModelsError}</p>
                             </div>
                         )}
                         {listedModels && listedModels.length > 0 && (
@@ -396,7 +400,7 @@ export default function MatchReportsPage() {
                             </div>
                         )}
                         {listedModels && listedModels.length === 0 && !isLoadingListedModels && !listModelsError && (
-                            <p className="text-muted-foreground font-body mt-2">No models returned by the API.</p>
+                            <p className="text-muted-foreground font-body mt-2">No models returned by the API for your GOOGLE_API_KEY.</p>
                         )}
                     </CollapsibleContent>
                 </Collapsible>
@@ -526,4 +530,3 @@ export default function MatchReportsPage() {
     </div>
   );
 }
-
