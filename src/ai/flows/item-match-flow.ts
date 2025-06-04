@@ -185,37 +185,44 @@ Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: L
 MATCH SCORE ASSIGNMENT ("High", "Medium", "Low"):
 Also indicate if the suggested matched item 'isGiftItForward'.
 
-- "High" Match: THIS SCORE REQUIRES ALL CONDITIONS BELOW TO BE MET EXCEPTIONALLY WELL:
+- "High" Match: A 'High' match is reserved for *exceptionally clear, direct, and mutually fulfilling trade opportunities*.
+    Before assigning 'High', internally ask: 'If I had to explain this match in detail, would I use phrases like "not an obvious direct match", "could appeal due to potential shared interest", or "might be of interest"?' If the answer is YES to any of these, IT IS NOT A 'HIGH' MATCH.
+    Both the primary exchange (Item A for Item B) AND the reciprocal exchange (Item C for a want of User A) MUST be direct, obvious, and fulfill explicit or very strongly implied needs/wants.
+
     1.  VERY STRONG & DIRECT PRIMARY OPPOSITE MATCH:
-        -   If 'Current Item' (User A) is 'offer', the 'Available Item' (User B) MUST be a 'want'.
-        -   If 'Current Item' (User A) is 'want', the 'Available Item' (User B) MUST be an 'offer'.
-        -   The fulfillment MUST be direct and obvious (e.g., User A offers a "Blue Widget Model X", User B wants "Blue Widget Model X" or "Widget for specific purpose Y" that Model X clearly satisfies). Cross-category or speculative primary matches DO NOT qualify for "High". The items must be highly relevant with a clear value proposition for User B.
+        -   The relationship between 'Current Item' (User A) and the 'Available Item' (User B) must be an *unmistakably strong fit based on their types and content*.
+        -   If 'Current Item' is 'offer', 'Available Item' MUST be a 'want' that is *clearly and directly satisfied* by 'Current Item' (e.g., User A offers "Blue Widget Model X", User B wants "Blue Widget Model X" or "Widget for specific purpose Y" that Model X clearly and perfectly satisfies).
+        -   If 'Current Item' is 'want', 'Available Item' MUST be an 'offer' that *clearly and directly satisfies* this 'want'.
+        -   *CRITICAL*: If there's any ambiguity, if it's cross-category without immediate functional equivalence, if it relies on inferring a loose connection, or if you would describe the A-B connection as 'not obvious', it is NOT a 'High' primary match.
+
     2.  AND VERY STRONG & DIRECT RECIPROCAL FULFILLMENT (via Item C):
-        -   User B (owner of the 'Available Item' in condition 1) MUST have *another listed 'offer' item* (Item C from their 'availableItems') that *clearly and directly fulfills an explicit or very strongly implied 'want' of User A* (the 'triggeringUser').
-        -   An 'explicit want' could be User A's 'currentItem' if it's a 'want' type, or a want clearly deductible from User A's triggeringUserPreferences (e.g., User A lists "want: old books", Item C is an "offer: rare vintage book").
-        -   Speculative appeal like "might be of interest" or "could complement" for Item C is NOT sufficient for "High". Item C must address a demonstrable need or very strong, specific interest of User A.
-    3.  AND OVERALL CLARITY: Both the primary match (Condition 1) and the reciprocal fulfillment (Condition 2) must be exceptionally strong and clear. If *either* part is weak, speculative, or not an obvious direct fulfillment of a want, DO NOT assign a "High" score. A "High" match represents an almost perfect, mutually beneficial trade opportunity.
+        -   User B (owner of the 'Available Item' in condition 1) MUST have *another listed 'offer' item* (Item C from their 'availableItems') that *unambiguously and directly fulfills an explicit or very strongly implied 'want' of User A* (the 'triggeringUser').
+        -   An 'explicit want' could be User A's 'currentItem' if it's a 'want' type, or another explicit 'want' item listed by User A, or a need strongly implied by User A's explicit triggeringUserPreferences (e.g., User A lists "Want: Wool Socks", Item C is "Offer: Handmade Wool Socks").
+        -   *CRITICAL*: Vague connections like "shared aesthetic", "general interest", or "potential appeal" for Item C are NOT sufficient. Item C must solve a stated problem or fulfill a clear want for User A.
+
+    3.  NO SPECULATION & OVERALL CLARITY: Both the primary match (Condition 1) and the reciprocal fulfillment (Condition 2) must be exceptionally strong and clear. If *either* part is weak, speculative, or not an obvious direct fulfillment of a want, DO NOT assign a "High" score. A "High" match represents an almost perfect, mutually beneficial trade opportunity.
+
     4.  If all these conditions are met, include Item C's ID as 'reciprocalItemId'.
 
 - "Medium" Match:
-    1.  GOOD PRIMARY OPPOSITE MATCH: The 'Current Item' fulfills a complementary 'Available Item' from User B (opposite listing types preferred).
+    1.  GOOD PRIMARY OPPOSITE MATCH: The 'Current Item' fulfills a complementary 'Available Item' from User B (opposite listing types preferred). The connection is good, but might not be as direct or perfect as a 'High' match primary component.
     2.  AND PARTIAL/POTENTIAL RECIPROCAL FULFILLMENT: Another 'Available Item' (an Offer from that same User B, Item C) partially fulfills or aligns with some of User A's preferences or *potential* wants. Reciprocal benefit is good, but User A's wants are not all perfectly or explicitly met by User B's offer.
     3.  If conditions 1 and 2 are met, and Item C is clearly identified as the source of this partial fulfillment, include its ID as 'reciprocalItemId'.
     Alternatively, a strong primary opposite match without clear reciprocal fulfillment can also be 'Medium'.
 
 - "Low" Match:
-    1.  PLAUSIBLE PRIMARY MATCH: The 'Current Item' has a plausible connection to an 'Available Item' from User B (opposite types still preferred, but offer-offer/want-want matches with good relevance are acceptable here).
+    1.  PLAUSIBLE PRIMARY MATCH: The 'Current Item' has a plausible connection to an 'Available Item' from User B (opposite types still preferred, but offer-offer/want-want matches with good relevance are acceptable here). This connection can be more speculative or indirect.
     2.  AND SPECULATIVE RECIPROCAL FULFILLMENT: Another 'Available Item' (an Offer from User B, Item C) might speculatively fulfill an *inferred or less obvious* want of the 'triggeringUser'.
     3.  Only include 'reciprocalItemId' if a specific item from User B strongly contributes to even this speculative fulfillment. Generally, 'Low' matches may not have a 'reciprocalItemId'.
 
-GIFT FULFILLMENT OVERRIDE (Takes precedence for scoring a specific match as High):
+GIFT FULFILLMENT OVERRIDE (Takes precedence for scoring a specific match as High, IF IT IS A DIRECT FULFILLMENT):
 -   IF 'Current Item' is a 'WANT':
     -   AND an 'Available Item' from User B is an 'OFFER' marked 'isGiftItForward: true'
-    -   AND this gift clearly fulfills the 'Current Item' (want) by category/description,
+    -   AND this gift *clearly and directly fulfills* the 'Current Item' (want) by category/description (e.g., user wants "beginner guitar", gift is "beginner acoustic guitar"),
     -   THEN this is a 'High' match. Do not set 'reciprocalItemId' in this case, as the gift itself is the primary fulfillment.
 -   IF 'Current Item' is an 'OFFER' marked 'isGiftItForward: true' (i.e., *your* item is a gift):
     -   AND an 'Available Item' from User B is a 'WANT'
-    -   AND your 'Current Item' (gift) clearly fulfills this 'Available Item' (want),
+    -   AND your 'Current Item' (gift) *clearly and directly fulfills* this 'Available Item' (want),
     -   THEN this is also a 'High' match. Do not set 'reciprocalItemId'.
 -   OTHERWISE (e.g., if 'Current Item' is an 'OFFER' but *not* a gift):
     -   An 'Available Item' from User B that is an 'OFFER' marked 'isGiftItForward: true' should NOT be considered a direct match for your 'Current Item' (offer), NOR should it be considered for 'reciprocalItemId' in relation to your current offer. Gifts are acquired, not traded for a standard offer. Do not suggest such items in the 'suggestedMatches' list if the 'Current Item' is a standard offer.
