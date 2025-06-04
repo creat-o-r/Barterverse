@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput, type ExplainMatchRationaleInput } from '@/ai/flows/explain-match-rationale-flow';
 import { logFeedbackEntry } from '@/services/feedback-service';
 import { useToast } from "@/hooks/use-toast";
+import { cn } from '@/lib/utils'; // Added this import
 
 
 // Helper to get item and owner details
@@ -60,8 +61,8 @@ function OpportunityItemCard({
           <Image
             src={item.imageUrl || 'https://placehold.co/600x400.png'}
             alt={item.name}
-            layout="fill"
-            objectFit="cover"
+            fill
+            className="object-cover"
             data-ai-hint={item.dataAiHint || "opportunity item"}
           />
         </div>
@@ -295,7 +296,6 @@ export default function OpportunityMatchPage() {
 
   let tradeId = '';
   let chatButtonText = 'Start Negotiation';
-  let actionButtonLink = '';
   let pageTitle = "Trade Opportunity";
   let pageDescription = "AI suggests a potential match. Explore the details and see if it's a fit!";
   let actionButtonIcon = <MessageSquare className="mr-2 h-5 w-5" />;
