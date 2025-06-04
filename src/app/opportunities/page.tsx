@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput, type ExplainMatchRationaleInput } from '@/ai/flows/explain-match-rationale-flow';
 import { logFeedbackEntry } from '@/services/feedback-service';
+import { getPreferredAIModel, type AIModelName } from '@/services/ai-config-service'; // Import getPreferredAIModel
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 
@@ -239,13 +240,16 @@ export default function OpportunityMatchPage() {
   const handleReportScore = async () => {
     if (!matchScore) return;
     setIsReportingScore(true);
+    let modelUsedForContext: AIModelName | undefined;
     try {
+      modelUsedForContext = await getPreferredAIModel();
       const result = await logFeedbackEntry({
         feedbackType: 'match-score',
         reportedValue: matchScore,
         mainItemId: mainItemIdQuery,
         suggestedItemId: suggestedItemIdQuery,
         reportingUserId: currentUser.id,
+        modelUsedContext: modelUsedForContext,
       });
       if (result.success) {
         toast({ title: "Score Reported", description: "Thank you for your feedback on the match score!" });
@@ -262,13 +266,16 @@ export default function OpportunityMatchPage() {
   const handleReportReasoning = async () => {
     if (!opportunityReasoning) return;
     setIsReportingReasoning(true);
+    let modelUsedForContext: AIModelName | undefined;
     try {
+      modelUsedForContext = await getPreferredAIModel();
       const result = await logFeedbackEntry({
         feedbackType: 'match-reasoning',
         reportedValue: opportunityReasoning,
         mainItemId: mainItemIdQuery,
         suggestedItemId: suggestedItemIdQuery,
         reportingUserId: currentUser.id,
+        modelUsedContext: modelUsedForContext,
       });
       if (result.success) {
         toast({ title: "Reasoning Reported", description: "Thank you for your feedback on the reasoning!" });
@@ -299,7 +306,7 @@ export default function OpportunityMatchPage() {
   let pageTitle = "Trade Opportunity";
   let pageDescription = "AI suggests a potential match. Explore the details and see if it's a fit!";
   let actionButtonIcon = <MessageSquare className="mr-2 h-5 w-5" />;
-  let actionButtonLink: string | undefined = undefined; // Declare actionButtonLink
+  let actionButtonLink: string | undefined = undefined; 
 
   const mainIsGiftOffer = mainItem.listingType === 'offer' && mainItem.isGiftItForward;
   const suggestedIsGiftOffer = suggestedItem.listingType === 'offer' && suggestedItem.isGiftItForward;
@@ -493,4 +500,3 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
-

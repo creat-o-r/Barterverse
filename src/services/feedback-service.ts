@@ -3,6 +3,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import type { AIModelName } from './ai-config-service'; // Import AIModelName
 
 export interface FeedbackReport {
   timestamp: string;
@@ -11,6 +12,7 @@ export interface FeedbackReport {
   mainItemId: string | null;
   suggestedItemId: string | null;
   reportingUserId?: string;
+  modelUsedContext?: AIModelName; // Added field for model context
 }
 
 const FEEDBACK_LOG_FILE_PATH = path.join(process.cwd(), '.feedback-reports.log.json');
@@ -50,7 +52,7 @@ async function writeFeedbackLogs(logs: FeedbackReport[]): Promise<boolean> {
 }
 
 export async function logFeedbackEntry(
-  data: Omit<FeedbackReport, 'timestamp'>
+  data: Omit<FeedbackReport, 'timestamp'> & { modelUsedContext?: AIModelName } // Allow modelUsedContext to be passed
 ): Promise<{ success: boolean; message?: string }> {
   const newReport: FeedbackReport = {
     ...data,
