@@ -151,11 +151,11 @@ export default function AdminAIPreferenceInsights() {
     }
     if (insightsError) {
       return (
-        <div className="p-4 border border-destructive bg-destructive/10 rounded-md text-destructive flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 shrink-0" />
+        <div className="p-4 border border-destructive bg-destructive/10 rounded-md text-destructive flex items-start gap-2">
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
             <div>
                 <p className="font-semibold">Error Fetching Insights:</p>
-                <p className="text-xs">{insightsError}</p>
+                <p className="text-xs whitespace-pre-wrap break-all max-h-48 overflow-auto">{insightsError}</p>
             </div>
         </div>
       );
