@@ -11,7 +11,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z}from 'genkit';
 import { logMatchSuggestion } from '@/services/match-report-service';
 import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '@/services/ai-config-service';
 import { dummyUsers } from '@/lib/dummy-data'; // For fetching user preferences
@@ -124,8 +124,16 @@ For each item you identify as a match, assign a qualitative match score: "High",
 - "Low": Possible but less direct relevance, different categories with niche appeal. Might be offer-for-offer type matches if still relevant.
 
 GIFT MATCHING:
-- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked 'isGiftItForward: true' that clearly fulfills this want by category/description, this is generally a 'High' match.
-- If 'Current Item' is an 'offer' marked as 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a strong match.
+- IF 'Current Item' is a 'want':
+  - AND an 'Available Item' is an 'offer' marked 'isGiftItForward: true'
+  - AND this gift clearly fulfills the 'Current Item' (want) by category/description,
+  - THEN this is generally a 'High' match.
+- IF 'Current Item' is an 'offer' marked 'isGiftItForward: true' (i.e., your item is a gift):
+  - AND an 'Available Item' is a 'want'
+  - AND your 'Current Item' (gift) clearly fulfills this 'Available Item' (want),
+  - THEN this is also a 'High' match.
+- OTHERWISE (e.g., if 'Current Item' is an 'offer' but *not* a gift):
+  - An 'Available Item' that is an 'offer' marked 'isGiftItForward: true' should NOT be considered a direct match for your 'Current Item' (offer). Do not suggest it as a match in this context.
 
 {{#if currentItem.minimumMatchRatingOverride}}
 IMPORTANT: The 'Current Item' has a specific minimum match rating requirement of '{{{currentItem.minimumMatchRatingOverride}}}'. When suggesting matches, your assigned score for any suggested item MUST be '{{{currentItem.minimumMatchRatingOverride}}}' or higher (e.g., if min is 'Medium', you can suggest 'Medium' or 'High', but not 'Low'). If no item override is specified, use general relevance.
@@ -148,6 +156,7 @@ const advancedItemMatchPrompt = ai.definePrompt({
   input: {schema: AdvancedItemMatchPromptInputSchema},
   output: {schema: PromptOutputSchema},
   prompt: `You are an expert AI trade facilitator for a bartering platform. Your goal is to identify highly relevant and mutually beneficial trade opportunities.
+The primary goal is to find matches where listing types are OPPOSITE and complementary (e.g., User A's 'offer' for User B's 'want').
 
 Current Item Details:
 ID: {{{currentItem.id}}}
@@ -174,7 +183,7 @@ Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: L
 {{/each}}
 
 MATCH SCORE ASSIGNMENT ("High", "Medium", "Low"):
-The primary goal is to find matches where listing types are OPPOSITE and complementary (e.g., User A's 'offer' for User B's 'want'). Also indicate if the suggested matched item 'isGiftItForward'.
+Also indicate if the suggested matched item 'isGiftItForward'.
 
 - "High" Match: THIS SCORE REQUIRES BOTH CONDITIONS BELOW:
     1.  STRONG PRIMARY OPPOSITE MATCH: The 'Current Item' (User A's {{{currentItem.listingType}}}) must directly and strongly fulfill a complementary 'Available Item' from User B (e.g., User A's 'offer' for User B's 'want', or User A's 'want' for User B's 'offer').
@@ -193,8 +202,16 @@ The primary goal is to find matches where listing types are OPPOSITE and complem
     3.  Only include 'reciprocalItemId' if a specific item from User B strongly contributes to even this speculative fulfillment. Generally, 'Low' matches may not have a 'reciprocalItemId'.
 
 GIFT FULFILLMENT OVERRIDE (Takes precedence for scoring a specific match as High):
-- If 'Current Item' is a 'want', and an 'Available Item' is an 'offer' marked 'isGiftItForward: true' that clearly fulfills this want, this is a 'High' match, overriding other reciprocity scoring for this specific gift. Do not set 'reciprocalItemId' in this case, as the gift itself is the primary fulfillment.
-- If 'Current Item' is an 'offer' marked 'isGiftItForward: true', and an 'Available Item' is a 'want' that the Current Item clearly fulfills, this is also a 'High' match. Do not set 'reciprocalItemId'.
+-   IF 'Current Item' is a 'WANT':
+    -   AND an 'Available Item' from User B is an 'OFFER' marked 'isGiftItForward: true'
+    -   AND this gift clearly fulfills the 'Current Item' (want) by category/description,
+    -   THEN this is a 'High' match. Do not set 'reciprocalItemId' in this case, as the gift itself is the primary fulfillment.
+-   IF 'Current Item' is an 'OFFER' marked 'isGiftItForward: true' (i.e., *your* item is a gift):
+    -   AND an 'Available Item' from User B is a 'WANT'
+    -   AND your 'Current Item' (gift) clearly fulfills this 'Available Item' (want),
+    -   THEN this is also a 'High' match. Do not set 'reciprocalItemId'.
+-   OTHERWISE (e.g., if 'Current Item' is an 'OFFER' but *not* a gift):
+    -   An 'Available Item' from User B that is an 'OFFER' marked 'isGiftItForward: true' should NOT be considered a direct match for your 'Current Item' (offer), NOR should it be considered for 'reciprocalItemId' in relation to your current offer. Gifts are acquired, not traded for a standard offer. Do not suggest such items in the 'suggestedMatches' list if the 'Current Item' is a standard offer.
 
 MINIMUM MATCH SCORE RULE:
 {{#if currentItem.minimumMatchRatingOverride}}
