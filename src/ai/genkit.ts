@@ -5,24 +5,24 @@ import fs from 'fs'; // Using synchronous fs for startup configuration
 import path from 'path';
 
 // Define types needed for reading settings synchronously at startup
-type AIModelNameForGenkit = 'gemini-2.5-pro-preview' | 'gemini-1.5-pro-latest' | 'gemini-1.0-pro'; // Updated available types
+type AIModelNameForGenkit = 'gemini-2.5-pro-preview'; // Forcing this single model
 interface AISettingsForGenkit {
-  matchingMode?: 'simple' | 'advanced'; 
+  matchingMode?: 'simple' | 'advanced';
   useUserProfilePreferencesInMatching?: boolean;
   enableAutomaticPreferenceInference?: boolean;
   preferredModel?: AIModelNameForGenkit;
 }
 
 // Force the default and only valid model for this attempt
-const forcedModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview'; // CHANGED
-const defaultGenkitModelName: AIModelNameForGenkit = forcedModelName; 
-const validGenkitModels: AIModelNameForGenkit[] = [forcedModelName];
+const forcedModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview';
+const defaultGenkitModelName: AIModelNameForGenkit = forcedModelName;
+const validGenkitModels: AIModelNameForGenkit[] = [forcedModelName]; // Only this model is valid
 
 function getModelNameForGenkitInit(): AIModelNameForGenkit {
   const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
   console.log(`[Genkit Init Debug] Attempting to read settings from: ${SETTINGS_FILE_PATH}`);
   console.log(`[Genkit Init Debug] Forcing model to: ${forcedModelName}`);
-  
+
   try {
     if (fs.existsSync(SETTINGS_FILE_PATH)) {
       console.log(`[Genkit Init Debug] Found .ai-settings.json.`);
@@ -34,7 +34,7 @@ function getModelNameForGenkitInit(): AIModelNameForGenkit {
       console.log(`[Genkit Init Debug] Raw content of .ai-settings.json: ${fileContent.substring(0, 200)}`);
       const parsedSettings = JSON.parse(fileContent) as AISettingsForGenkit;
       console.log(`[Genkit Init Debug] Parsed settings from .ai-settings.json:`, parsedSettings);
-      
+
       if (parsedSettings.preferredModel) {
         console.log(`[Genkit Init Debug] preferredModel from file: '${parsedSettings.preferredModel}'`);
         if (parsedSettings.preferredModel === forcedModelName) {
@@ -52,7 +52,7 @@ function getModelNameForGenkitInit(): AIModelNameForGenkit {
   } catch (error) {
     console.error(`[Genkit Init Debug] Error reading/parsing .ai-settings.json. Using forced model: ${forcedModelName}. Error:`, error);
   }
-  
+
   console.log(`[Genkit Init Debug] Falling back to forced model name: ${forcedModelName}`);
   return forcedModelName;
 }
@@ -66,5 +66,28 @@ console.log(`[Genkit Init] Initializing with default model: ${genkitModelId}`);
 export const ai = genkit({
   plugins: [googleAI()],
   model: genkitModelId,
+  config: {
+    safetySettings: [
+      {
+        category: 'HARM_CATEGORY_HATE_SPEECH',
+        threshold: 'BLOCK_ONLY_HIGH',
+      },
+      {
+        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+        threshold: 'BLOCK_NONE', // More permissive for testing
+      },
+      {
+        category: 'HARM_CATEGORY_HARASSMENT',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      },
+      {
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE', // Made slightly more permissive
+      },
+      {
+        category: 'HARM_CATEGORY_CIVIC_INTEGRITY', // Supported by Gemini 1.5+ and likely 2.5
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      }
+    ],
+  },
 });
-
