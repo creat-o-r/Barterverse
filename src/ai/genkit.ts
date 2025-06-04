@@ -13,8 +13,8 @@ interface AISettingsForGenkit {
   preferredModel?: AIModelNameForGenkit;
 }
 
-// Ensure this default is the one you intend to test if file reading fails
-const defaultGenkitModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview-05-06'; 
+// Ensure this default is a very stable model for fallback
+const defaultGenkitModelName: AIModelNameForGenkit = 'gemini-1.0-pro'; 
 const validGenkitModels: AIModelNameForGenkit[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 function getModelNameForGenkitInit(): AIModelNameForGenkit {

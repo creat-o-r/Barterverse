@@ -16,12 +16,12 @@ interface AISettings {
   preferredModel: AIModelName;
 }
 
-// Default settings
+// Default settings - use a very stable model here
 const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
   enableAutomaticPreferenceInference: false,
-  preferredModel: 'gemini-2.5-pro-preview-05-06', // Ensure this default matches your test intention
+  preferredModel: 'gemini-1.0-pro', 
 };
 
 const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
