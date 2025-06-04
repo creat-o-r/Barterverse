@@ -21,49 +21,53 @@ const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
   enableAutomaticPreferenceInference: false,
-  preferredModel: 'gemini-2.5-pro-preview-05-06',
+  preferredModel: 'gemini-2.5-pro-preview-05-06', // Ensure this default matches your test intention
 };
 
 const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 async function readSettings(): Promise<AISettings> {
+  console.log('[AI Config Service Debug] readSettings called.');
   try {
     await fs.access(SETTINGS_FILE_PATH);
     const fileContent = await fs.readFile(SETTINGS_FILE_PATH, 'utf-8');
+    console.log('[AI Config Service Debug] readSettings - Raw file content:', fileContent.substring(0, 200));
     if (fileContent.trim() === '') {
-      const writeSuccess = await writeSettings(defaultSettings);
-      if (!writeSuccess) {
-        console.error('[AI Config Service] Failed to write default settings to empty file. Using in-memory defaults.');
-      }
-      return defaultSettings;
+      console.warn('[AI Config Service Debug] .ai-settings.json is empty. Writing default settings.');
+      await writeSettings(defaultSettings);
+      return { ...defaultSettings }; // Return a copy
     }
     const parsedSettings = JSON.parse(fileContent);
-    // Ensure all fields from defaultSettings are present, especially new ones
+    console.log('[AI Config Service Debug] readSettings - Parsed settings:', parsedSettings);
+    
     const settingsToReturn = { ...defaultSettings, ...parsedSettings };
     if (!validModels.includes(settingsToReturn.preferredModel)) {
-        console.warn(`[AI Config Service] Invalid preferredModel ('${settingsToReturn.preferredModel}') in settings, defaulting to '${defaultSettings.preferredModel}'.`);
+        console.warn(`[AI Config Service Debug] Invalid preferredModel ('${settingsToReturn.preferredModel}') in settings, defaulting to '${defaultSettings.preferredModel}'.`);
         settingsToReturn.preferredModel = defaultSettings.preferredModel;
     }
+    console.log('[AI Config Service Debug] readSettings - Effective settings to return:', settingsToReturn);
     return settingsToReturn;
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      const writeSuccess = await writeSettings(defaultSettings);
-       if (!writeSuccess) {
-        console.error('[AI Config Service] Failed to write default settings to new file. Using in-memory defaults.');
-      }
-      return defaultSettings;
+      console.warn('[AI Config Service Debug] .ai-settings.json not found. Writing default settings.');
+      await writeSettings(defaultSettings);
+      return { ...defaultSettings }; // Return a copy
     }
-    console.error('[AI Config Service] Error reading settings file, using defaults:', error);
-    return defaultSettings; 
+    console.error('[AI Config Service Debug] Error reading settings file, using defaults:', error);
+    return { ...defaultSettings }; // Return a copy
   }
 }
 
 async function writeSettings(settings: AISettings): Promise<boolean> {
+  console.log('[AI Config Service Debug] writeSettings called with:', settings);
   try {
-    await fs.writeFile(SETTINGS_FILE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+    const contentToWrite = JSON.stringify(settings, null, 2);
+    console.log('[AI Config Service Debug] writeSettings - Writing to .ai-settings.json:', contentToWrite);
+    await fs.writeFile(SETTINGS_FILE_PATH, contentToWrite, 'utf-8');
+    console.log('[AI Config Service Debug] writeSettings - Successfully wrote to .ai-settings.json.');
     return true; 
   } catch (error) {
-    console.error('[AI Config Service] Error writing settings file:', error);
+    console.error('[AI Config Service Debug] Error writing settings file:', error);
     return false; 
   }
 }
@@ -132,14 +136,16 @@ export async function setEnableAutomaticPreferenceInference(enable: boolean): Pr
 }
 
 export async function getPreferredAIModel(): Promise<AIModelName> {
+  console.log('[AI Config Service Debug] getPreferredAIModel called.');
   const settings = await readSettings();
+  console.log(`[AI Config Service Debug] getPreferredAIModel returning: ${settings.preferredModel}`);
   return settings.preferredModel; 
 }
 
 export async function setPreferredAIModel(model: AIModelName): Promise<{success: boolean; message?: string}> {
   try {
     if (!validModels.includes(model)) {
-        return { success: false, message: `Invalid model name: ${model}.` };
+        return { success: false, message: `Invalid model name: ${model}. Valid models are: ${validModels.join(', ')}` };
     }
     const currentSettings = await readSettings();
     currentSettings.preferredModel = model;
@@ -154,4 +160,3 @@ export async function setPreferredAIModel(model: AIModelName): Promise<{success:
     return { success: false, message: 'An unexpected error occurred while updating the preferred AI model.' };
   }
 }
-
