@@ -13,7 +13,7 @@ interface AISettingsForGenkit {
   preferredModel?: AIModelNameForGenkit;
 }
 
-const defaultGenkitModelName: AIModelNameForGenkit = 'gemini-1.5-pro-latest'; // Changed default model
+const defaultGenkitModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview-05-06'; // Changed default model for testing
 const validGenkitModels: AIModelNameForGenkit[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 function getModelNameForGenkitInit(): AIModelNameForGenkit {
