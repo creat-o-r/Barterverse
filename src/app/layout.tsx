@@ -1,9 +1,12 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
+// Toaster will be handled by ClientLayoutWrapper
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import ClientLayoutWrapper from '@/components/layout/ClientLayoutWrapper';
 
+// Metadata can now be exported from here as it's a Server Component
 export const metadata: Metadata = {
   title: 'BarterVerse - Trade Anything',
   description: 'A non-money marketplace with LLM chat for easy bartering.',
@@ -23,12 +26,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8">
-          {children}
-        </main>
-        <Footer />
-        <Toaster />
+        <ClientLayoutWrapper>
+          <Navbar />
+          <main className="flex-grow container mx-auto px-4 py-8">
+            {children}
+          </main>
+          <Footer />
+        </ClientLayoutWrapper>
       </body>
     </html>
   );
