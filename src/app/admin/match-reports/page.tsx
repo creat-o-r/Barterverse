@@ -20,7 +20,7 @@ import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu, ListTree, AlertCircle as AlertCircleIcon, PackageSearch } from 'lucide-react'; // Added PackageSearch
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu, ListTree, AlertCircle as AlertCircleIcon, PackageSearch } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -253,7 +253,13 @@ export default function MatchReportsPage() {
       const data = await response.json();
       if (!response.ok) {
         let errorMessage = data.error || `API request failed with status ${response.status}`;
-        if (data.details) errorMessage += ` Details: ${data.details}`;
+        if (data.details) {
+            if (data.details.includes("listModels on Class.prototype: false")) {
+                 errorMessage = `Failed to list models: The Google AI SDK's 'listModels' method is not available in the server environment. This suggests an issue with the SDK installation or a build/bundling problem. Details: ${data.details}`;
+            } else {
+                errorMessage += ` Details: ${data.details}`;
+            }
+        }
         if (data.gaiError) errorMessage += ` Google AI Error: ${data.gaiError}`;
         throw new Error(errorMessage);
       }
@@ -359,7 +365,7 @@ export default function MatchReportsPage() {
       <Card>
         <CardHeader>
             <CardTitle className="font-headline text-xl flex items-center gap-3">
-                <PackageSearch className="h-6 w-6 text-primary" /> {/* Changed icon */}
+                <PackageSearch className="h-6 w-6 text-primary" />
                 Google AI Model Diagnostics
             </CardTitle>
             <CardDescription className="font-body">
@@ -530,3 +536,4 @@ export default function MatchReportsPage() {
     </div>
   );
 }
+
