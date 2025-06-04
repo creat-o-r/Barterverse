@@ -449,7 +449,7 @@ export function addNewItemToDummyData(
     ownerName: owner.name,
     status: 'available',
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
-    imageUrl: itemData.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(itemData.name.substring(0,15))}`,
+    imageUrl: itemData.imageUrl || 'https://placehold.co/600x400.png',
     isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false,
     logistics: finalLogistics,
   };

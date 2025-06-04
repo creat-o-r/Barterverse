@@ -53,7 +53,7 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
       <CardHeader className="p-0 relative">
         <div className="aspect-[1/1] md:aspect-[4/3] relative w-full overflow-hidden">
           <Image
-            src={item.imageUrl || `https://placehold.co/600x400.png?text=${item.listingType}`}
+            src={item.imageUrl || 'https://placehold.co/600x400.png'}
             alt={item.name}
             fill
             className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
