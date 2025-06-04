@@ -13,20 +13,23 @@ interface AISettingsForGenkit {
   preferredModel?: AIModelNameForGenkit;
 }
 
-// Ensure this default is a very stable model for fallback
-const defaultGenkitModelName: AIModelNameForGenkit = 'gemini-1.0-pro'; 
-const validGenkitModels: AIModelNameForGenkit[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
+// Force the default and only valid model to gemini-2.5-pro-preview-05-06 for testing
+const forcedModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview-05-06';
+const defaultGenkitModelName: AIModelNameForGenkit = forcedModelName; 
+const validGenkitModels: AIModelNameForGenkit[] = [forcedModelName];
 
 function getModelNameForGenkitInit(): AIModelNameForGenkit {
   const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
   console.log(`[Genkit Init Debug] Attempting to read settings from: ${SETTINGS_FILE_PATH}`);
+  console.log(`[Genkit Init Debug] Forcing model to: ${forcedModelName}`);
+  
   try {
     if (fs.existsSync(SETTINGS_FILE_PATH)) {
       console.log(`[Genkit Init Debug] Found .ai-settings.json.`);
       const fileContent = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
       if (fileContent.trim() === '') {
-        console.warn(`[Genkit Init Debug] .ai-settings.json is empty. Using default model: ${defaultGenkitModelName}`);
-        return defaultGenkitModelName;
+        console.warn(`[Genkit Init Debug] .ai-settings.json is empty. Using forced model: ${forcedModelName}`);
+        return forcedModelName;
       }
       console.log(`[Genkit Init Debug] Raw content of .ai-settings.json: ${fileContent.substring(0, 200)}`);
       const parsedSettings = JSON.parse(fileContent) as AISettingsForGenkit;
@@ -34,23 +37,24 @@ function getModelNameForGenkitInit(): AIModelNameForGenkit {
       
       if (parsedSettings.preferredModel) {
         console.log(`[Genkit Init Debug] preferredModel from file: '${parsedSettings.preferredModel}'`);
-        if (validGenkitModels.includes(parsedSettings.preferredModel)) {
-          console.log(`[Genkit Init Debug] Valid preferredModel '${parsedSettings.preferredModel}' found in file. Using it.`);
-          return parsedSettings.preferredModel;
+        if (parsedSettings.preferredModel === forcedModelName) {
+          console.log(`[Genkit Init Debug] Preferred model from file matches forced model '${forcedModelName}'. Using it.`);
+          return forcedModelName;
         } else {
-          console.warn(`[Genkit Init Debug] preferredModel '${parsedSettings.preferredModel}' from file is NOT in validGenkitModels. Valid models: ${validGenkitModels.join(', ')}. Using default: ${defaultGenkitModelName}`);
+          console.warn(`[Genkit Init Debug] preferredModel '${parsedSettings.preferredModel}' from file does NOT match forced model '${forcedModelName}'. Overriding and using forced model.`);
         }
       } else {
-        console.warn(`[Genkit Init Debug] 'preferredModel' field missing in .ai-settings.json. Using default: ${defaultGenkitModelName}`);
+        console.warn(`[Genkit Init Debug] 'preferredModel' field missing in .ai-settings.json. Using forced model: ${forcedModelName}`);
       }
     } else {
-      console.log(`[Genkit Init Debug] .ai-settings.json not found. Using default model: ${defaultGenkitModelName}.`);
+      console.log(`[Genkit Init Debug] .ai-settings.json not found. Using forced model: ${forcedModelName}.`);
     }
   } catch (error) {
-    console.error(`[Genkit Init Debug] Error reading/parsing .ai-settings.json. Using default model: ${defaultGenkitModelName}. Error:`, error);
+    console.error(`[Genkit Init Debug] Error reading/parsing .ai-settings.json. Using forced model: ${forcedModelName}. Error:`, error);
   }
-  console.log(`[Genkit Init Debug] Falling back to default model name: ${defaultGenkitModelName}`);
-  return defaultGenkitModelName;
+  
+  console.log(`[Genkit Init Debug] Falling back to forced model name: ${forcedModelName}`);
+  return forcedModelName;
 }
 
 const modelToUse = getModelNameForGenkitInit();
