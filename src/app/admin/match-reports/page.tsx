@@ -20,7 +20,7 @@ import { getAIDiagnosticLogContent } from '@/services/ai-diagnostic-log-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu } from 'lucide-react';
+import { ServerCrash, Link as LinkIcon, TrendingUp, TrendingDown, Minus, User as UserIconLucide, BrainCircuit, Zap, RefreshCw, Settings2, UserCog, Brain, Wand2, ClipboardCopy, AlertTriangle, Bug, Trash2, SlidersHorizontal, Cpu, ListTree, AlertCircle as AlertCircleIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -40,6 +40,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
 
 function getMatchScoreColor(score?: string) {
   switch (score?.toLowerCase()) {
@@ -65,13 +67,23 @@ const modelDisplayMap: Record<AIModelName, string> = {
   'gemini-2.5-pro-preview': 'Gemini 2.5 Pro Preview',
 };
 
+interface ListedModel {
+    name: string;
+    version: string;
+    displayName: string;
+    description: string;
+    inputTokenLimit: number;
+    outputTokenLimit: number;
+    supportedGenerationMethods: string[];
+}
+
 export default function MatchReportsPage() {
   const [reports, setReports] = useState<LoggedMatchSuggestion[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
   const [useUserPrefsInMatching, setUseUserPrefsInMatching] = useState(true);
   const [enableAutoPrefInference, setEnableAutoPrefInference] = useState(false);
-  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-1.5-pro-latest'); // Default to the new forced model
+  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-1.5-pro-latest');
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
@@ -81,6 +93,12 @@ export default function MatchReportsPage() {
   const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
   const [isClearingFeedbackLog, setIsClearingFeedbackLog] = useState(false);
   const [showClearFeedbackDialog, setShowClearFeedbackDialog] = useState(false);
+  
+  const [listedModels, setListedModels] = useState<ListedModel[] | null>(null);
+  const [isLoadingListedModels, setIsLoadingListedModels] = useState(false);
+  const [listModelsError, setListModelsError] = useState<string | null>(null);
+  const [showListedModels, setShowListedModels] = useState(false);
+
   const { toast } = useToast();
 
   const fetchReports = async () => {
@@ -104,7 +122,7 @@ export default function MatchReportsPage() {
       setUseUserPrefsInMatching(prefsEnabledMatch);
       const autoPrefEnabled = await getEnableAutomaticPreferenceInference();
       setEnableAutoPrefInference(autoPrefEnabled);
-      const model = await getPreferredAIModel(); // This will be forced to 'gemini-1.5-pro-latest' by the service
+      const model = await getPreferredAIModel();
       setPreferredModel(model);
     } catch (error) {
       console.error("Failed to fetch AI settings:", error);
@@ -168,10 +186,10 @@ export default function MatchReportsPage() {
     const newModel = newModelValue as AIModelName;
     setIsUpdatingPreferredModel(true);
     try {
-      const result = await setPreferredAIModelService(newModel); // Service will handle forcing logic
+      const result = await setPreferredAIModelService(newModel);
       if (result.success) {
-        setPreferredModel('gemini-1.5-pro-latest'); // Reflect the forced model in UI
-        toast({ title: "Preferred AI Model Updated", description: result.message || `Preferred model set to ${modelDisplayMap['gemini-1.5-pro-latest']}. A restart may be needed for changes to take full effect.` });
+        setPreferredModel(newModel);
+        toast({ title: "Preferred AI Model Updated", description: result.message || `Preferred model set to ${modelDisplayMap[newModel]}. A restart may be needed for changes to take full effect.` });
       } else { throw new Error(result.message || "Failed to update preferred model server-side."); }
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update preferred AI model.", variant: "destructive" });
@@ -221,6 +239,27 @@ export default function MatchReportsPage() {
     } finally {
       setIsClearingFeedbackLog(false);
       setShowClearFeedbackDialog(false);
+    }
+  };
+
+  const handleListModels = async () => {
+    setIsLoadingListedModels(true);
+    setListModelsError(null);
+    setListedModels(null);
+    setShowListedModels(true);
+    try {
+      const response = await fetch('/api/list-models');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `API request failed with status ${response.status}`);
+      }
+      setListedModels(data.models);
+    } catch (error: any) {
+      console.error("Failed to list models:", error);
+      setListModelsError(error.message || "Could not fetch model list from API.");
+      toast({ title: "Error Listing Models", description: error.message || "Could not fetch model list.", variant: "destructive" });
+    } finally {
+      setIsLoadingListedModels(false);
     }
   };
 
@@ -282,7 +321,7 @@ export default function MatchReportsPage() {
                         <SelectValue placeholder="Select a model" />
                     </SelectTrigger>
                     <SelectContent>
-                        {(Object.keys(modelDisplayMap) as AIModelName[]).filter(modelKey => modelKey === 'gemini-1.5-pro-latest').map(modelKey => ( // Only show the forced model
+                        {(Object.keys(modelDisplayMap) as AIModelName[]).filter(modelKey => modelKey === 'gemini-1.5-pro-latest').map(modelKey => (
                             <SelectItem key={modelKey} value={modelKey}>
                                 {modelDisplayMap[modelKey] || modelKey}
                             </SelectItem>
@@ -309,6 +348,60 @@ export default function MatchReportsPage() {
                 <span>Model: <Badge variant="outline" className="capitalize">{modelDisplayMap[preferredModel] || preferredModel}</Badge>.</span>
             </div>
         </CardFooter>
+      </Card>
+
+      <Separator />
+      
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline text-xl flex items-center gap-3">
+                <ListTree className="h-6 w-6 text-primary" />
+                Google AI Model Diagnostics
+            </CardTitle>
+            <CardDescription className="font-body">
+                List models available to your GOOGLE_API_KEY via the Google AI SDK.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button onClick={handleListModels} disabled={isLoadingListedModels}>
+                {isLoadingListedModels && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                List Available Models
+            </Button>
+            {showListedModels && (
+                <Collapsible open={showListedModels} onOpenChange={setShowListedModels} className="mt-4">
+                    <CollapsibleContent>
+                        {isLoadingListedModels && <p className="text-muted-foreground font-body">Loading models...</p>}
+                        {listModelsError && (
+                            <div className="p-3 my-2 border border-destructive bg-destructive/10 rounded-md text-destructive text-sm flex items-center gap-2">
+                                <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                                <p>Error listing models: {listModelsError}</p>
+                            </div>
+                        )}
+                        {listedModels && listedModels.length > 0 && (
+                            <div className="mt-2 space-y-2">
+                                <h4 className="font-semibold">Available Models ({listedModels.length}):</h4>
+                                <ScrollArea className="h-[300px] border rounded-md p-2">
+                                    {listedModels.map(model => (
+                                        <div key={model.name} className="p-2 mb-1 border-b text-xs">
+                                            <p><strong>Display Name:</strong> {model.displayName}</p>
+                                            <p><strong>Name:</strong> {model.name}</p>
+                                            <p><strong>Version:</strong> {model.version}</p>
+                                            <p><strong>Methods:</strong> {model.supportedGenerationMethods.join(', ')}</p>
+                                            <p><strong>Input Tokens:</strong> {model.inputTokenLimit}</p>
+                                            <p><strong>Output Tokens:</strong> {model.outputTokenLimit}</p>
+                                            <p className="mt-1 text-muted-foreground italic line-clamp-2">{model.description}</p>
+                                        </div>
+                                    ))}
+                                </ScrollArea>
+                            </div>
+                        )}
+                        {listedModels && listedModels.length === 0 && !isLoadingListedModels && !listModelsError && (
+                            <p className="text-muted-foreground font-body mt-2">No models returned by the API.</p>
+                        )}
+                    </CollapsibleContent>
+                </Collapsible>
+            )}
+        </CardContent>
       </Card>
 
       <Separator />
@@ -433,3 +526,4 @@ export default function MatchReportsPage() {
     </div>
   );
 }
+
