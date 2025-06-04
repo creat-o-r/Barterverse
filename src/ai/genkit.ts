@@ -5,7 +5,7 @@ import fs from 'fs'; // Using synchronous fs for startup configuration
 import path from 'path';
 
 // Define types needed for reading settings synchronously at startup
-type AIModelNameForGenkit = 'gemini-2.5-pro-preview'; // Forcing this single model
+type AIModelNameForGenkit = 'gemini-1.5-pro-latest'; // Forcing this model
 interface AISettingsForGenkit {
   matchingMode?: 'simple' | 'advanced';
   useUserProfilePreferencesInMatching?: boolean;
@@ -13,8 +13,8 @@ interface AISettingsForGenkit {
   preferredModel?: AIModelNameForGenkit;
 }
 
-// Force the default and only valid model for this attempt
-const forcedModelName: AIModelNameForGenkit = 'gemini-2.5-pro-preview';
+// Force the model to 'gemini-1.5-pro-latest'
+const forcedModelName: AIModelNameForGenkit = 'gemini-1.5-pro-latest';
 const defaultGenkitModelName: AIModelNameForGenkit = forcedModelName;
 const validGenkitModels: AIModelNameForGenkit[] = [forcedModelName]; // Only this model is valid
 
@@ -74,7 +74,7 @@ export const ai = genkit({
       },
       {
         category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE', // More permissive for testing
+        threshold: 'BLOCK_NONE', 
       },
       {
         category: 'HARM_CATEGORY_HARASSMENT',
@@ -82,10 +82,10 @@ export const ai = genkit({
       },
       {
         category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE', // Made slightly more permissive
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
       },
       {
-        category: 'HARM_CATEGORY_CIVIC_INTEGRITY', // Supported by Gemini 1.5+ and likely 2.5
+        category: 'HARM_CATEGORY_CIVIC_INTEGRITY', 
         threshold: 'BLOCK_MEDIUM_AND_ABOVE',
       }
     ],

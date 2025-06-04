@@ -62,7 +62,7 @@ function getMatchScoreIcon(score?: string) {
 const modelDisplayMap: Record<AIModelName, string> = {
   'gemini-1.5-pro-latest': 'Gemini 1.5 Pro (Latest)',
   'gemini-1.0-pro': 'Gemini 1.0 Pro',
-  'gemini-2.5-pro-preview': 'Gemini 2.5 Pro Preview', // CHANGED
+  'gemini-2.5-pro-preview': 'Gemini 2.5 Pro Preview',
 };
 
 export default function MatchReportsPage() {
@@ -71,7 +71,7 @@ export default function MatchReportsPage() {
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
   const [useUserPrefsInMatching, setUseUserPrefsInMatching] = useState(true);
   const [enableAutoPrefInference, setEnableAutoPrefInference] = useState(false);
-  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-2.5-pro-preview'); // CHANGED default state
+  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-1.5-pro-latest'); // Default to the new forced model
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
@@ -104,8 +104,8 @@ export default function MatchReportsPage() {
       setUseUserPrefsInMatching(prefsEnabledMatch);
       const autoPrefEnabled = await getEnableAutomaticPreferenceInference();
       setEnableAutoPrefInference(autoPrefEnabled);
-      const model = await getPreferredAIModel();
-      setPreferredModel(model); // This will be forced to 'gemini-2.5-pro-preview' by the service
+      const model = await getPreferredAIModel(); // This will be forced to 'gemini-1.5-pro-latest' by the service
+      setPreferredModel(model);
     } catch (error) {
       console.error("Failed to fetch AI settings:", error);
       toast({ title: "Error", description: "Could not load AI settings.", variant: "destructive" });
@@ -166,14 +166,12 @@ export default function MatchReportsPage() {
 
   const handlePreferredModelChange = async (newModelValue: string) => {
     const newModel = newModelValue as AIModelName;
-    // No need to check if newModel === preferredModel because the service forces it.
-    // The UI will only show one option if the service's validModels is restricted.
     setIsUpdatingPreferredModel(true);
     try {
       const result = await setPreferredAIModelService(newModel); // Service will handle forcing logic
       if (result.success) {
-        setPreferredModel('gemini-2.5-pro-preview'); // Reflect the forced model in UI
-        toast({ title: "Preferred AI Model Updated", description: result.message || `Preferred model set to ${modelDisplayMap['gemini-2.5-pro-preview']}. A restart may be needed for changes to take full effect.` });
+        setPreferredModel('gemini-1.5-pro-latest'); // Reflect the forced model in UI
+        toast({ title: "Preferred AI Model Updated", description: result.message || `Preferred model set to ${modelDisplayMap['gemini-1.5-pro-latest']}. A restart may be needed for changes to take full effect.` });
       } else { throw new Error(result.message || "Failed to update preferred model server-side."); }
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update preferred AI model.", variant: "destructive" });
@@ -284,7 +282,7 @@ export default function MatchReportsPage() {
                         <SelectValue placeholder="Select a model" />
                     </SelectTrigger>
                     <SelectContent>
-                        {(Object.keys(modelDisplayMap) as AIModelName[]).filter(modelKey => modelKey === 'gemini-2.5-pro-preview').map(modelKey => ( // Only show the forced model
+                        {(Object.keys(modelDisplayMap) as AIModelName[]).filter(modelKey => modelKey === 'gemini-1.5-pro-latest').map(modelKey => ( // Only show the forced model
                             <SelectItem key={modelKey} value={modelKey}>
                                 {modelDisplayMap[modelKey] || modelKey}
                             </SelectItem>
@@ -297,7 +295,7 @@ export default function MatchReportsPage() {
                         <div>
                             <strong className="text-foreground">Model Selection:</strong> Chooses the default model for Genkit flows.
                             <br />
-                            <span className="text-xs italic">Note: This configuration forces the model to '{modelDisplayMap['gemini-2.5-pro-preview']}'. Changes to the default model typically require an application restart to fully take effect across all backend flows.</span>
+                            <span className="text-xs italic">Note: This configuration forces the model to '{modelDisplayMap['gemini-1.5-pro-latest']}'. Changes to the default model typically require an application restart to fully take effect across all backend flows.</span>
                         </div>
                     </div>
                 </div>
@@ -435,4 +433,3 @@ export default function MatchReportsPage() {
     </div>
   );
 }
-

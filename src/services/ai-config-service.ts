@@ -5,8 +5,8 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export type AIMatchingMode = 'simple' | 'advanced';
-// Update available model types, forcing 'gemini-2.5-pro-preview'
-export type AIModelName = 'gemini-2.5-pro-preview' | 'gemini-1.5-pro-latest' | 'gemini-1.0-pro'; // Updated
+// Update available model types, forcing 'gemini-1.5-pro-latest'
+export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview'; // Keep 2.5 for type safety, but won't be used
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 
@@ -18,7 +18,7 @@ interface AISettings {
 }
 
 // Force the default and only valid model for this attempt
-const forcedModel: AIModelName = 'gemini-2.5-pro-preview'; // CHANGED
+const forcedModel: AIModelName = 'gemini-1.5-pro-latest'; 
 
 const defaultSettings: AISettings = {
   matchingMode: 'advanced',
@@ -164,4 +164,3 @@ export async function setPreferredAIModel(model: AIModelName): Promise<{success:
     return { success: false, message: 'An unexpected error occurred while updating the preferred AI model.' };
   }
 }
-
