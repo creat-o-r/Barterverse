@@ -17,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput, type ExplainMatchRationaleInput } from '@/ai/flows/explain-match-rationale-flow';
 import { logFeedbackEntry } from '@/services/feedback-service';
 import { useToast } from "@/hooks/use-toast";
-import { cn } from '@/lib/utils'; // Added this import
+import { cn } from '@/lib/utils';
 
 
 // Helper to get item and owner details
@@ -299,6 +299,7 @@ export default function OpportunityMatchPage() {
   let pageTitle = "Trade Opportunity";
   let pageDescription = "AI suggests a potential match. Explore the details and see if it's a fit!";
   let actionButtonIcon = <MessageSquare className="mr-2 h-5 w-5" />;
+  let actionButtonLink: string | undefined = undefined; // Declare actionButtonLink
 
   const mainIsGiftOffer = mainItem.listingType === 'offer' && mainItem.isGiftItForward;
   const suggestedIsGiftOffer = suggestedItem.listingType === 'offer' && suggestedItem.isGiftItForward;
@@ -317,21 +318,16 @@ export default function OpportunityMatchPage() {
     actionButtonIcon = <Gift className="mr-2 h-5 w-5" />;
   } else {
     pageTitle = "Trade Opportunity";
-    if (mainItem.ownerId === currentUser.id) { // Current user is viewing their own item as the 'main item' context for the suggestion
+    if (mainItem.ownerId === currentUser.id) { 
       tradeId = `trade-${currentUser.id}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
       chatButtonText = `Negotiate for "${suggestedItem.name}"`;
-    } else { // Current user is viewing someone else's item ('mainItem') and was suggested one of their own items or another item
-      // This case needs careful tradeId construction. Assume 'mainItem' is what they're viewing (other's),
-      // and 'suggestedItem' is what they might trade for it.
-      // If suggestedItem is THEIRS, then the other person (mainItemOwner) wants suggestedItem.
-      // If suggestedItem is ALSO OTHER'S, it's a more complex suggestion.
-      // For simplicity, if mainItem is NOT current user's, we assume current user WANTS mainItem.
+    } else { 
       tradeId = `trade-${currentUser.id}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
       chatButtonText = `Negotiate for "${mainItem.name}"`;
     }
     if (mainItem.ownerId === currentUser.id && suggestedItem.ownerId === currentUser.id) {
        chatButtonText = "View Items (Cannot trade with self)"; 
-       actionButtonLink = `/items/${mainItem.id}`; // Or some other sensible link
+       actionButtonLink = `/items/${mainItem.id}`; 
     } else {
         actionButtonLink = `/trades/${tradeId}`;
     }
@@ -368,7 +364,7 @@ export default function OpportunityMatchPage() {
                 <ArrowRightLeft className="h-8 w-8 text-muted-foreground mx-auto rotate-90" />
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4"> {/* This column now holds suggestedItem and its reciprocal if any */}
               <OpportunityItemCard
                   item={suggestedItem}
                   owner={suggestedItemOwner}
