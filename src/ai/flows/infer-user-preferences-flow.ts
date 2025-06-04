@@ -285,8 +285,11 @@ const inferUserPreferencesFlow = ai.defineFlow(
       let userMessage = "An unexpected error occurred while trying to infer user preferences. Default preferences applied. Please check server logs for details.";
       const lowerErrorMessage = String(error.message || "").toLowerCase();
       const errorName = String(error.name || "").toLowerCase();
+      const errorStatus = (error as any).status;
 
-      if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars')) {
+      if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
+        userMessage = "Authentication error (401/403) with the AI service. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.";
+      } else if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars')) {
         userMessage = `The AI preference inference service encountered an issue with the request structure (likely template formatting for user ID: ${input.userId}). Default preferences applied. Please check server logs for details.`;
       } else if (errorDetails.status === 400 || errorDetails.code === 3 /* INVALID_ARGUMENT */) {
         userMessage = `The preference inference service received a bad request. This might be due to problematic input data (User ID: ${input.userId}) or an issue with the prompt structure. Please check server logs for details on the input.`;
@@ -294,8 +297,6 @@ const inferUserPreferencesFlow = ai.defineFlow(
         userMessage = "The preference inference service has reached its current usage limit.";
       } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = "The preference inference service is temporarily overloaded or unavailable.";
-      } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
-        userMessage = "Authentication error with the AI preference service. Please check API key configuration.";
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
         userMessage = "Could not infer preferences due to content restrictions or safety settings.";
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
@@ -318,7 +319,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
           message: errorDetails.message,
           stack: errorDetails.stack,
           details: errorDetails.details,
-          status: errorDetails.status,
+          status: errorDetails.status || errorStatus,
           code: errorDetails.code,
         },
         userFacingMessage: userMessage,

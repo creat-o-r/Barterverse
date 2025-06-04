@@ -416,8 +416,11 @@ const itemMatchFlow = ai.defineFlow(
       let userMessage = `An unexpected error occurred while trying to get AI suggestions (${usedMatchingMode} mode). Please check server logs.`;
       const lowerErrorMessage = String(error.message || "").toLowerCase();
       const errorName = String(error.name || "").toLowerCase();
+      const errorStatus = (error as any).status;
 
-      if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars') || lowerErrorMessage.includes('got \'equals\'')) {
+      if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
+        userMessage = `Authentication error (401/403) with the AI service (${usedMatchingMode} mode). Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.`;
+      } else if (lowerErrorMessage.includes('parse error on line') || errorName.includes('handlebars') || lowerErrorMessage.includes('got \'equals\'')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) encountered an issue with its request structure (likely template formatting for item ID: ${input.currentItem.id}). Please check server logs for details.`;
       } else if (errorDetails.status === 400 || errorDetails.code === 3 ) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) received a bad request. This might be due to problematic input data (Item ID: ${input.currentItem.id}) or an issue with the prompt structure. Please check server logs for details on the input.`;
@@ -425,8 +428,6 @@ const itemMatchFlow = ai.defineFlow(
         userMessage = `The AI matching service (${usedMatchingMode} mode) has reached its current usage limit. Please try again later.`;
       } else if (errorDetails.status === 503 || errorDetails.code === 14 || lowerErrorMessage.includes('overloaded') || lowerErrorMessage.includes('unavailable')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) is temporarily overloaded or unavailable. Please try again.`;
-      } else if (errorDetails.status === 401 || errorDetails.status === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
-        userMessage = `Authentication error (401/403) with the AI service (${usedMatchingMode} mode). Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.`;
       } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
         userMessage = `The AI matching service (${usedMatchingMode} mode) could not process the request due to content restrictions.`;
       } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
@@ -449,7 +450,7 @@ const itemMatchFlow = ai.defineFlow(
           message: errorDetails.message,
           stack: errorDetails.stack,
           details: errorDetails.details,
-          status: errorDetails.status,
+          status: errorDetails.status || errorStatus, // Ensure status is captured
           code: errorDetails.code,
         },
         userFacingMessage: userMessage,
@@ -480,8 +481,3 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
-
-
-    
-
-    

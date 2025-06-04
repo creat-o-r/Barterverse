@@ -91,7 +91,6 @@ const explainMatchRationaleFlow = ai.defineFlow(
   },
   async (input: ExplainMatchRationaleInput): Promise<ExplainMatchRationaleOutput> => {
     const flowName = 'explainMatchRationaleFlow';
-    // Ensure boolean values for isGiftItForward for the prompt
     const processedInput = {
         itemA: { ...input.itemA, isGiftItForward: input.itemA.isGiftItForward || false },
         itemB: { ...input.itemB, isGiftItForward: input.itemB.isGiftItForward || false },
@@ -110,18 +109,25 @@ const explainMatchRationaleFlow = ai.defineFlow(
       return { rationale: output.rationale.trim() };
     } catch (error: any) {
       console.error(`Error in ${flowName} calling prompt:`, error);
+       try {
+        console.error(`Detailed error object in ${flowName}:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      } catch (e) {
+        console.error(`Could not stringify detailed error object in ${flowName}:`, e);
+      }
       let userMessage = "An unexpected error occurred while trying to generate the match rationale.";
-      if (error.message && typeof error.message === 'string') {
-        const lowerErrorMessage = error.message.toLowerCase();
-        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-          userMessage = "The AI rationale service has reached its current usage limit.";
-        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
-          userMessage = "The AI rationale service is temporarily overloaded.";
-        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
+      const lowerErrorMessage = error.message?.toLowerCase() || "";
+      const errorStatus = (error as any).status;
+
+      if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
+        userMessage = "Authentication error (401/403) with the AI service. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.";
+      } else if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
+        userMessage = "The AI rationale service has reached its current usage limit.";
+      } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
+        userMessage = "The AI rationale service is temporarily overloaded.";
+      } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
             userMessage = "The AI rationale service could not process the request due to content restrictions.";
-        } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
+      } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
           userMessage = "The AI's response for rationale was not in the expected format.";
-        }
       }
       return {
         rationale: "Failed to load AI rationale due to a system issue.",

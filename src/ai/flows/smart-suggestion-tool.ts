@@ -57,10 +57,11 @@ const suggestTradesFlow = ai.defineFlow(
     outputSchema: SuggestTradesOutputSchema,
   },
   async (input): Promise<SuggestTradesOutput> => {
+    const flowName = 'suggestTradesFlow';
     try {
       const {output} = await prompt(input);
       if (!output) {
-        console.warn("suggestTradesFlow: Prompt returned null output");
+        console.warn(`${flowName}: Prompt returned null output`);
         return { 
             suggestedTrades: "",
             reasoning: "The AI assistant could not generate trade suggestions at this time." 
@@ -68,18 +69,26 @@ const suggestTradesFlow = ai.defineFlow(
       }
       return output;
     } catch (error: any) {
-      console.error("Error in suggestTradesFlow calling prompt:", error);
+      console.error(`Error in ${flowName} calling prompt:`, error);
+      try {
+        console.error(`Detailed error object in ${flowName}:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      } catch (e) {
+        console.error(`Could not stringify detailed error object in ${flowName}:`, e);
+      }
       let userMessage = "An unexpected error occurred while trying to get AI trade suggestions.";
+      const lowerErrorMessage = error.message?.toLowerCase() || "";
+      const errorStatus = (error as any).status;
 
-      if (error.message && typeof error.message === 'string') {
-        const lowerErrorMessage = error.message.toLowerCase();
-        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-          userMessage = "The AI trade suggestion service has reached its current usage limit. Please try again later.";
-        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
-          userMessage = "The AI trade suggestion service is temporarily overloaded. Please try again in a few moments.";
-        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
+      if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
+        userMessage = "Authentication error (401/403) with the AI service. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.";
+      } else if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
+        userMessage = "The AI trade suggestion service has reached its current usage limit. Please try again later.";
+      } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
+        userMessage = "The AI trade suggestion service is temporarily overloaded. Please try again in a few moments.";
+      } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
             userMessage = "The AI trade suggestion service could not process the request due to content restrictions or safety settings.";
-        }
+      } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
+        userMessage = "The AI's response for trade suggestions was not in the expected format.";
       }
       return { 
         suggestedTrades: "",

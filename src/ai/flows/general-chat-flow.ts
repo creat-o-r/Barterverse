@@ -69,7 +69,7 @@ const generalChatFlow = ai.defineFlow(
       const errorStatus = (error as any).status; // Check for status property
 
       if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
-        userMessage = "Authentication error with the AI assistant. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project is properly configured.";
+        userMessage = "Authentication error (401/403) with the AI service. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.";
       } else if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
         userMessage = "The AI assistant has reached its current usage limit. Please try again later.";
       } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {

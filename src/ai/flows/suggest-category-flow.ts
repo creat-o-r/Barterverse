@@ -67,19 +67,25 @@ const suggestCategoryFlow = ai.defineFlow(
       return { suggestedCategory: output.suggestedCategory };
     } catch (error: any) {
       console.error(`Error in ${flowName} calling prompt:`, error);
+       try {
+        console.error(`Detailed error object in ${flowName}:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      } catch (e) {
+        console.error(`Could not stringify detailed error object in ${flowName}:`, e);
+      }
       let userMessage = "An unexpected error occurred while trying to get an AI category suggestion.";
+      const lowerErrorMessage = error.message?.toLowerCase() || "";
+      const errorStatus = (error as any).status;
 
-      if (error.message && typeof error.message === 'string') {
-        const lowerErrorMessage = error.message.toLowerCase();
-        if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-          userMessage = "The AI category suggestion service has reached its current usage limit. Please try again later.";
-        } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
-          userMessage = "The AI category suggestion service is temporarily overloaded. Please try again in a few moments.";
-        } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
+      if (errorStatus === 401 || errorStatus === 403 || lowerErrorMessage.includes('permission_denied') || lowerErrorMessage.includes('authentication failed')) {
+        userMessage = "Authentication error (401/403) with the AI service. Please ensure your GOOGLE_API_KEY in the .env file is correct and active, and that your Google Cloud project has the necessary APIs enabled and billing configured.";
+      } else if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
+        userMessage = "The AI category suggestion service has reached its current usage limit. Please try again later.";
+      } else if (lowerErrorMessage.includes('503') || lowerErrorMessage.includes('overloaded')) {
+        userMessage = "The AI category suggestion service is temporarily overloaded. Please try again in a few moments.";
+      } else if (lowerErrorMessage.includes('blocked') || lowerErrorMessage.includes('safety settings')) {
             userMessage = "The AI category suggestion service could not process the request due to content restrictions or safety settings.";
-        } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
-          userMessage = "The AI's response for category was not in the expected format.";
-        }
+      } else if (error.name === 'ZodError' || lowerErrorMessage.includes('invalid_type') || lowerErrorMessage.includes('expected')) {
+        userMessage = "The AI's response for category was not in the expected format.";
       }
       return { 
         suggestedCategory: "",
