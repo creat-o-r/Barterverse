@@ -268,6 +268,7 @@ export default function MatchReportsPage() {
         return; 
       }
       setListedModels(data.models);
+      setListModelsError(null); 
     } catch (error: any) {
       console.error("Failed to list models (client-side catch):", error);
       const clientErrorMsg = error.message || "Could not fetch model list from API.";
