@@ -3,7 +3,7 @@
 
 console.log('[AI Dev Init] dev.ts: Module execution START.');
 
-// import { config as dotenvConfig } from 'dotenv';
+// import { config as dotenvConfig } from 'dotenv'; // Keep commented out
 // try {
 //   console.log('[AI Dev Init] dev.ts: Attempting dotenvConfig() (CURRENTLY DISABLED).');
 //   // const result = dotenvConfig();
@@ -46,3 +46,4 @@ try {
 }
 
 console.log('[AI Dev Init] dev.ts: Module execution END.');
+
