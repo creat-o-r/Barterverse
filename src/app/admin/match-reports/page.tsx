@@ -84,7 +84,7 @@ export default function MatchReportsPage() {
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
   const [useUserPrefsInMatching, setUseUserPrefsInMatching] = useState(true);
   const [enableAutoPrefInference, setEnableAutoPrefInference] = useState(false);
-  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-1.5-pro-latest');
+  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-2.5-pro-preview'); // Default to new model
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
@@ -338,7 +338,7 @@ export default function MatchReportsPage() {
                         <SelectValue placeholder="Select a model" />
                     </SelectTrigger>
                     <SelectContent>
-                        {(Object.keys(modelDisplayMap) as AIModelName[]).filter(modelKey => modelKey === 'gemini-1.5-pro-latest').map(modelKey => (
+                        {(Object.keys(modelDisplayMap) as AIModelName[]).map(modelKey => (
                             <SelectItem key={modelKey} value={modelKey}>
                                 {modelDisplayMap[modelKey] || modelKey}
                             </SelectItem>
@@ -351,7 +351,7 @@ export default function MatchReportsPage() {
                         <div>
                             <strong className="text-foreground">Model Selection:</strong> Chooses the default model for Genkit flows.
                             <br />
-                            <span className="text-xs italic">Note: This configuration forces the model to '{modelDisplayMap['gemini-1.5-pro-latest']}'. Changes to the default model typically require an application restart to fully take effect across all backend flows.</span>
+                            <span className="text-xs italic">Note: Changes to the default model typically require an application restart to fully take effect across all backend flows.</span>
                         </div>
                     </div>
                 </div>

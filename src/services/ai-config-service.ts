@@ -5,10 +5,21 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export type AIMatchingMode = 'simple' | 'advanced';
-// Update available model types, forcing 'gemini-1.5-pro-latest'
-export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview'; // Keep 2.5 for type safety, but won't be used
+// Update available model types
+export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview';
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
+
+// Update default preferred model
+const defaultSettings: AISettings = {
+  matchingMode: 'advanced',
+  useUserProfilePreferencesInMatching: true,
+  enableAutomaticPreferenceInference: false,
+  preferredModel: 'gemini-2.5-pro-preview', 
+};
+
+// Update valid models
+const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview'];
 
 interface AISettings {
   matchingMode: AIMatchingMode;
@@ -17,19 +28,6 @@ interface AISettings {
   preferredModel: AIModelName;
 }
 
-// Force the default and only valid model for this attempt
-const forcedModel: AIModelName = 'gemini-1.5-pro-latest'; 
-
-const defaultSettings: AISettings = {
-  matchingMode: 'advanced',
-  useUserProfilePreferencesInMatching: true,
-  enableAutomaticPreferenceInference: false,
-  preferredModel: forcedModel, 
-};
-
-// Only the forced model is considered valid now for the dropdown and settings.
-const validModels: AIModelName[] = [forcedModel];
-
 async function readSettings(): Promise<AISettings> {
   console.log('[AI Config Service Debug] readSettings called.');
   try {
@@ -37,35 +35,43 @@ async function readSettings(): Promise<AISettings> {
     const fileContent = await fs.readFile(SETTINGS_FILE_PATH, 'utf-8');
     console.log('[AI Config Service Debug] readSettings - Raw file content:', fileContent.substring(0, 200));
     if (fileContent.trim() === '') {
-      console.warn('[AI Config Service Debug] .ai-settings.json is empty. Writing default settings with forced model.');
+      console.warn('[AI Config Service Debug] .ai-settings.json is empty. Writing default settings.');
       await writeSettings(defaultSettings); 
       return { ...defaultSettings };
     }
-    const parsedSettings = JSON.parse(fileContent);
+    const parsedSettings = JSON.parse(fileContent) as Partial<AISettings>; // Partial to allow for missing fields initially
     console.log('[AI Config Service Debug] readSettings - Parsed settings:', parsedSettings);
     
-    const settingsToReturn = { ...defaultSettings, ...parsedSettings, preferredModel: forcedModel };
-    if (parsedSettings.preferredModel && parsedSettings.preferredModel !== forcedModel) {
-        console.warn(`[AI Config Service Debug] preferredModel ('${parsedSettings.preferredModel}') in settings file is being overridden by forced model '${forcedModel}'.`);
+    // Merge parsed settings with defaults, ensuring preferredModel is valid
+    const mergedSettings = { ...defaultSettings, ...parsedSettings };
+    if (parsedSettings.preferredModel && !validModels.includes(parsedSettings.preferredModel)) {
+        console.warn(`[AI Config Service Debug] preferredModel ('${parsedSettings.preferredModel}') in settings file is invalid. Using default: '${defaultSettings.preferredModel}'.`);
+        mergedSettings.preferredModel = defaultSettings.preferredModel;
+    } else if (!parsedSettings.preferredModel) {
+        mergedSettings.preferredModel = defaultSettings.preferredModel;
     }
-    console.log('[AI Config Service Debug] readSettings - Effective settings to return (forced model):', settingsToReturn);
-    return settingsToReturn;
+    
+    console.log('[AI Config Service Debug] readSettings - Effective settings to return:', mergedSettings);
+    return mergedSettings;
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      console.warn('[AI Config Service Debug] .ai-settings.json not found. Writing default settings with forced model.');
+      console.warn('[AI Config Service Debug] .ai-settings.json not found. Writing default settings.');
       await writeSettings(defaultSettings);
       return { ...defaultSettings };
     }
-    console.error('[AI Config Service Debug] Error reading settings file, using defaults with forced model:', error);
+    console.error('[AI Config Service Debug] Error reading settings file, using defaults:', error);
     return { ...defaultSettings };
   }
 }
 
 async function writeSettings(settings: AISettings): Promise<boolean> {
-  const settingsToWrite = { ...settings, preferredModel: forcedModel };
-  console.log('[AI Config Service Debug] writeSettings called with (forced model):', settingsToWrite);
+  console.log('[AI Config Service Debug] writeSettings called with:', settings);
+  if (!validModels.includes(settings.preferredModel)) {
+    console.error(`[AI Config Service Debug] Attempted to write invalid preferredModel: ${settings.preferredModel}. Reverting to default: ${defaultSettings.preferredModel}`);
+    settings.preferredModel = defaultSettings.preferredModel;
+  }
   try {
-    const contentToWrite = JSON.stringify(settingsToWrite, null, 2);
+    const contentToWrite = JSON.stringify(settings, null, 2);
     console.log('[AI Config Service Debug] writeSettings - Writing to .ai-settings.json:', contentToWrite);
     await fs.writeFile(SETTINGS_FILE_PATH, contentToWrite, 'utf-8');
     console.log('[AI Config Service Debug] writeSettings - Successfully wrote to .ai-settings.json.');
@@ -142,23 +148,23 @@ export async function setEnableAutomaticPreferenceInference(enable: boolean): Pr
 export async function getPreferredAIModel(): Promise<AIModelName> {
   console.log('[AI Config Service Debug] getPreferredAIModel called.');
   const settings = await readSettings(); 
-  console.log(`[AI Config Service Debug] getPreferredAIModel returning (forced): ${settings.preferredModel}`);
+  console.log(`[AI Config Service Debug] getPreferredAIModel returning: ${settings.preferredModel}`);
   return settings.preferredModel; 
 }
 
 export async function setPreferredAIModel(model: AIModelName): Promise<{success: boolean; message?: string}> {
   try {
-    if (!validModels.includes(model)) { // Check against the now very restricted validModels
-        return { success: false, message: `Attempt to set invalid model: ${model}. Only ${forcedModel} is allowed in this configuration.` };
+    if (!validModels.includes(model)) {
+        return { success: false, message: `Attempt to set invalid model: ${model}. Valid models are: ${validModels.join(', ')}.` };
     }
     const currentSettings = await readSettings();
-    currentSettings.preferredModel = model; // This will be forced to forcedModel by writeSettings anyway
+    currentSettings.preferredModel = model;
     const writeSuccess = await writeSettings(currentSettings);
     if (!writeSuccess) {
       return { success: false, message: 'Failed to save preferred AI model to the settings file.' };
     }
-    console.log(`[AI Config Service] Preferred AI Model effectively set to (forced): ${forcedModel}`);
-    return { success: true, message: `Preferred AI Model is forced to ${forcedModel}. Note: App restart may be needed for changes to take full effect for the default model.` };
+    console.log(`[AI Config Service] Preferred AI Model set to: ${model}`);
+    return { success: true, message: `Preferred AI Model set to ${model}. Note: App restart may be needed for changes to take full effect for the default model.` };
   } catch (error: any) {
     console.error('[AI Config Service] Unexpected error in setPreferredAIModel:', error);
     return { success: false, message: 'An unexpected error occurred while updating the preferred AI model.' };
