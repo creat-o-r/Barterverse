@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   const apiKey = process.env.GOOGLE_API_KEY;
-  console.log('[API List Models] Route /api/list-models called.');
+  // console.log('[API List Models] Route /api/list-models called.');
 
   if (!apiKey) {
     console.error('[API List Models] GOOGLE_API_KEY is not set in the environment variable.');
@@ -21,8 +21,8 @@ export async function GET() {
   let typeofGoogleGenerativeAIClass = typeof GoogleGenerativeAI;
 
   try {
-    console.log('[API List Models] Attempting to inspect GoogleGenerativeAI class and then instantiate.');
-    console.log(`[API List Models] typeof GoogleGenerativeAI (the class/constructor): ${typeofGoogleGenerativeAIClass}`);
+    // console.log('[API List Models] Attempting to inspect GoogleGenerativeAI class and then instantiate.');
+    // console.log(`[API List Models] typeof GoogleGenerativeAI (the class/constructor): ${typeofGoogleGenerativeAIClass}`);
 
     if (typeof GoogleGenerativeAI === 'function') {
       // console.log('[API List Models] GoogleGenerativeAI is a function. Inspecting its prototype.');
@@ -32,7 +32,6 @@ export async function GET() {
       // console.log(`[API List Models] GoogleGenerativeAI.prototype.hasOwnProperty('listModels'): ${listModelsOnClassProto}`);
     } else {
       console.error('[API List Models] CRITICAL: GoogleGenerativeAI is NOT a function.');
-      // This case should also be part of the error detail if it happens.
       const diagnosticDetails = `GoogleGenerativeAI class is not a function (typeof: ${typeofGoogleGenerativeAIClass}). SDK not imported correctly.`;
       throw new Error(diagnosticDetails);
     }
@@ -89,22 +88,24 @@ export async function GET() {
     return NextResponse.json({ models });
 
   } catch (error: any) {
-    console.error("[API List Models] Error in GET handler:", error.message);
+    console.error(`[API List Models] Error in GET handler. Name: ${error.name}, Message: ${error.message}`);
     
     const errorResponse: { error: string; details?: string; gaiError?: string } = {
         error: "Failed to list models from Google AI.",
         details: error.message || "An unknown error occurred within the list-models API.",
     };
 
-    // Check if the error object has a 'cause' property (common for Google AI SDK errors)
     if (error.cause) { 
         try {
-            // Attempt to stringify the cause, which might contain nested details
             errorResponse.gaiError = JSON.stringify(error.cause, Object.getOwnPropertyNames(error.cause));
-        } catch (e) {
-            // Fallback if stringifying the cause fails
-            errorResponse.gaiError = "Could not stringify the error cause from Google AI SDK.";
+        } catch (stringifyError: any) {
+            console.error("[API List Models] Could not stringify error.cause:", stringifyError.message);
+            errorResponse.gaiError = "Could not stringify the error.cause from Google AI SDK. Check server logs for original error details.";
+            console.error("[API List Models] Original error object (since cause stringification failed):", JSON.stringify(error, Object.getOwnPropertyNames(error)));
         }
+    } else {
+        // If no cause, log more about the error itself for better diagnostics
+        console.error("[API List Models] Full error object (no cause property):", JSON.stringify(error, Object.getOwnPropertyNames(error)));
     }
     
     return NextResponse.json(errorResponse, { status: 500 });
