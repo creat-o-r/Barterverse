@@ -8,7 +8,7 @@ import type { AIModelName } from '@/services/ai-config-service'; // Import type
 console.log('[Genkit Init] genkit.ts: Module execution START.');
 
 // Temporarily hardcode the model to simplify initialization and bypass file reading.
-const modelToUse: AIModelName = 'gemini-2.5-pro-preview-05-06';
+const modelToUse: AIModelName = 'gemini-1.5-pro-latest'; // CHANGED for testing
 const genkitModelId = `googleai/${modelToUse}`;
 
 console.log(`[Genkit Init] Using HARDCODED effective model: ${genkitModelId}`);

@@ -16,7 +16,7 @@ const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
   enableAutomaticPreferenceInference: false,
-  preferredModel: 'gemini-2.5-pro-preview-05-06',
+  preferredModel: 'gemini-1.5-pro-latest', // CHANGED for testing
 };
 
 const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
