@@ -37,13 +37,14 @@ export default function HomePage() {
       setUserItemSuggestions([]);
 
       const currentUser = dummyUsers[0]; // Simulate current user
-      const userOfferItems = dummyItems.filter(
-        (item) => item.ownerId === currentUser.id && item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending')
+      // Fetch both 'offer' and 'want' items for the current user
+      const currentUserActiveListings = dummyItems.filter(
+        (item) => item.ownerId === currentUser.id && (item.listingType === 'offer' || item.listingType === 'want') && (item.status === 'available' || item.status === 'pending')
       );
 
-      if (userOfferItems.length === 0) {
+      if (currentUserActiveListings.length === 0) {
         setUserItemSuggestions([{
-          userItem: { id: 'no-offers', name: 'No Offers Found', description: "You haven't listed any 'offer' items yet.", imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' },
+          userItem: { id: 'no-active-listings', name: 'No Active Listings Found', description: "You haven't listed any items yet, or none are currently active.", imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' }, // Placeholder type
           suggestedMatches: [],
           isLoading: false,
           error: null,
@@ -54,7 +55,7 @@ export default function HomePage() {
         return;
       }
 
-      const initialSuggestions = userOfferItems.map(item => ({
+      const initialSuggestions = currentUserActiveListings.map(item => ({
         userItem: item,
         suggestedMatches: [],
         isLoading: true,
@@ -65,7 +66,7 @@ export default function HomePage() {
       setUserItemSuggestions(initialSuggestions);
       setOverallLoading(false);
 
-      const suggestionPromises = userOfferItems.map(async (userItem, index) => {
+      const suggestionPromises = currentUserActiveListings.map(async (userItem, index) => {
         const otherItemsForMatching = dummyItems.filter(
           (item) => item.id !== userItem.id && item.ownerId !== currentUser.id && (item.status === 'available' || item.status === 'pending')
         ).map(item => ({
@@ -164,7 +165,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-      {/* Removed Welcome Section */}
+      
 
       {overallLoading && (
         <section>
@@ -172,7 +173,7 @@ export default function HomePage() {
             <CardHeader>
               <CardTitle className="font-headline text-2xl flex items-center gap-2">
                 <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                Loading Your Items & AI Suggestions...
+                Loading Your Listings & AI Suggestions...
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -202,7 +203,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {!overallLoading && userItemSuggestions.length > 0 && userItemSuggestions[0].userItem.id === 'no-offers' && (
+      {!overallLoading && userItemSuggestions.length > 0 && userItemSuggestions[0].userItem.id === 'no-active-listings' && (
         <section>
             <Card className="border-border border-dashed">
                  <CardHeader>
@@ -213,7 +214,7 @@ export default function HomePage() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground font-body text-center py-4">
-                        List an 'offer' item to see personalized AI matches and potential trades here!
+                        List an item (offer or want) to see personalized AI matches and potential trades here!
                     </p>
                 </CardContent>
             </Card>
@@ -221,52 +222,58 @@ export default function HomePage() {
         </section>
       )}
 
-      {!overallLoading && userItemSuggestions.length > 0 && userItemSuggestions[0].userItem.id !== 'no-offers' && (
-        userItemSuggestions.map((itemSuggestion, idx) => (
-          <section key={itemSuggestion.userItem.id || idx}>
-            <Card className={itemSuggestion.error ? "border-destructive" : (itemSuggestion.suggestedMatches.length === 0 && !itemSuggestion.isLoading ? "border-border border-dashed" : "border-border")}>
-              <CardHeader>
-                <div className="flex justify-between items-start flex-wrap gap-2">
-                    <CardTitle className={`font-headline text-2xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
-                    {itemSuggestion.isLoading ? <Loader2 className="h-6 w-6 text-primary animate-spin" /> : (itemSuggestion.error ? <AlertCircle className="h-6 w-6 text-destructive" /> : <Sparkles className={`h-6 w-6 ${itemSuggestion.suggestedMatches.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />)}
-                    {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.name}...` :
-                    itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` :
-                    `AI Matches for your ${itemSuggestion.userItem.name}`}
-                    </CardTitle>
-                    {/* Removed Mode/Prefs Badges */}
-                </div>
-                 {!itemSuggestion.isLoading && itemSuggestion.error && (
-                  <p className="text-sm text-destructive mt-1 font-body">{itemSuggestion.error}</p>
-                )}
-              </CardHeader>
-              <CardContent>
-                {itemSuggestion.isLoading ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {[...Array(3)].map((_, i) => (
-                      <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50">
-                        <div className="aspect-[4/3] bg-muted animate-pulse"></div>
-                        <CardContent className="p-4 flex-grow space-y-2">
-                          <div className="h-5 bg-muted-foreground/20 rounded animate-pulse w-3/4"></div>
-                          <div className="h-4 bg-muted-foreground/20 rounded animate-pulse w-full"></div>
-                        </CardContent>
-                        <CardFooter className="p-4 border-t border-muted-foreground/10">
-                          <div className="h-9 bg-muted-foreground/20 rounded animate-pulse w-full"></div>
-                        </CardFooter>
-                      </Card>
-                    ))}
+      {!overallLoading && userItemSuggestions.length > 0 && userItemSuggestions[0].userItem.id !== 'no-active-listings' && (
+        userItemSuggestions.map((itemSuggestion, idx) => {
+          const cardTitleText = itemSuggestion.userItem.listingType === 'offer'
+            ? `AI Matches for your Offer: "${itemSuggestion.userItem.name}"`
+            : `AI Matches for your Want: "${itemSuggestion.userItem.name}"`;
+
+          return (
+            <section key={itemSuggestion.userItem.id || idx}>
+              <Card className={itemSuggestion.error ? "border-destructive" : (itemSuggestion.suggestedMatches.length === 0 && !itemSuggestion.isLoading ? "border-border border-dashed" : "border-border")}>
+                <CardHeader>
+                  <div className="flex justify-between items-start flex-wrap gap-2">
+                      <CardTitle className={`font-headline text-2xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
+                      {itemSuggestion.isLoading ? <Loader2 className="h-6 w-6 text-primary animate-spin" /> : (itemSuggestion.error ? <AlertCircle className="h-6 w-6 text-destructive" /> : <Sparkles className={`h-6 w-6 ${itemSuggestion.suggestedMatches.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />)}
+                      {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"...` :
+                      itemSuggestion.error ? `Error for ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"` :
+                      cardTitleText}
+                      </CardTitle>
+                      
                   </div>
-                ) : !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 ? (
-                  <ItemList items={itemSuggestion.suggestedMatches} mainContextItemId={itemSuggestion.userItem.id} />
-                ) : !itemSuggestion.error && (
-                  <p className="text-muted-foreground font-body text-center py-4">
-                    {itemSuggestion.suggestedMatches.length === 0 ? `We couldn't find specific AI matches for your "${itemSuggestion.userItem.name}" right now.` : "No matches found."}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-            {idx < userItemSuggestions.length -1 && <Separator className="my-8" />}
-          </section>
-        ))
+                   {!itemSuggestion.isLoading && itemSuggestion.error && (
+                    <p className="text-sm text-destructive mt-1 font-body">{itemSuggestion.error}</p>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {itemSuggestion.isLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                      {[...Array(3)].map((_, i) => (
+                        <Card key={i} className="flex flex-col overflow-hidden h-full bg-muted/50">
+                          <div className="aspect-[4/3] bg-muted animate-pulse"></div>
+                          <CardContent className="p-4 flex-grow space-y-2">
+                            <div className="h-5 bg-muted-foreground/20 rounded animate-pulse w-3/4"></div>
+                            <div className="h-4 bg-muted-foreground/20 rounded animate-pulse w-full"></div>
+                          </CardContent>
+                          <CardFooter className="p-4 border-t border-muted-foreground/10">
+                            <div className="h-9 bg-muted-foreground/20 rounded animate-pulse w-full"></div>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : !itemSuggestion.error && itemSuggestion.suggestedMatches.length > 0 ? (
+                    <ItemList items={itemSuggestion.suggestedMatches} mainContextItemId={itemSuggestion.userItem.id} />
+                  ) : !itemSuggestion.error && (
+                    <p className="text-muted-foreground font-body text-center py-4">
+                      {itemSuggestion.suggestedMatches.length === 0 ? `We couldn't find specific AI matches for your "${itemSuggestion.userItem.name}" right now.` : "No matches found."}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+              {idx < userItemSuggestions.length -1 && <Separator className="my-8" />}
+            </section>
+          );
+        })
       )}
 
       <SearchBar
