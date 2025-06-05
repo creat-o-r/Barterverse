@@ -5,7 +5,7 @@ import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, Filter, LogIn, UserPlus } from 'lucide-react';
+import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus, Filter as FilterIconLucide } from 'lucide-react'; // Renamed Filter to FilterIconLucide to avoid conflict
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,16 +42,15 @@ function GlobalCategoryFilter() {
   const { selectedCategory, setSelectedCategory, availableCategories } = useGlobalFilter();
 
   return (
-    <div className="flex items-center gap-2">
-      <Filter className="h-4 w-4 text-muted-foreground" />
+    <div className="flex items-center">
       <Select
         value={selectedCategory || "any"}
         onValueChange={(value) => {
           setSelectedCategory(value === "any" ? null : value);
         }}
       >
-        <SelectTrigger className="w-[180px] h-9 text-xs md:text-sm bg-background">
-          <SelectValue placeholder="Filter by category..." />
+        <SelectTrigger className="w-auto max-w-[120px] sm:max-w-[140px] text-xs h-9 px-2 md:w-[180px] md:text-sm md:px-3 md:h-10 md:max-w-none bg-background">
+          <SelectValue placeholder="Any Category" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="any">Any Category</SelectItem>
@@ -73,18 +72,23 @@ export default function Navbar() {
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-auto md:h-16 flex flex-col md:flex-row md:items-center">
+      <div className="container mx-auto px-4 h-16 flex items-center">
 
-        {/* Mobile: Top Row for Icons */}
-        <div className="w-full flex md:hidden items-center justify-between h-16">
-          {/* Mobile Icon Navigation (left-aligned icons) */}
-          <nav className="flex items-center gap-1">
+        {/* Mobile Navigation (hidden on md and up) */}
+        <div className="w-full flex md:hidden items-center h-full">
+          {/* Left: Category Filter */}
+          <div className="flex-none mr-2"> 
+            <GlobalCategoryFilter />
+          </div>
+
+          {/* Center: Primary Nav Icons (flow after filter) */}
+          <nav className="flex items-center gap-1"> 
             {primaryNavLinks.map((link) => (
               <Button key={`mobile-icon-${link.label}`} variant="ghost" size="icon" asChild>
-                <Link href={link.href} aria-label={link.label} className="relative flex items-center justify-center w-10 h-10">
+                <Link href={link.href} aria-label={link.label} className="relative flex items-center justify-center w-9 h-9">
                   {React.cloneElement(link.icon, { className: "h-5 w-5" })}
                   {link.hasNotification && unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 h-3 w-3 min-w-[0.75rem] rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center p-0.5 leading-none shadow-sm">
+                    <span className="absolute top-0.5 right-0.5 h-3 w-3 min-w-[0.75rem] rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center p-0.5 leading-none shadow-sm">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -93,23 +97,25 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Mobile Profile/Auth Icons (right-aligned icons) */}
-          <div className="flex items-center gap-1">
+          {/* Right: Auth/Profile Icons (pushed to the far right) */}
+          <div className="flex-none flex items-center gap-0.5 ml-auto"> 
             {isLoggedIn ? (
-              <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
-                <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-10 h-10">
-                  {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
-                </Link>
-              </Button>
+              <>
+                <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
+                  <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-9 h-9">
+                    {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
+                  </Link>
+                </Button>
+              </>
             ) : (
               <>
                 <Button variant="ghost" size="icon" asChild>
-                  <Link href="/auth/signin" aria-label="Login" className="flex items-center justify-center w-10 h-10">
+                  <Link href="/auth/signin" aria-label="Login" className="flex items-center justify-center w-9 h-9">
                     <LogIn className="h-5 w-5" />
                   </Link>
                 </Button>
                 <Button variant="ghost" size="icon" asChild>
-                  <Link href="/auth/signup" aria-label="Sign Up" className="flex items-center justify-center w-10 h-10">
+                  <Link href="/auth/signup" aria-label="Sign Up" className="flex items-center justify-center w-9 h-9">
                     <UserPlus className="h-5 w-5" />
                   </Link>
                 </Button>
@@ -118,13 +124,12 @@ export default function Navbar() {
           </div>
         </div>
         
-        {/* Mobile: Bottom Row for Filter */}
-        <div className="w-full flex md:hidden justify-center py-2 border-t border-border">
-          <GlobalCategoryFilter />
-        </div>
-
-        {/* Desktop Navigation - Main Links (left-aligned) */}
+        {/* Desktop Navigation (hidden on sm and down) */}
         <nav className="hidden md:flex items-center gap-1">
+          {/* Desktop Category Filter first */}
+          <div className="mr-4"> 
+             <GlobalCategoryFilter />
+          </div>
           {primaryNavLinks.map((link) => (
             <Button key={link.label} variant="ghost" asChild>
               <Link href={link.href} className="relative flex items-center gap-2 text-sm px-3 py-2">
@@ -138,59 +143,52 @@ export default function Navbar() {
               </Link>
             </Button>
           ))}
-          {/* Global Category Filter for Desktop */}
-          <div className="ml-4">
-            <GlobalCategoryFilter />
-          </div>
         </nav>
 
-        {/* Right-aligned items: Profile Dropdown / Login Button */}
+        {/* Right-aligned items: Profile Dropdown / Login Button - Desktop */}
         <div className="ml-auto hidden md:flex items-center">
-          {/* Profile Dropdown / Login Button - Desktop */}
-          <div className="hidden md:block">
-            {isLoggedIn ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 text-sm px-3 py-2">
-                    {profileLinkConfig.icon}
-                    {profileLinkConfig.label}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src="https://placehold.co/100x100.png?text=U" alt="User" data-ai-hint="profile avatar" />
-                        <AvatarFallback>U</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">Current User</p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          user@example.com
-                        </p>
-                      </div>
+          {isLoggedIn ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 text-sm px-3 py-2">
+                  {React.cloneElement(profileLinkConfig.icon, { className: "h-4 w-4" })}
+                  {profileLinkConfig.label}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src="https://placehold.co/100x100.png?text=U" alt="User" data-ai-hint="profile avatar" />
+                      <AvatarFallback>U</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">Current User</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        user@example.com
+                      </p>
                     </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href={profileLinkConfig.href}>
-                      <UserCircle className="mr-2 h-4 w-4" />
-                      <span>View Profile</span>
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-               <div className="flex items-center gap-2">
-                <Button variant="default" size="sm" asChild>
-                  <Link href="/auth/signin">Login</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/auth/signup">Sign Up</Link>
-                </Button>
-              </div>
-            )}
-          </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={profileLinkConfig.href}>
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    <span>View Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+             <div className="flex items-center gap-2">
+              <Button variant="default" size="sm" asChild>
+                <Link href="/auth/signin">Login</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/auth/signup">Sign Up</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </header>
