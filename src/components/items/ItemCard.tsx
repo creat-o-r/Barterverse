@@ -5,8 +5,9 @@ import type { Item } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Gift, Search, Link2, HeartHandshake } from 'lucide-react';
+import { Eye, Gift, Search, Link2 as LinkIcon, HeartHandshake } from 'lucide-react'; // Renamed Link2 to LinkIcon
 import type { AIMatchingMode } from '@/services/ai-config-service';
+import { cn } from '@/lib/utils';
 
 interface ItemCardProps {
   item: Item & { matchScore?: string; reciprocalItemId?: string };
@@ -25,7 +26,7 @@ function getMatchScoreColorStyles(score?: string): string {
 }
 
 export default function ItemCard({ item, opportunityContextItemId, usedMatchingMode, preferencesConsidered }: ItemCardProps) {
-  const linkHref = `/items/${item.id}`;
+  const itemDetailLink = `/items/${item.id}`;
   const matchScore = item.matchScore;
 
   let opportunityLink: string | null = null;
@@ -48,8 +49,8 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
     opportunityLink = `/opportunities?${opportunityLinkParams.toString()}`;
   }
 
-  return (
-    <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl group">
+  const CardBodyAndHeader = (
+    <>
       <CardHeader className="p-0 relative">
         <div className="aspect-[1/1] md:aspect-[4/3] relative w-full overflow-hidden">
           <Image
@@ -91,7 +92,7 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
       </CardHeader>
       <CardContent className="p-2 md:p-4 flex-grow">
         <CardTitle className="text-sm md:text-lg font-headline mb-1 md:mb-2 leading-tight line-clamp-2">
-          <Link href={linkHref} className="hover:text-primary transition-colors">
+          <Link href={itemDetailLink} className="hover:text-primary transition-colors">
             {item.name}
           </Link>
         </CardTitle>
@@ -102,17 +103,31 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
             <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 md:text-xs md:px-2.5 md:py-0.5">{item.category}</Badge>
         </div>
       </CardContent>
+    </>
+  );
+
+  return (
+    <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl group">
+      {opportunityLink ? (
+        <Link href={opportunityLink} className="block flex flex-col flex-grow cursor-pointer">
+          {CardBodyAndHeader}
+        </Link>
+      ) : (
+        <div className="flex flex-col flex-grow">
+            {CardBodyAndHeader}
+        </div>
+      )}
       <CardFooter className="p-2 md:p-4 border-t flex flex-col items-stretch gap-2">
         <Button asChild variant="default" className="w-full bg-primary hover:bg-primary/90 h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm">
-          <Link href={linkHref} className="flex items-center gap-1 md:gap-2">
+          <Link href={itemDetailLink} className="flex items-center gap-1 md:gap-2">
             <Eye className="h-3.5 w-3.5 md:h-4 md:w-4" />
-            View Details
+            View Item
           </Link>
         </Button>
         {opportunityLink && (
           <Button asChild variant="outline" size="sm" className="w-full h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm">
             <Link href={opportunityLink} className="flex items-center gap-1 md:gap-2">
-              <Link2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <LinkIcon className="h-3.5 w-3.5 md:h-4 md:w-4" />
               View Opportunity
             </Link>
           </Button>
