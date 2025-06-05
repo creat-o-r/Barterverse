@@ -105,8 +105,13 @@ async function writeSettings(settings: AISettings): Promise<boolean> {
 }
 
 export async function getAIMatchingMode(): Promise<AIMatchingMode> {
-  const settings = await readSettings();
-  return settings.matchingMode;
+  try {
+    const settings = await readSettings();
+    return settings.matchingMode;
+  } catch (error: any) {
+    console.error('[AI Config Service] FATAL error in getAIMatchingMode:', error);
+    return defaultSettings.matchingMode; // Fallback to default
+  }
 }
 
 export async function setAIMatchingMode(mode: AIMatchingMode): Promise<{success: boolean; message?: string}> {
@@ -120,14 +125,19 @@ export async function setAIMatchingMode(mode: AIMatchingMode): Promise<{success:
     // console.log(`[AI Config Service] AI Matching Mode set to: ${mode}`);
     return { success: true, message: `AI Matching Mode set to ${mode}.` };
   } catch (error: any) {
-    // console.error('[AI Config Service] Unexpected error in setAIMatchingMode:', error);
-    return { success: false, message: 'An unexpected error occurred while updating AI matching mode.' };
+    console.error('[AI Config Service] FATAL, UNEXPECTED error in setAIMatchingMode:', error);
+    return { success: false, message: 'A truly unexpected fatal error occurred while updating AI matching mode. Check server logs for "FATAL".' };
   }
 }
 
 export async function getUseUserProfilePreferencesInMatching(): Promise<boolean> {
-  const settings = await readSettings();
-  return settings.useUserProfilePreferencesInMatching;
+  try {
+    const settings = await readSettings();
+    return settings.useUserProfilePreferencesInMatching;
+  } catch (error: any) {
+    console.error('[AI Config Service] FATAL error in getUseUserProfilePreferencesInMatching:', error);
+    return defaultSettings.useUserProfilePreferencesInMatching; // Fallback to default
+  }
 }
 
 export async function setUseUserProfilePreferencesInMatching(usePrefs: boolean): Promise<{success: boolean; message?: string}> {
@@ -141,14 +151,19 @@ export async function setUseUserProfilePreferencesInMatching(usePrefs: boolean):
     // console.log(`[AI Config Service] Use User Profile Preferences in Matching set to: ${usePrefs}`);
     return { success: true, message: `Consideration of user preferences in matching set to ${usePrefs}.` };
   } catch (error: any) {
-    // console.error('[AI Config Service] Unexpected error in setUseUserProfilePreferencesInMatching:', error);
-    return { success: false, message: 'An unexpected error occurred while updating user preference setting for matching.' };
+    console.error('[AI Config Service] FATAL, UNEXPECTED error in setUseUserProfilePreferencesInMatching:', error);
+    return { success: false, message: 'A truly unexpected fatal error occurred while updating user preference setting for matching. Check server logs for "FATAL".' };
   }
 }
 
 export async function getEnableAutomaticPreferenceInference(): Promise<boolean> {
-  const settings = await readSettings();
-  return settings.enableAutomaticPreferenceInference;
+  try {
+    const settings = await readSettings();
+    return settings.enableAutomaticPreferenceInference;
+  } catch (error: any) {
+    console.error('[AI Config Service] FATAL error in getEnableAutomaticPreferenceInference:', error);
+    return defaultSettings.enableAutomaticPreferenceInference; // Fallback to default
+  }
 }
 
 export async function setEnableAutomaticPreferenceInference(enable: boolean): Promise<{success: boolean; message?: string}> {
@@ -161,18 +176,22 @@ export async function setEnableAutomaticPreferenceInference(enable: boolean): Pr
     }
     // console.log(`[AI Config Service] Automatic Preference Inference set to: ${enable}`);
     return { success: true, message: `Automatic AI preference inference ${enable ? 'enabled' : 'disabled'}.` };
-  } catch (error: any)
-{
-    // console.error('[AI Config Service] Unexpected error in setEnableAutomaticPreferenceInference:', error);
-    return { success: false, message: 'An unexpected error occurred while updating automatic preference inference setting.' };
+  } catch (error: any) {
+    console.error('[AI Config Service] FATAL, UNEXPECTED error in setEnableAutomaticPreferenceInference:', error);
+    return { success: false, message: 'A truly unexpected fatal error occurred while updating automatic preference inference setting. Check server logs for "FATAL".' };
   }
 }
 
 export async function getPreferredAIModel(): Promise<AIModelName> {
   // console.log('[AI Config Service Debug] getPreferredAIModel CALLED.');
-  const settings = await readSettings();
-  // console.log(`[AI Config Service Debug] getPreferredAIModel is RETURNING: ${settings.preferredModel} based on effective read settings:`, JSON.stringify(settings));
-  return settings.preferredModel;
+  try {
+    const settings = await readSettings();
+    // console.log(`[AI Config Service Debug] getPreferredAIModel is RETURNING: ${settings.preferredModel} based on effective read settings:`, JSON.stringify(settings));
+    return settings.preferredModel;
+  } catch (error: any) {
+    console.error('[AI Config Service] FATAL error in getPreferredAIModel:', error);
+    return defaultSettings.preferredModel; // Fallback to default
+  }
 }
 
 export async function setPreferredAIModel(model: AIModelName): Promise<{success: boolean; message?: string}> {
@@ -194,7 +213,9 @@ export async function setPreferredAIModel(model: AIModelName): Promise<{success:
     // console.log(`[AI Config Service] Preferred AI Model set to: ${model} (write success).`);
     return { success: true, message: `Preferred AI Model set to ${model}. Note: A full server restart might be needed for Genkit to use this as its default model if it was already running with an older configuration.` };
   } catch (error: any) {
-    // console.error('[AI Config Service Debug] Unexpected error in setPreferredAIModel:', error);
-    return { success: false, message: 'An unexpected error occurred while updating the preferred AI model.' };
+    // console.error('[AI Config Service Debug] FATAL, UNEXPECTED error in setPreferredAIModel:', error);
+    return { success: false, message: 'A truly unexpected fatal error occurred while updating the preferred AI model. Check server logs for "FATAL".' };
   }
 }
+
+    
