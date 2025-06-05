@@ -13,6 +13,7 @@ export type Item = {
   isThirdPartyFulfillment?: boolean;
   minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High';
   isGiftItForward?: boolean;
+  openToAnyOpportunity?: boolean; // Added new field
   logistics?: ItemLogistics;
 };
 
@@ -123,3 +124,4 @@ export type InferUserPreferencesOutput = {
   reasoning?: string;
   errorMessage?: string;
 };
+

@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter, HeartHandshake, MapPin, Truck, Edit2 } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter, HeartHandshake, MapPin, Truck, Edit2, Network } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
@@ -49,6 +49,7 @@ const itemFormSchema = z.object({
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
   minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']),
   isGiftItForward: z.boolean().optional(),
+  openToAnyOpportunity: z.boolean().optional(), // New field
   
   selectedLocationIdentifier: z.string().min(1, { message: "Please select or specify an item location."}),
   itemSpecificAddress: z.string().optional(),
@@ -101,6 +102,7 @@ export default function NewItemPage() {
       listingType: 'offer',
       minimumMatchRatingOverride: currentUserProfileRating, 
       isGiftItForward: false,
+      openToAnyOpportunity: false, // Default for new field
       selectedLocationIdentifier: ITEM_SPECIFIC_LOCATION_VALUE,
       itemSpecificAddress: '',
       deliveryMethods: ['pickup_only'],
@@ -126,6 +128,7 @@ export default function NewItemPage() {
         form.reset({
             ...currentFormValues,
             minimumMatchRatingOverride: currentFormValues.minimumMatchRatingOverride || currentUser.minimumMatchRating || 'Low',
+            openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false, // Ensure default applied
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (currentFormValues.itemSpecificAddress || '') : '',
             deliveryMethods: currentFormValues.deliveryMethods?.length ? currentFormValues.deliveryMethods : defaultDeliveryMethods,
@@ -210,6 +213,7 @@ export default function NewItemPage() {
         ownerId: currentUser.id,
         minimumMatchRatingOverride: data.minimumMatchRatingOverride,
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false,
+        openToAnyOpportunity: data.openToAnyOpportunity, // Pass new field
         logistics: itemLogistics,
       };
       const addedItem = addNewItemToDummyData(newItemData);
@@ -237,6 +241,7 @@ export default function NewItemPage() {
             listingType: 'offer',
             minimumMatchRatingOverride: currentUser.minimumMatchRating || 'Low',
             isGiftItForward: false,
+            openToAnyOpportunity: false, // Reset new field
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: '',
             deliveryMethods: defaultDeliveryMethods,
@@ -388,7 +393,57 @@ export default function NewItemPage() {
                 />
               </section>
               
-              {listingTypeWatch === 'offer' && (<FormField control={form.control} name="isGiftItForward" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoadingOverall} id="isGiftItForward"/></FormControl><div className="space-y-1 leading-none"><FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2"><HeartHandshake className="h-5 w-5 text-pink-500" />Gift It Forward</FormLabel><FormDescription className="font-body">Offer this item freely, no direct trade expected.</FormDescription></div></FormItem>)} />)}
+              {listingTypeWatch === 'offer' && (
+                <FormField
+                  control={form.control}
+                  name="isGiftItForward"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isLoadingOverall}
+                          id="isGiftItForward"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel htmlFor="isGiftItForward" className="font-headline flex items-center gap-2">
+                          <HeartHandshake className="h-5 w-5 text-pink-500" />Gift It Forward
+                        </FormLabel>
+                        <FormDescription className="font-body">Offer this item freely, no direct trade expected.</FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
+                name="openToAnyOpportunity"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isLoadingOverall}
+                        id="openToAnyOpportunity"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel htmlFor="openToAnyOpportunity" className="font-headline flex items-center gap-2">
+                        <Network className="h-5 w-5 text-blue-500" />Open to any opportunity
+                      </FormLabel>
+                      <FormDescription className="font-body">
+                        {field.value
+                          ? "AI will consider a wider range of matches for this item."
+                          : "AI will primarily focus on direct matches based on your listing type."}
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
               
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
                 {isLoadingOverall ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting...' : (isInferringListingType ? 'Inferring...' : 'Loading...'))}</>) : (`Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`)}

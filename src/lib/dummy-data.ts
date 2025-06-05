@@ -123,6 +123,7 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     minimumMatchRatingOverride: 'High',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
@@ -142,6 +143,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
     logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
@@ -160,6 +162,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: true,
+    openToAnyOpportunity: true, // Example of true
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
@@ -178,6 +181,7 @@ export let dummyItems: Item[] = [
     status: 'pending',
     listingType: 'offer',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
@@ -196,6 +200,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
      logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Balcony Garden",
@@ -214,6 +219,7 @@ export let dummyItems: Item[] = [
     status: 'traded',
     listingType: 'offer',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
      logistics: { 
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Workshop",
@@ -232,6 +238,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     minimumMatchRatingOverride: 'Medium',
+    openToAnyOpportunity: true, // Example for a 'want'
     logistics: { 
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
@@ -249,6 +256,7 @@ export let dummyItems: Item[] = [
     ownerName: 'Bob Barterer',
     status: 'available',
     listingType: 'want',
+    openToAnyOpportunity: false,
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
@@ -267,6 +275,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Diana's Boutique",
@@ -284,6 +293,7 @@ export let dummyItems: Item[] = [
     ownerName: 'Diana Doodad',
     status: 'available',
     listingType: 'want',
+    openToAnyOpportunity: false,
     logistics: {
         locationType: 'item_specific_location', 
         itemSpecificAddress: 'Diana Doodad Wants This Shipped To: 12Collector Lane',
@@ -302,6 +312,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: true,
+    openToAnyOpportunity: true,
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Garage",
@@ -320,6 +331,7 @@ export let dummyItems: Item[] = [
     status: 'pending',
     listingType: 'offer',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Home Gym",
@@ -338,6 +350,7 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: false,
+    openToAnyOpportunity: false,
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_work',
@@ -355,6 +368,7 @@ export let dummyItems: Item[] = [
     ownerName: 'Charlie Swapper',
     status: 'available',
     listingType: 'want',
+    openToAnyOpportunity: false,
     logistics: {
         locationType: 'item_specific_location', 
         itemSpecificAddress: "Charlie Swapper wants this delivered locally if possible.",
@@ -444,13 +458,12 @@ export function addNewItemToDummyData(
 
 
   const newItem: Item = {
-    ...itemData,
+    ...itemData, // This will include isGiftItForward and openToAnyOpportunity from form data
     id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     ownerName: owner.name,
     status: 'available',
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || 'https://placehold.co/600x400.png',
-    isGiftItForward: itemData.listingType === 'offer' ? (itemData.isGiftItForward || false) : false,
     logistics: finalLogistics,
   };
 
@@ -465,3 +478,4 @@ export function addNewItemToDummyData(
   console.log('[DummyData] Total items now:', dummyItems.length);
   return newItem;
 }
+
