@@ -38,6 +38,7 @@ const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCi
 
 
 function GlobalCategoryFilter() {
+  'use client';
   const { selectedCategory, setSelectedCategory, availableCategories } = useGlobalFilter();
 
   return (
@@ -49,7 +50,7 @@ function GlobalCategoryFilter() {
           setSelectedCategory(value === "any" ? null : value);
         }}
       >
-        <SelectTrigger className="w-[180px] h-9 text-xs md:text-sm">
+        <SelectTrigger className="w-[180px] h-9 text-xs md:text-sm bg-background">
           <SelectValue placeholder="Filter by category..." />
         </SelectTrigger>
         <SelectContent>
@@ -72,43 +73,55 @@ export default function Navbar() {
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-16 flex items-center">
+      <div className="container mx-auto px-4 h-auto md:h-16 flex flex-col md:flex-row md:items-center">
 
-        {/* Mobile Icon Navigation */}
-        <nav className="flex md:hidden items-center gap-1">
-          {primaryNavLinks.map((link) => (
-            <Button key={`mobile-icon-${link.label}`} variant="ghost" size="icon" asChild>
-              <Link href={link.href} aria-label={link.label} className="relative flex items-center justify-center w-10 h-10">
-                {React.cloneElement(link.icon, { className: "h-5 w-5" })}
-                {link.hasNotification && unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 h-3 w-3 min-w-[0.75rem] rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center p-0.5 leading-none shadow-sm">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </Link>
-            </Button>
-          ))}
-          {isLoggedIn ? (
-            <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
-              <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-10 h-10">
-                {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
-              </Link>
-            </Button>
-          ) : (
-            <>
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/auth/signin" aria-label="Login" className="flex items-center justify-center w-10 h-10">
-                  <LogIn className="h-5 w-5" />
+        {/* Mobile: Top Row for Icons */}
+        <div className="w-full flex md:hidden items-center justify-between h-16">
+          {/* Mobile Icon Navigation (left-aligned icons) */}
+          <nav className="flex items-center gap-1">
+            {primaryNavLinks.map((link) => (
+              <Button key={`mobile-icon-${link.label}`} variant="ghost" size="icon" asChild>
+                <Link href={link.href} aria-label={link.label} className="relative flex items-center justify-center w-10 h-10">
+                  {React.cloneElement(link.icon, { className: "h-5 w-5" })}
+                  {link.hasNotification && unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 h-3 w-3 min-w-[0.75rem] rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center p-0.5 leading-none shadow-sm">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/auth/signup" aria-label="Sign Up" className="flex items-center justify-center w-10 h-10">
-                  <UserPlus className="h-5 w-5" />
+            ))}
+          </nav>
+
+          {/* Mobile Profile/Auth Icons (right-aligned icons) */}
+          <div className="flex items-center gap-1">
+            {isLoggedIn ? (
+              <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
+                <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-10 h-10">
+                  {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
                 </Link>
               </Button>
-            </>
-          )}
-        </nav>
+            ) : (
+              <>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link href="/auth/signin" aria-label="Login" className="flex items-center justify-center w-10 h-10">
+                    <LogIn className="h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link href="/auth/signup" aria-label="Sign Up" className="flex items-center justify-center w-10 h-10">
+                    <UserPlus className="h-5 w-5" />
+                  </Link>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+        
+        {/* Mobile: Bottom Row for Filter */}
+        <div className="w-full flex md:hidden justify-center py-2 border-t border-border">
+          <GlobalCategoryFilter />
+        </div>
 
         {/* Desktop Navigation - Main Links (left-aligned) */}
         <nav className="hidden md:flex items-center gap-1">
@@ -132,7 +145,7 @@ export default function Navbar() {
         </nav>
 
         {/* Right-aligned items: Profile Dropdown / Login Button */}
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto hidden md:flex items-center">
           {/* Profile Dropdown / Login Button - Desktop */}
           <div className="hidden md:block">
             {isLoggedIn ? (
