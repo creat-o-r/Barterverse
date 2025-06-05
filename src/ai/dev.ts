@@ -22,10 +22,10 @@ try {
 
 console.log('[AI Dev Init] dev.ts: Importing flows...');
 try {
-  import '@/ai/flows/smart-suggestion-tool.ts'; // UNCOMMENTED
-  console.log('[AI Dev Init] dev.ts: Imported smart-suggestion-tool.ts');
-  // import '@/ai/flows/trade-negotiation-chat.ts';
-  // console.log('[AI Dev Init] dev.ts: Imported trade-negotiation-chat.ts');
+  // import '@/ai/flows/smart-suggestion-tool.ts'; // Re-commented
+  // console.log('[AI Dev Init] dev.ts: Imported smart-suggestion-tool.ts');
+  import '@/ai/flows/trade-negotiation-chat.ts'; // Uncommented this one
+  console.log('[AI Dev Init] dev.ts: Imported trade-negotiation-chat.ts');
   // import '@/ai/flows/item-match-flow.ts';
   // console.log('[AI Dev Init] dev.ts: Imported item-match-flow.ts');
   // import '@/ai/flows/suggest-category-flow.ts';
@@ -38,7 +38,7 @@ try {
   // console.log('[AI Dev Init] dev.ts: Imported infer-user-preferences-flow.ts');
   // import '@/ai/flows/explain-match-rationale-flow.ts';
   // console.log('[AI Dev Init] dev.ts: Imported explain-match-rationale-flow.ts');
-  // console.log('[AI Dev Init] dev.ts: All other flows are currently commented out.'); // Updated message
+  console.log('[AI Dev Init] dev.ts: All other flows are currently commented out.'); // Updated message
 } catch (e: any) {
   console.error('[AI Dev Init] dev.ts: CRITICAL error during flow imports -', e.message, e.stack);
   // Optionally, re-throw if this should halt: throw e;
