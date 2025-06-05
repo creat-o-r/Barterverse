@@ -3,7 +3,7 @@ import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, Menu, LogOut, MessageSquare } from 'lucide-react';
+import { Package, PlusCircle, UserCircle, LogOut, MessageSquare } from 'lucide-react'; // Removed Menu
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,17 +12,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 
 // Define link configurations
 const primaryNavLinks = [
   { href: '/', label: 'Match', icon: <Package className="h-4 w-4" /> },
   { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
-  { 
-    href: '/chats', 
-    label: 'Chats', 
+  {
+    href: '/chats',
+    label: 'Chats',
     icon: <MessageSquare className="h-4 w-4" />,
-    hasNotification: true 
+    hasNotification: true
   },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
@@ -34,7 +33,7 @@ export default function Navbar() {
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center">
-        
+
         {/* Mobile Icon Navigation (replaces desktop nav on mobile) */}
         <nav className="flex md:hidden items-center gap-1">
           {primaryNavLinks.map((link) => (
@@ -49,6 +48,13 @@ export default function Navbar() {
               </Link>
             </Button>
           ))}
+          {isLoggedIn && (
+            <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
+              <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-10 h-10">
+                {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
+              </Link>
+            </Button>
+          )}
         </nav>
 
         {/* Desktop Navigation - Main Links (left-aligned) */}
@@ -68,10 +74,10 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* Right-aligned items: Profile, Mobile Menu Trigger */}
-        <div className="ml-auto flex items-center gap-2">
+        {/* Right-aligned items: Profile Dropdown / Login Button */}
+        <div className="ml-auto flex items-center">
           {/* Profile Dropdown / Login Button - Desktop */}
-          <div className="hidden md:block"> 
+          <div className="hidden md:block">
             {isLoggedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -102,10 +108,7 @@ export default function Navbar() {
                       <span>View Profile</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
+                  {/* Logout option removed from dropdown */}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
@@ -114,55 +117,19 @@ export default function Navbar() {
               </Button>
             )}
           </div>
-          
-          {/* Mobile Navigation Trigger */}
-          <div className="md:hidden">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <Menu className="h-6 w-6" />
+
+          {/* Mobile Login/Signup Buttons (if not logged in, and no hamburger menu) */}
+          <div className="flex md:hidden items-center gap-2">
+            {!isLoggedIn && (
+              <>
+                <Button variant="default" size="sm" asChild>
+                  <Link href="/auth/signin">Login</Link>
                 </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="flex flex-col p-0">
-                <SheetTitle className="font-headline text-lg p-4 border-b">Menu</SheetTitle>
-                <nav className="flex flex-col gap-1 p-4 flex-grow"> {/* Changed gap to 1, padding to p-4 */}
-                  {isLoggedIn && (
-                    <Button variant="ghost" asChild className="justify-start h-auto py-2.5">
-                      <Link href={profileLinkConfig.href} className="flex items-center gap-3 text-base">
-                        {profileLinkConfig.icon}
-                        {profileLinkConfig.label}
-                      </Link>
-                    </Button>
-                  )}
-                </nav>
-                <div className="mt-auto flex flex-col gap-2 p-4 border-t">
-                  {isLoggedIn ? (
-                    <>
-                      <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-3 text-muted-foreground">
-                          <Avatar className="h-7 w-7">
-                          <AvatarImage src="https://placehold.co/100x100.png?text=U" alt="User" data-ai-hint="profile avatar mobile" />
-                          <AvatarFallback>U</AvatarFallback>
-                          </Avatar>
-                          Current User
-                      </div>
-                      <Button variant="ghost" className="justify-start text-base h-auto py-2.5">
-                        <LogOut className="mr-3 h-4 w-4" />
-                        Log out
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button asChild className="w-full">
-                        <Link href="/auth/signin">Login</Link>
-                      </Button>
-                      <Button asChild variant="outline" className="w-full">
-                        <Link href="/auth/signup">Sign Up</Link>
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/auth/signup">Sign Up</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
