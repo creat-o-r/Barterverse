@@ -5,7 +5,7 @@ import fs from 'fs/promises';
 import path from 'path';
 
 export type AIMatchingMode = 'simple' | 'advanced';
-export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview';
+export type AIModelName = 'gemini-1.5-pro-latest' | 'gemini-1.0-pro' | 'gemini-2.5-pro-preview-05-06';
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
 
@@ -13,10 +13,10 @@ const defaultSettings: AISettings = {
   matchingMode: 'advanced',
   useUserProfilePreferencesInMatching: true,
   enableAutomaticPreferenceInference: false,
-  preferredModel: 'gemini-2.5-pro-preview', 
+  preferredModel: 'gemini-2.5-pro-preview-05-06', 
 };
 
-const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview'];
+const validModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 interface AISettings {
   matchingMode: AIMatchingMode;
@@ -178,7 +178,7 @@ export async function setPreferredAIModel(model: AIModelName): Promise<{success:
       return { success: false, message: 'Failed to save preferred AI model to the settings file.' };
     }
     console.log(`[AI Config Service] Preferred AI Model set to: ${model} (write success).`);
-    return { success: true, message: `Preferred AI Model set to ${model}. Note: A full server restart might be needed for Genkit to use this as its default model if it was already running.` };
+    return { success: true, message: `Preferred AI Model set to ${model}. Note: A full server restart might be needed for Genkit to use this as its default model if it was already running with an older configuration.` };
   } catch (error: any) {
     console.error('[AI Config Service Debug] Unexpected error in setPreferredAIModel:', error);
     return { success: false, message: 'An unexpected error occurred while updating the preferred AI model.' };

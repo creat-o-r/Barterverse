@@ -15,9 +15,9 @@ interface AISettingsForGenkitFile {
 }
 
 // Default model if settings file is missing or model is invalid
-const defaultGenkitModelName: AIModelName = 'gemini-2.5-pro-preview';
+const defaultGenkitModelName: AIModelName = 'gemini-2.5-pro-preview-05-06';
 // Valid models for Genkit initialization
-const validGenkitModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview'];
+const validGenkitModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 function getModelNameForGenkitInit(): AIModelName {
   const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');

@@ -65,7 +65,7 @@ function getMatchScoreIcon(score?: string) {
 const modelDisplayMap: Record<AIModelName, string> = {
   'gemini-1.5-pro-latest': 'Gemini 1.5 Pro (Latest)',
   'gemini-1.0-pro': 'Gemini 1.0 Pro',
-  'gemini-2.5-pro-preview': 'Gemini 2.5 Pro Preview',
+  'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview (05-06)',
 };
 
 interface ListedModel {
@@ -84,7 +84,7 @@ export default function MatchReportsPage() {
   const [currentMatchingMode, setCurrentMatchingMode] = useState<AIMatchingMode>('advanced');
   const [useUserPrefsInMatching, setUseUserPrefsInMatching] = useState(true);
   const [enableAutoPrefInference, setEnableAutoPrefInference] = useState(false);
-  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-2.5-pro-preview'); // Default to new model
+  const [preferredModel, setPreferredModel] = useState<AIModelName>('gemini-2.5-pro-preview-05-06'); 
   const [isUpdatingMode, setIsUpdatingMode] = useState(false);
   const [isUpdatingPrefsMatchToggle, setIsUpdatingPrefsMatchToggle] = useState(false);
   const [isUpdatingAutoPrefToggle, setIsUpdatingAutoPrefToggle] = useState(false);
@@ -248,11 +248,12 @@ export default function MatchReportsPage() {
   const handleListModels = async () => {
     setIsLoadingListedModels(true);
     setListModelsError(null);
-    setListedModels(null);
-    setShowListedModels(true);
+    setListedModels(null); // Clear previous results immediately
+    setShowListedModels(true); // Show the collapsible section
     try {
       const response = await fetch('/api/list-models');
       const data = await response.json();
+
       if (!response.ok) {
         let errorMessage = data.error || `API request failed with status ${response.status}`;
         if (data.details && data.details.includes("listModels on Class.prototype: false")) {
@@ -264,17 +265,17 @@ export default function MatchReportsPage() {
         
         setListModelsError(errorMessage);
         toast({ title: "Error Listing Models", description: errorMessage, variant: "destructive", duration: 10000 });
-        setListedModels(null);
-        return; 
+        setListedModels(null); // Explicitly set to null on error
+        return; // Important to return here so we don't try to set models from an error response
       }
       setListedModels(data.models);
-      setListModelsError(null); 
+      setListModelsError(null); // Clear any previous error
     } catch (error: any) {
       console.error("Failed to list models (client-side catch):", error);
       const clientErrorMsg = error.message || "Could not fetch model list from API.";
       setListModelsError(clientErrorMsg);
       toast({ title: "Error Listing Models", description: clientErrorMsg, variant: "destructive", duration: 10000 });
-      setListedModels(null);
+      setListedModels(null); // Explicitly set to null on client-side catch
     } finally {
       setIsLoadingListedModels(false);
     }
