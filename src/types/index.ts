@@ -11,9 +11,9 @@ export type Item = {
   status: 'available' | 'traded' | 'pending';
   listingType: 'offer' | 'want';
   isThirdPartyFulfillment?: boolean;
-  minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High';
+  // minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High'; // Removed
   isGiftItForward?: boolean;
-  openToAnyOpportunity?: boolean; // Added new field
+  openToAnyOpportunity?: boolean;
   logistics?: ItemLogistics;
 };
 
@@ -30,7 +30,7 @@ export type UserProfilePreferences = {
   locationPreference?: UserProfileLocationPreference;
   tradeTimingPreference?: TradeTimingPreference;
   interestedInThirdPartyFulfillment?: boolean;
-  minimumMatchRating: 'Low' | 'Medium' | 'High';
+  minimumMatchRating: 'Low' | 'Medium' | 'High'; // User's global preference, remains
 };
 
 export type UserStoredLocation = {
@@ -40,10 +40,10 @@ export type UserStoredLocation = {
   isDefault?: boolean;
 };
 
-export type ItemDeliveryMethod = 
-  | 'pickup_only' 
-  | 'willing_to_ship' 
-  | 'delivery_area' 
+export type ItemDeliveryMethod =
+  | 'pickup_only'
+  | 'willing_to_ship'
+  | 'delivery_area'
   | 'possible_delivery'
   | 'public_meetup'
   | 'flexible_meetup';
@@ -51,7 +51,7 @@ export type ItemDeliveryMethod =
 export type UserLogisticsPreferences = {
   defaultDeliveryMethods: ItemDeliveryMethod[];
   preferredStoredLocationId?: string;
-  openToChainDelivery?: boolean; // Added new preference
+  openToChainDelivery?: boolean;
 };
 
 export type User = {
@@ -67,13 +67,20 @@ export type User = {
   logisticsPreferences?: UserLogisticsPreferences;
 } & UserProfilePreferences;
 
-export type ItemLogisticsLocationType = 'profile_stored_location' | 'item_specific_location';
+export type ItemLogisticsLocationType = 'profile_stored_location' | 'item_specific_location' | 'not_specified';
+
+export type ItemTimingType = 'flexible' | 'fixed_date';
+export type ItemTiming = {
+  type: ItemTimingType;
+  date?: string; // ISO date string if type is 'fixed_date'
+};
 
 export type ItemLogistics = {
   locationType: ItemLogisticsLocationType;
-  selectedUserStoredLocationId?: string;
-  itemSpecificAddress?: string;
+  selectedUserStoredLocationId?: string; // Only if locationType is 'profile_stored_location'
+  itemSpecificAddress?: string;         // Only if locationType is 'item_specific_location'
   deliveryMethods: ItemDeliveryMethod[];
+  timing?: ItemTiming; // Added single timing preference
   notes?: string;
 };
 
@@ -124,4 +131,3 @@ export type InferUserPreferencesOutput = {
   reasoning?: string;
   errorMessage?: string;
 };
-

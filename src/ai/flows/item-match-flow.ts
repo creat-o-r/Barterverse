@@ -25,8 +25,9 @@ const ItemBriefSchema = z.object({
   category: z.string(),
   ownerId: z.string(),
   listingType: z.enum(['offer', 'want']),
-  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional().describe("Item-specific minimum match rating requirement. This is optional and might not be present for all items."),
+  // minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']).optional().describe("Item-specific minimum match rating requirement. This is optional and might not be present for all items."), // Removed
   isGiftItForward: z.boolean().optional().describe("Whether the item is offered as a 'Gift It Forward' item."),
+  openToAnyOpportunity: z.boolean().optional().describe("Whether the item owner is open to any type of match, not just direct category/type matches."),
 });
 
 // Schema for user preferences to be passed to the advanced prompt
@@ -46,8 +47,8 @@ const UserPreferencesSchema = z.object({
 // Base Input Schema
 const BaseItemMatchInputSchema = z.object({
   triggeringUserId: z.string().describe("The ID of the user for whom the matches are being suggested."),
-  currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches. It may have its own 'minimumMatchRatingOverride' and 'isGiftItForward' status."),
-  availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform. Each may also have its own 'minimumMatchRatingOverride' and 'isGiftItForward' status."),
+  currentItem: ItemBriefSchema.describe("The item (offer or want) for which to find matches. It may have 'isGiftItForward' status and 'openToAnyOpportunity' flag."),
+  availableItems: z.array(ItemBriefSchema).describe("A list of other items (offers and wants) available on the platform. Each may also have 'isGiftItForward' status and 'openToAnyOpportunity' flag."),
 });
 
 // Input schema for the flow, which will conditionally add preferences
@@ -68,18 +69,13 @@ const SuggestedItemInPromptSchema = z.object({
 
 const SuggestedItemWithScoreSchema = SuggestedItemInPromptSchema.extend({
   ownerId: z.string().describe("The ID of the owner of the suggested item."),
-  // isGiftItForward is already in SuggestedItemInPromptSchema
-  // reciprocalItemId is already in SuggestedItemInPromptSchema
 });
 
-// This is what prompts are expected to return (subset of the flow's final output)
 const PromptOutputSchema = z.object({
   suggestedMatches: z.array(SuggestedItemInPromptSchema),
   reasoning: z.string().optional(),
 });
 
-
-// Final Output Schema for the flow
 const ItemMatchOutputSchema = z.object({
   suggestedMatches: z.array(SuggestedItemWithScoreSchema).describe("A list of suggested matching items with their scores, ownerIds, gift status, and potential reciprocal item ID. Can be empty if no good matches are found or if they don't meet minimum rating criteria."),
   reasoning: z.string().optional().describe("The overall reasoning behind the suggestions."),
@@ -88,8 +84,6 @@ const ItemMatchOutputSchema = z.object({
 });
 export type ItemMatchOutput = z.infer<typeof ItemMatchOutputSchema>;
 
-
-// SIMPLE PROMPT (existing)
 const simpleItemMatchPrompt = ai.definePrompt({
   name: 'simpleItemMatchPrompt',
   input: {schema: BaseItemMatchInputSchema},
@@ -99,7 +93,7 @@ Given a 'Current Item' and a list of 'Available Items' from other users, identif
 
 MATCHING PRIORITY:
 1.  OPPOSITE LISTING TYPES: Strongly prioritize matches where the 'Current Item's' listing type is the opposite of an 'Available Item's' listing type (e.g., your 'offer' for their 'want', or your 'want' for their 'offer'). This direct fulfillment is key.
-2.  GENERAL RELEVANCE: Also consider general relevance, category similarity, and keyword matches in descriptions for other types of matches (e.g., offer-for-offer).
+2.  GENERAL RELEVANCE: Also consider general relevance, category similarity, and keyword matches in descriptions for other types of matches (e.g., offer-for-offer). If 'Current Item' has 'openToAnyOpportunity: true', be more flexible with category matching.
 
 Current Item:
 ID: {{{currentItem.id}}}
@@ -109,19 +103,17 @@ Category: {{{currentItem.category}}}
 Owner ID: {{{currentItem.ownerId}}}
 Listing Type: {{{currentItem.listingType}}}
 Is Gift: {{#if currentItem.isGiftItForward}}Yes{{else}}No{{/if}}
-{{#if currentItem.minimumMatchRatingOverride}}
-Minimum Acceptable Match Score for THIS ITEM: '{{{currentItem.minimumMatchRatingOverride}}}' (You MUST NOT suggest items with a score lower than this for the 'Current Item').
-{{/if}}
+Open to Any Opportunity: {{#if currentItem.openToAnyOpportunity}}Yes{{else}}No{{/if}}
 
-Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: IsGift :: Description):
+Available Items (format: ID :: Name :: Category :: OwnerID :: ListingType :: IsGift :: OpenToAny :: Description):
 {{#each availableItems}}
-- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{{description}}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{#if openToAnyOpportunity}}Yes{{else}}No{{/if}} :: {{{description}}}
 {{/each}}
 
 For each item you identify as a match, assign a qualitative match score: "High", "Medium", or "Low". Also indicate if the suggested matched item 'isGiftItForward'.
 - "High": Strong direct relevance, especially if opposite listing types match (offer for want, want for offer). Very similar categories, clear keyword overlap.
 - "Medium": Good general relevance, related categories, some keyword overlap. Opposite listing types still preferred.
-- "Low": Possible but less direct relevance, different categories with niche appeal. Might be offer-for-offer type matches if still relevant.
+- "Low": Possible but less direct relevance, different categories with niche appeal. Might be offer-for-offer type matches if still relevant. If an item is 'openToAnyOpportunity', a 'Low' score can reflect a broader, less obvious connection.
 
 GIFT MATCHING:
 - IF 'Current Item' is a 'want':
@@ -135,22 +127,17 @@ GIFT MATCHING:
 - OTHERWISE (e.g., if 'Current Item' is an 'offer' but *not* a gift):
   - An 'Available Item' that is an 'offer' marked 'isGiftItForward: true' should NOT be considered a direct match for your 'Current Item' (offer). Do not suggest it as a match in this context.
 
-{{#if currentItem.minimumMatchRatingOverride}}
-IMPORTANT: The 'Current Item' has a specific minimum match rating requirement of '{{{currentItem.minimumMatchRatingOverride}}}'. When suggesting matches, your assigned score for any suggested item MUST be '{{{currentItem.minimumMatchRatingOverride}}}' or higher (e.g., if min is 'Medium', you can suggest 'Medium' or 'High', but not 'Low'). If no item override is specified, use general relevance.
-{{/if}}
-
 Do not suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
 - Any items owned by the same owner as the "Current Item" (Owner ID: {{{currentItem.ownerId}}}) as direct matches for their own items.
 
 Respond with a list of up to 5 suggested matches if available, each including the 'itemId', its 'matchScore', and 'isGiftItForward' status. The 'reciprocalItemId' field is generally not applicable for simple matching, so you can omit it or leave it null.
 Aim for variety if multiple good options exist.
-If no good matches are found (or none meet the minimum rating if specified), return an empty list for 'suggestedMatches' AND provide a brief reasoning.
+If no good matches are found, return an empty list for 'suggestedMatches' AND provide a brief reasoning.
 Optionally, if matches are found, provide a brief (1-2 sentences) overall reasoning for your suggestions.
   `,
 });
 
-// ADVANCED PROMPT
 const advancedItemMatchPrompt = ai.definePrompt({
   name: 'advancedItemMatchPrompt',
   input: {schema: AdvancedItemMatchPromptInputSchema},
@@ -165,9 +152,7 @@ Description: "{{{currentItem.description}}}"
 Category: "{{{currentItem.category}}}"
 Listed As: {{{currentItem.listingType}}} (by user {{{currentItem.ownerId}}})
 Is Gift: {{#if currentItem.isGiftItForward}}Yes{{else}}No{{/if}}
-{{#if currentItem.minimumMatchRatingOverride}}
-This Item's Specific Minimum Match Requirement: '{{{currentItem.minimumMatchRatingOverride}}}' (Overrides user's global preference for this item).
-{{/if}}
+Open to Any Opportunity: {{#if currentItem.openToAnyOpportunity}}Yes (consider broader matches){{else}}No (focus on direct relevance){{/if}}
 
 The user viewing these suggestions (ID: {{{triggeringUserId}}}), who owns/wants the 'Current Item', has the following preferences:
 {{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
@@ -175,64 +160,39 @@ The user viewing these suggestions (ID: {{{triggeringUserId}}}), who owns/wants 
 {{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
  - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
-(Consider these preferences when evaluating if an item from another user fulfills the triggeringUser's wants. Also, consider other 'want' items listed by {{{triggeringUserId}}} if available in 'Available Items' or implied by their current item context.)
 
-Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: MinMatchRatingOverride (if set) :: IsGift :: Description):
+Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: IsGift :: OpenToAny :: Description):
 {{#each availableItems}}
-- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if minimumMatchRatingOverride}}{{{minimumMatchRatingOverride}}}{{else}}N/A{{/if}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{{description}}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{#if openToAnyOpportunity}}Yes{{else}}No{{/if}} :: {{{description}}}
 {{/each}}
 
 MATCH SCORE ASSIGNMENT ("High", "Medium", "Low"):
 Also indicate if the suggested matched item 'isGiftItForward'.
+If 'Current Item' or 'Available Item' has 'openToAnyOpportunity: true', you can be more lenient in category matching for 'Medium' or 'Low' scores, suggesting items that might appeal due to broader interests rather than direct category similarity.
 
-- "High" Match: A 'High' match is reserved for *exceptionally clear, direct, and mutually fulfilling trade opportunities*.
-    Before assigning 'High', internally ask: 'If I had to explain this match in detail, would I use phrases like "not an obvious direct match", "could appeal due to potential shared interest", or "might be of interest"?' If the answer is YES to any of these, IT IS NOT A 'HIGH' MATCH.
-    Both the primary exchange (Item A for Item B) AND the reciprocal exchange (Item C for a want of User A) MUST be direct, obvious, and fulfill explicit or very strongly implied needs/wants.
-
-    1.  VERY STRONG & DIRECT PRIMARY OPPOSITE MATCH:
-        -   The relationship between 'Current Item' (User A) and the 'Available Item' (User B) must be an *unmistakably strong fit based on their types and content*.
-        -   If 'Current Item' is 'offer', 'Available Item' MUST be a 'want' that is *clearly and directly satisfied* by 'Current Item' (e.g., User A offers "Blue Widget Model X", User B wants "Blue Widget Model X" or "Widget for specific purpose Y" that Model X clearly and perfectly satisfies).
-        -   If 'Current Item' is 'want', 'Available Item' MUST be an 'offer' that *clearly and directly satisfies* this 'want'.
-        -   *CRITICAL*: If there's any ambiguity, if it's cross-category without immediate functional equivalence, if it relies on inferring a loose connection, or if you would describe the A-B connection as 'not obvious', it is NOT a 'High' primary match.
-
-    2.  AND VERY STRONG & DIRECT RECIPROCAL FULFILLMENT (via Item C):
-        -   User B (owner of the 'Available Item' in condition 1) MUST have *another listed 'offer' item* (Item C from their 'availableItems') that *unambiguously and directly fulfills an explicit or very strongly implied 'want' of User A* (the 'triggeringUser').
-        -   An 'explicit want' could be User A's 'currentItem' if it's a 'want' type, or another explicit 'want' item listed by User A, or a need strongly implied by User A's explicit triggeringUserPreferences (e.g., User A lists "Want: Wool Socks", Item C is "Offer: Handmade Wool Socks").
-        -   *CRITICAL*: Vague connections like "shared aesthetic", "general interest", or "potential appeal" for Item C are NOT sufficient. Item C must solve a stated problem or fulfill a clear want for User A.
-
-    3.  NO SPECULATION & OVERALL CLARITY: Both the primary match (Condition 1) and the reciprocal fulfillment (Condition 2) must be exceptionally strong and clear. If *either* part is weak, speculative, or not an obvious direct fulfillment of a want, DO NOT assign a "High" score. A "High" match represents an almost perfect, mutually beneficial trade opportunity.
-
+- "High" Match: (Same definition as before, focusing on strong direct and reciprocal fulfillment)
+    1.  VERY STRONG & DIRECT PRIMARY OPPOSITE MATCH...
+    2.  AND VERY STRONG & DIRECT RECIPROCAL FULFILLMENT (via Item C)...
+    3.  NO SPECULATION & OVERALL CLARITY...
     4.  If all these conditions are met, include Item C's ID as 'reciprocalItemId'.
 
-- "Medium" Match:
-    1.  GOOD PRIMARY OPPOSITE MATCH: The 'Current Item' fulfills a complementary 'Available Item' from User B (opposite listing types preferred). The connection is good, but might not be as direct or perfect as a 'High' match primary component.
-    2.  AND PARTIAL/POTENTIAL RECIPROCAL FULFILLMENT: Another 'Available Item' (an Offer from that same User B, Item C) partially fulfills or aligns with some of User A's preferences or *potential* wants. Reciprocal benefit is good, but User A's wants are not all perfectly or explicitly met by User B's offer.
-    3.  If conditions 1 and 2 are met, and Item C is clearly identified as the source of this partial fulfillment, include its ID as 'reciprocalItemId'.
+- "Medium" Match: (Same general definition, but consider 'openToAnyOpportunity')
+    1.  GOOD PRIMARY OPPOSITE MATCH...
+    2.  AND PARTIAL/POTENTIAL RECIPROCAL FULFILLMENT...
+    3.  If conditions 1 and 2 are met, and Item C is clearly identified, include its ID as 'reciprocalItemId'.
     Alternatively, a strong primary opposite match without clear reciprocal fulfillment can also be 'Medium'.
+    If 'openToAnyOpportunity' is true for currentItem or suggestedItem, a 'Medium' score can also indicate a less direct but still interesting cross-category match if reciprocal value is present or implied.
 
-- "Low" Match:
-    1.  PLAUSIBLE PRIMARY MATCH: The 'Current Item' has a plausible connection to an 'Available Item' from User B (opposite types still preferred, but offer-offer/want-want matches with good relevance are acceptable here). This connection can be more speculative or indirect.
-    2.  AND SPECULATIVE RECIPROCAL FULFILLMENT: Another 'Available Item' (an Offer from User B, Item C) might speculatively fulfill an *inferred or less obvious* want of the 'triggeringUser'.
-    3.  Only include 'reciprocalItemId' if a specific item from User B strongly contributes to even this speculative fulfillment. Generally, 'Low' matches may not have a 'reciprocalItemId'.
+- "Low" Match: (Same general definition, but consider 'openToAnyOpportunity')
+    1.  PLAUSIBLE PRIMARY MATCH...
+    2.  AND SPECULATIVE RECIPROCAL FULFILLMENT...
+    3.  Only include 'reciprocalItemId' if a specific item from User B strongly contributes.
+    If 'openToAnyOpportunity' is true for currentItem or suggestedItem, a 'Low' score might reflect a more speculative connection based on potential shared interests even across different categories.
 
-GIFT FULFILLMENT OVERRIDE (Takes precedence for scoring a specific match as High, IF IT IS A DIRECT FULFILLMENT):
--   IF 'Current Item' is a 'WANT':
-    -   AND an 'Available Item' from User B is an 'OFFER' marked 'isGiftItForward: true'
-    -   AND this gift *clearly and directly fulfills* the 'Current Item' (want) by category/description (e.g., user wants "beginner guitar", gift is "beginner acoustic guitar"),
-    -   THEN this is a 'High' match. Do not set 'reciprocalItemId' in this case, as the gift itself is the primary fulfillment.
--   IF 'Current Item' is an 'OFFER' marked 'isGiftItForward: true' (i.e., *your* item is a gift):
-    -   AND an 'Available Item' from User B is a 'WANT'
-    -   AND your 'Current Item' (gift) *clearly and directly fulfills* this 'Available Item' (want),
-    -   THEN this is also a 'High' match. Do not set 'reciprocalItemId'.
--   OTHERWISE (e.g., if 'Current Item' is an 'OFFER' but *not* a gift):
-    -   An 'Available Item' from User B that is an 'OFFER' marked 'isGiftItForward: true' should NOT be considered a direct match for your 'Current Item' (offer), NOR should it be considered for 'reciprocalItemId' in relation to your current offer. Gifts are acquired, not traded for a standard offer. Do not suggest such items in the 'suggestedMatches' list if the 'Current Item' is a standard offer.
+GIFT FULFILLMENT OVERRIDE (Takes precedence for scoring a specific match as High, IF IT IS A DIRECT FULFILLMENT): (Same logic as before)
 
 MINIMUM MATCH SCORE RULE:
-{{#if currentItem.minimumMatchRatingOverride}}
-The 'Current Item' has an OVERRIDE, REQUIRING suggestions to have a match score of at least '{{{currentItem.minimumMatchRatingOverride}}}'. Do NOT suggest any items you score lower than this.
-{{else}}
-The 'Current Item' uses the user's profile preference. The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level. You MUST NOT suggest items with a match score lower than this.
-{{/if}}
+The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level. You MUST NOT suggest items with a match score lower than this.
 
 Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
@@ -254,10 +214,9 @@ const itemMatchFlow = ai.defineFlow(
   async (input: ItemMatchInput): Promise<ItemMatchOutput> => {
     const flowName = 'itemMatchFlow';
     let preferencesConsideredBeyondDefaultMinRating = false;
-    // ALWAYS USE SIMPLE PROMPT FOR NOW TO DEBUG HANGING ISSUE
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
     let finalInputForPrompt: any = { ...input };
-    let usedMatchingMode: 'simple' | 'advanced' = 'simple'; // Forcing simple for now
+    let usedMatchingMode: 'simple' | 'advanced' = 'simple';
 
     const itemsToConsider = input.availableItems.filter(item =>
         item.id !== input.currentItem.id && item.ownerId !== input.currentItem.ownerId
@@ -268,7 +227,7 @@ const itemMatchFlow = ai.defineFlow(
         const output: ItemMatchOutput = {
             suggestedMatches: [],
             reasoning: reasoning,
-            usedMatchingMode: usedMatchingMode, // 'simple'
+            usedMatchingMode: usedMatchingMode,
             preferencesConsidered: false,
         };
         logMatchSuggestion({
@@ -286,62 +245,67 @@ const itemMatchFlow = ai.defineFlow(
     finalInputForPrompt.availableItems = itemsToConsider.map(item => ({
         ...item,
         isGiftItForward: item.isGiftItForward || false,
-        minimumMatchRatingOverride: item.minimumMatchRatingOverride,
+        openToAnyOpportunity: item.openToAnyOpportunity || false, // Include openToAnyOpportunity
     }));
     finalInputForPrompt.currentItem = {
         ...input.currentItem,
-        minimumMatchRatingOverride: input.currentItem.minimumMatchRatingOverride,
         isGiftItForward: input.currentItem.isGiftItForward || false,
+        openToAnyOpportunity: input.currentItem.openToAnyOpportunity || false, // Include openToAnyOpportunity
     };
+    
+    const currentMatchingMode = await getAIMatchingMode();
+    const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
+    usedMatchingMode = currentMatchingMode;
+    preferencesConsideredBeyondDefaultMinRating = false;
 
-    // TEMPORARILY BYPASS ADVANCED LOGIC
-    // const currentMatchingMode = await getAIMatchingMode();
-    // const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
-    // usedMatchingMode = currentMatchingMode;
-    // preferencesConsideredBeyondDefaultMinRating = false;
+    if (currentMatchingMode === 'advanced') {
+      promptToUse = advancedItemMatchPrompt;
+      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
-    // if (currentMatchingMode === 'advanced') {
-    //   promptToUse = advancedItemMatchPrompt;
-    //   const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
-    //   const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
+      let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
+      if (userProfile?.interestedInThirdPartyFulfillment === true) {
+        fulfillmentDisplayText = "Yes";
+      } else if (userProfile?.interestedInThirdPartyFulfillment === false) {
+        fulfillmentDisplayText = "No";
+      }
 
-    //   let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
-    //   if (userProfile?.interestedInThirdPartyFulfillment === true) {
-    //     fulfillmentDisplayText = "Yes";
-    //   } else if (userProfile?.interestedInThirdPartyFulfillment === false) {
-    //     fulfillmentDisplayText = "No";
-    //   }
+      const userPrefsForPrompt: z.infer<typeof UserPreferencesSchema> = {
+        motivations: userProfile?.motivations,
+        locationPreference: userProfile?.locationPreference,
+        tradeTimingPreference: userProfile?.tradeTimingPreference,
+        interestedInThirdPartyFulfillment: userProfile?.interestedInThirdPartyFulfillment,
+        minimumMatchRating: effectiveUserMinRating,
+        fulfillmentPreferenceDisplay: fulfillmentDisplayText,
+      };
 
-    //   const userPrefsForPrompt: z.infer<typeof UserPreferencesSchema> = {
-    //     motivations: userProfile?.motivations,
-    //     locationPreference: userProfile?.locationPreference,
-    //     tradeTimingPreference: userProfile?.tradeTimingPreference,
-    //     interestedInThirdPartyFulfillment: userProfile?.interestedInThirdPartyFulfillment,
-    //     minimumMatchRating: effectiveUserMinRating,
-    //     fulfillmentPreferenceDisplay: fulfillmentDisplayText,
-    //   };
+      finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
 
-    //   finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
+      if (usePrefsInMatchingGlobal) {
+        const hasMeaningfulMotivations = !!(userProfile?.motivations && userProfile.motivations.length > 0);
+        const hasMeaningfulLocationPref = !!(userProfile?.locationPreference && (userProfile.locationPreference.isSensitive || (userProfile.locationPreference.notes && userProfile.locationPreference.notes.trim() !== '')));
+        const hasMeaningfulTimingPref = !!userProfile?.tradeTimingPreference;
+        const hasExplicit3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
+        // minimumMatchRating always exists, so check if it's non-default
+        const hasNonDefaultMinRating = !!(userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low');
 
-    //   if (usePrefsInMatchingGlobal) {
-    //     const hasMeaningfulMotivations = !!(userProfile?.motivations && userProfile.motivations.length > 0);
-    //     const hasMeaningfulLocationPref = !!(userProfile?.locationPreference && (userProfile.locationPreference.isSensitive || (userProfile.locationPreference.notes && userProfile.locationPreference.notes.trim() !== '')));
-    //     const hasMeaningfulTimingPref = !!userProfile?.tradeTimingPreference;
-    //     const hasExplicit3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
-    //     const hasNonDefaultMinRating = !!(userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low');
 
-    //     preferencesConsideredBeyondDefaultMinRating =
-    //       hasMeaningfulMotivations ||
-    //       hasMeaningfulLocationPref ||
-    //       hasMeaningfulTimingPref ||
-    //       hasExplicit3rdPartyPref ||
-    //       hasNonDefaultMinRating;
-    //   }
-    // }
+        preferencesConsideredBeyondDefaultMinRating =
+          hasMeaningfulMotivations ||
+          hasMeaningfulLocationPref ||
+          hasMeaningfulTimingPref ||
+          hasExplicit3rdPartyPref ||
+          hasNonDefaultMinRating;
+      }
+    } else { // Simple mode
+        promptToUse = simpleItemMatchPrompt;
+        // No user preferences for simple prompt input, finalInputForPrompt is already set up
+    }
+
 
     try {
-      console.log(`[${flowName}] (FORCED SIMPLE mode) Calling prompt with input:`, JSON.stringify(finalInputForPrompt, null, 2));
-      const { output: promptOutput } = await promptToUse(finalInputForPrompt); // Will use simpleItemMatchPrompt
+      console.log(`[${flowName}] (${usedMatchingMode} mode) Calling prompt with input:`, JSON.stringify(finalInputForPrompt, null, 2));
+      const { output: promptOutput } = await promptToUse(finalInputForPrompt);
 
       let defaultReasoning = `AI (${usedMatchingMode} mode) did not find strong matches for '${input.currentItem.name}' based on the current criteria. Users might explore other items or categories.`;
       if (itemsToConsider.length < 3) {
@@ -491,4 +455,3 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
-

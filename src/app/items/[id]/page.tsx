@@ -3,16 +3,17 @@ import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod } from '@/types';
+import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod, ItemTiming } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, Filter, HeartHandshake, MapPin, Truck, Edit2 } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, ClockFast } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
 import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient';
 import { Separator } from '@/components/ui/separator';
+import { format } from 'date-fns';
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
   const item = dummyItems.find((i) => i.id === itemId);
@@ -36,13 +37,14 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
     return <p className="text-sm text-muted-foreground font-body">Logistics details not specified for this item.</p>;
   }
 
-  let locationDisplay = "Location not specified.";
+  let locationDisplay = "Location not specified for this item.";
   if (logistics.locationType === 'profile_stored_location' && logistics.selectedUserStoredLocationId) {
     const storedLoc = owner.locations?.find(l => l.id === logistics.selectedUserStoredLocationId);
     locationDisplay = storedLoc ? `${storedLoc.name} (${storedLoc.address || 'Address not set'})` : "Stored address (details unavailable)";
   } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
     locationDisplay = logistics.itemSpecificAddress;
-  } else { 
+  } else if (logistics.locationType !== 'not_specified') {
+    // Fallback if type is set but no specific details (e.g. profile default implied)
     const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
     const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
     if (defaultLoc) {
@@ -50,14 +52,37 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
     }
   }
 
+
+  let timingDisplay = "Timing not specified.";
+  if (logistics.timing) {
+    if (logistics.timing.type === 'flexible') {
+      timingDisplay = "Flexible";
+    } else if (logistics.timing.type === 'fixed_date' && logistics.timing.date) {
+      try {
+        timingDisplay = `Fixed: ${format(new Date(logistics.timing.date), "PPP")}`;
+      } catch (e) {
+        timingDisplay = `Fixed: Invalid Date (${logistics.timing.date})`;
+      }
+    }
+  }
+
+
   return (
     <div className="space-y-3">
+      {logistics.locationType !== 'not_specified' && (
+        <div>
+            <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" /> Location:</h4>
+            <p className="text-sm text-foreground/90 font-body pl-5">{locationDisplay}</p>
+        </div>
+      )}
+       {(logistics.locationType === 'not_specified') && (
+        <div>
+             <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" /> Location:</h4>
+            <p className="text-sm text-foreground/90 font-body pl-5">{locationDisplay}</p>
+        </div>
+      )}
       <div>
-        <h4 className="font-headline text-md flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground" /> Location:</h4>
-        <p className="text-sm text-foreground/90 font-body pl-5">{locationDisplay}</p>
-      </div>
-      <div>
-        <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Delivery Methods:</h4>
+        <h4 className="font-headline text-md flex items-center gap-1.5"><Truck className="h-4 w-4 text-muted-foreground" /> Delivery:</h4>
         {logistics.deliveryMethods && logistics.deliveryMethods.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 pl-5 mt-1">
             {logistics.deliveryMethods.map(method => (
@@ -70,7 +95,14 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
           <p className="text-sm text-foreground/90 font-body pl-5">Not specified</p>
         )}
       </div>
-      
+
+      {logistics.timing && (
+        <div>
+            <h4 className="font-headline text-md flex items-center gap-1.5"><ClockFast className="h-4 w-4 text-muted-foreground" /> Timing:</h4>
+            <p className="text-sm text-foreground/90 font-body pl-5">{timingDisplay}</p>
+        </div>
+      )}
+
       {logistics.notes && (
         <div>
           <h4 className="font-headline text-md flex items-center gap-1.5"><Edit2 className="h-4 w-4 text-muted-foreground" /> Notes:</h4>
@@ -135,9 +167,10 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                     <HeartHandshake className="mr-1 h-3 w-3" /> Gift It Forward
                   </Badge>
                 )}
-                {item.minimumMatchRatingOverride && (
-                  <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                    <Filter className="mr-1 h-3 w-3" /> Min. Match: {item.minimumMatchRatingOverride}
+                {/* Minimum Match Rating Override badge removed */}
+                 {item.openToAnyOpportunity && (
+                  <Badge variant="outline" className="text-xs border-accent/50 text-accent">
+                    Open to Any Opportunity
                   </Badge>
                 )}
               </div>
@@ -229,9 +262,9 @@ function ItemPageLoadingState() {
                 </div>
               </div>
                <div className="my-4 h-px bg-border"></div>
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div> 
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div> 
-              <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div> 
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
+              <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div>
             </div>
             <div className="p-0 pt-6">
               <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>

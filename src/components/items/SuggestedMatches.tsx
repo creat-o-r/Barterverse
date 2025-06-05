@@ -38,11 +38,11 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setMatchModeUsed(undefined);
 
       if (!currentItem?.id) {
-          setLoading(false);
           const missingItemError = "Cannot fetch suggestions: current item information is missing.";
           setInternalReasoning(missingItemError);
           setFetchError(missingItemError);
           toast({ title: "Suggestion Error", description: missingItemError, variant: "destructive" });
+          setLoading(false);
           return;
       }
 
@@ -59,16 +59,17 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             category: item.category,
             ownerId: item.ownerId,
             listingType: item.listingType,
-            minimumMatchRatingOverride: item.minimumMatchRatingOverride,
-            isGiftItForward: item.isGiftItForward, 
+            // minimumMatchRatingOverride: item.minimumMatchRatingOverride, // Removed
+            isGiftItForward: item.isGiftItForward,
+            openToAnyOpportunity: item.openToAnyOpportunity, // Added
         }));
 
         if (otherAvailableItems.length === 0) {
             const noItemsReasoning = `No other items currently available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'this item'} "${currentItem.name}".`;
             setInternalReasoning(noItemsReasoning);
             setSuggestedItems([]);
+            setMatchModeUsed('simple');
             setLoading(false);
-            setMatchModeUsed('simple'); 
             return;
         }
 
@@ -81,27 +82,28 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             category: currentItem.category,
             ownerId: currentItem.ownerId,
             listingType: currentItem.listingType,
-            minimumMatchRatingOverride: currentItem.minimumMatchRatingOverride,
-            isGiftItForward: currentItem.isGiftItForward, 
+            // minimumMatchRatingOverride: currentItem.minimumMatchRatingOverride, // Removed
+            isGiftItForward: currentItem.isGiftItForward,
+            openToAnyOpportunity: currentItem.openToAnyOpportunity, // Added
           },
           availableItems: otherAvailableItems,
         };
 
         const flowPromise = suggestMatchingItems(inputForFlow);
-        const timeoutPromise = new Promise<ItemMatchOutput>((_, reject) => 
+        const timeoutPromise = new Promise<ItemMatchOutput>((_, reject) =>
             setTimeout(() => reject(new Error("AI_SUGGESTION_TIMEOUT")), FLOW_TIMEOUT_MS)
         );
 
         const result: ItemMatchOutput = await Promise.race([flowPromise, timeoutPromise]);
-        
+
         setPreferencesWereConsidered(result.preferencesConsidered || false);
         setMatchModeUsed(result.usedMatchingMode);
 
         const itemsWithScores = (result.suggestedMatches || []).map(match => {
           const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-          return itemDetails ? { 
-            ...itemDetails, 
-            matchScore: match.matchScore, 
+          return itemDetails ? {
+            ...itemDetails,
+            matchScore: match.matchScore,
             isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward,
             reciprocalItemId: match.reciprocalItemId
           } : null;
@@ -141,7 +143,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         } else {
             setInternalReasoning(err.message || clientErrorMsg);
         }
-        
+
         setFetchError(clientErrorMsg);
         toast({ title: "Suggestion Error", description: clientErrorMsg, variant: toastSeverity, duration: 7000 });
 
@@ -152,7 +154,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
     fetchSuggestions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem.id, currentItem.name, currentItem.listingType, currentItem.ownerId, currentItem.minimumMatchRatingOverride, currentItem.isGiftItForward]);
+  }, [currentItem.id, currentItem.name, currentItem.listingType, currentItem.ownerId, /* currentItem.minimumMatchRatingOverride removed */ currentItem.isGiftItForward, currentItem.openToAnyOpportunity]);
 
 
   const cardTitleText = currentItem.listingType === 'offer'
@@ -215,7 +217,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             </CardTitle>
             <div className="flex items-center gap-2 text-xs">
               {matchModeUsed && <Badge variant="outline" className="capitalize">Mode: {matchModeUsed}</Badge>}
-              <Badge variant={preferencesWereConsidered ? 'default' : 'secondary'}>Prefs: {preferencesWereConsidered ? 'On' : 'Off'}</Badge>
+              <Badge variant={preferencesWereConsidered ? 'default' : 'secondary'}>Prefs: {preferencesWereConsidered ? 'Yes' : 'No'}</Badge>
             </div>
           </div>
         </CardHeader>
@@ -243,8 +245,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           </div>
       </CardHeader>
       <CardContent>
-          <ItemList 
-            items={suggestedItems} 
+          <ItemList
+            items={suggestedItems}
             mainContextItemId={currentItem.id}
             usedMatchingMode={matchModeUsed}
             preferencesConsidered={preferencesWereConsidered}
@@ -253,4 +255,3 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       </Card>
   );
 }
-

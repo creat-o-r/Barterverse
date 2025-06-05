@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search, Filter, HeartHandshake, MapPin, Truck, Edit2, Network } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search, HeartHandshake, MapPin, Truck, Edit2, Network, CalendarDays, ClockFast } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
@@ -26,44 +26,63 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data';
-import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics } from '@/types';
+import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming } from '@/types';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
+const NO_LOCATION_SPECIFIED_VALUE = "no_location_specified_for_item";
 
 const deliveryMethodEnum = z.enum([
-  'pickup_only', 
-  'willing_to_ship', 
-  'delivery_area', 
+  'pickup_only',
+  'willing_to_ship',
+  'delivery_area',
   'possible_delivery',
   'public_meetup',
   'flexible_meetup'
 ]);
 
-const itemFormSchema = z.object({
+const itemFormSchemaBase = z.object({
   name: z.string().min(3, { message: 'Item name must be at least 3 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']),
+  // minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']), // Removed
   isGiftItForward: z.boolean().optional(),
-  openToAnyOpportunity: z.boolean().optional(), // New field
-  
-  selectedLocationIdentifier: z.string().min(1, { message: "Please select or specify an item location."}),
+  openToAnyOpportunity: z.boolean().optional(),
+
+  selectedLocationIdentifier: z.string().min(1, { message: "Please select a location option or 'Not Specified'."}), // Now always required, but can be NO_LOCATION_SPECIFIED_VALUE
   itemSpecificAddress: z.string().optional(),
   deliveryMethods: z.array(deliveryMethodEnum).min(1, { message: "Please select at least one delivery method." }),
   logisticsNotes: z.string().optional(),
-}).refine(data => {
+
+  timingType: z.enum(['flexible', 'fixed_date']).optional(),
+  timingFixedDate: z.string().optional(), // Store as ISO string or similar
+});
+
+const itemFormSchema = itemFormSchemaBase.refine(data => {
   if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
-    return data.itemSpecificAddress && data.itemSpecificAddress.length >= 5;
+    return data.itemSpecificAddress && data.itemSpecificAddress.trim().length >= 5;
   }
   return true;
 }, {
   message: "Please enter a valid specific address (min 5 characters) if you've chosen to enter one.",
   path: ["itemSpecificAddress"],
+}).refine(data => {
+  if (data.timingType === 'fixed_date') {
+    return data.timingFixedDate && data.timingFixedDate.trim() !== '';
+  }
+  return true;
+}, {
+  message: "Please enter a date if timing type is 'Fixed Date'.",
+  path: ["timingFixedDate"],
 });
+
 
 type ItemFormValues = z.infer<typeof itemFormSchema>;
 
@@ -84,14 +103,12 @@ export default function NewItemPage() {
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  
+
   useEffect(() => {
-    const user = dummyUsers.find(u => u.id === 'user1');
+    const user = dummyUsers.find(u => u.id === 'user1'); // Simulating logged-in user
     setCurrentUser(user || null);
   }, []);
 
-  const currentUserProfileRating = currentUser?.minimumMatchRating || 'Low';
-  
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
@@ -100,45 +117,52 @@ export default function NewItemPage() {
       category: '',
       imageUrl: '',
       listingType: 'offer',
-      minimumMatchRatingOverride: currentUserProfileRating, 
+      // minimumMatchRatingOverride: currentUser?.minimumMatchRating || 'Low', // Removed
       isGiftItForward: false,
-      openToAnyOpportunity: false, // Default for new field
-      selectedLocationIdentifier: ITEM_SPECIFIC_LOCATION_VALUE,
+      openToAnyOpportunity: false,
+      selectedLocationIdentifier: NO_LOCATION_SPECIFIED_VALUE, // Default to not specified
       itemSpecificAddress: '',
       deliveryMethods: ['pickup_only'],
       logisticsNotes: '',
+      timingType: 'flexible',
+      timingFixedDate: undefined,
     },
   });
-  
+
  useEffect(() => {
     if (currentUser && form.reset) {
-        const currentFormValues = form.getValues();
-        
-        let defaultSelectedLocationId: string = ITEM_SPECIFIC_LOCATION_VALUE;
+        const currentFormValues = form.getValues(); // Get potentially dirty form values
+
+        let defaultSelectedLocationId: string = NO_LOCATION_SPECIFIED_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
 
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
             defaultSelectedLocationId = preferredStoredLocId;
         } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
-            defaultSelectedLocationId = currentUser.locations[0].id;
+            // If no preferred, but locations exist, take the first one as a sensible default (or keep NO_LOCATION_SPECIFIED_VALUE)
+            // For now, let's still prioritize NO_LOCATION_SPECIFIED_VALUE if no explicit preferred one
+            // defaultSelectedLocationId = currentUser.locations[0].id;
         }
-        
+
         const defaultDeliveryMethods = currentUser.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
 
         form.reset({
-            ...currentFormValues,
-            minimumMatchRatingOverride: currentFormValues.minimumMatchRatingOverride || currentUser.minimumMatchRating || 'Low',
-            openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false, // Ensure default applied
-            selectedLocationIdentifier: defaultSelectedLocationId,
-            itemSpecificAddress: defaultSelectedLocationId === ITEM_SPECIFIC_LOCATION_VALUE ? (currentFormValues.itemSpecificAddress || '') : '',
+            ...currentFormValues, // Keep existing form values if any
+            // minimumMatchRatingOverride: currentFormValues.minimumMatchRatingOverride || currentUser.minimumMatchRating || 'Low', // Removed
+            openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false,
+            selectedLocationIdentifier: currentFormValues.selectedLocationIdentifier && currentFormValues.selectedLocationIdentifier !== NO_LOCATION_SPECIFIED_VALUE ? currentFormValues.selectedLocationIdentifier : defaultSelectedLocationId,
+            itemSpecificAddress: (currentFormValues.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) ? (currentFormValues.itemSpecificAddress || '') : '',
             deliveryMethods: currentFormValues.deliveryMethods?.length ? currentFormValues.deliveryMethods : defaultDeliveryMethods,
+            timingType: currentFormValues.timingType || 'flexible',
+            timingFixedDate: currentFormValues.timingFixedDate || undefined,
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, form.reset]); 
+  }, [currentUser, form.reset]);
 
   const listingTypeWatch = form.watch('listingType');
   const selectedLocationIdentifierWatch = form.watch('selectedLocationIdentifier');
+  const timingTypeWatch = form.watch('timingType');
 
   const handleAiSuggestions = useCallback(async () => {
     const name = form.getValues('name');
@@ -183,24 +207,34 @@ export default function NewItemPage() {
     }
     setIsSubmitting(true);
     try {
-      let itemLogistics: ItemLogistics;
       let locationTypeForLogistics: ItemLogisticsLocationType;
       let storedLocationIdForLogistics: string | undefined = undefined;
       let specificAddressForLogistics: string | undefined = undefined;
 
-      if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
+      if (data.selectedLocationIdentifier === NO_LOCATION_SPECIFIED_VALUE) {
+        locationTypeForLogistics = 'not_specified';
+      } else if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
         locationTypeForLogistics = 'item_specific_location';
         specificAddressForLogistics = data.itemSpecificAddress;
-      } else { 
+      } else {
         locationTypeForLogistics = 'profile_stored_location';
         storedLocationIdForLogistics = data.selectedLocationIdentifier;
       }
-      
-      itemLogistics = {
+
+      let itemTiming: ItemTiming | undefined = undefined;
+      if (data.timingType) {
+        itemTiming = { type: data.timingType as ItemTimingType };
+        if (data.timingType === 'fixed_date' && data.timingFixedDate) {
+          itemTiming.date = data.timingFixedDate;
+        }
+      }
+
+      const itemLogistics: ItemLogistics = {
           locationType: locationTypeForLogistics,
           selectedUserStoredLocationId: storedLocationIdForLogistics,
           itemSpecificAddress: specificAddressForLogistics,
           deliveryMethods: data.deliveryMethods,
+          timing: itemTiming,
           notes: data.logisticsNotes,
       };
 
@@ -211,41 +245,40 @@ export default function NewItemPage() {
         listingType: data.listingType,
         imageUrl: data.imageUrl || '',
         ownerId: currentUser.id,
-        minimumMatchRatingOverride: data.minimumMatchRatingOverride,
+        // minimumMatchRatingOverride is removed
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false,
-        openToAnyOpportunity: data.openToAnyOpportunity, // Pass new field
+        openToAnyOpportunity: data.openToAnyOpportunity,
         logistics: itemLogistics,
       };
       const addedItem = addNewItemToDummyData(newItemData);
-      
+
       toast({
         title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
         description: `${data.name} has been successfully posted.`,
       });
-      
+
       if (currentUser && form.reset) {
-        let defaultSelectedLocationId: string = ITEM_SPECIFIC_LOCATION_VALUE;
+        let defaultSelectedLocationId: string = NO_LOCATION_SPECIFIED_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
             defaultSelectedLocationId = preferredStoredLocId;
-        } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
-            defaultSelectedLocationId = currentUser.locations[0].id;
         }
         const defaultDeliveryMethods = currentUser.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
 
         form.reset({
-            name: '', 
+            name: '',
             description: '',
             category: '',
             imageUrl: '',
             listingType: 'offer',
-            minimumMatchRatingOverride: currentUser.minimumMatchRating || 'Low',
             isGiftItForward: false,
-            openToAnyOpportunity: false, // Reset new field
+            openToAnyOpportunity: false,
             selectedLocationIdentifier: defaultSelectedLocationId,
             itemSpecificAddress: '',
             deliveryMethods: defaultDeliveryMethods,
             logisticsNotes: '',
+            timingType: 'flexible',
+            timingFixedDate: undefined,
         });
       } else {
         form.reset();
@@ -264,7 +297,7 @@ export default function NewItemPage() {
   if (!currentUser) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Loading user data...</div>;
   }
-  
+
   return (
     <div className="max-w-2xl mx-auto">
       <Card>
@@ -274,13 +307,13 @@ export default function NewItemPage() {
             List an Item
           </CardTitle>
           <CardDescription className="font-body">
-            Tell us about your item. Logistics fields initialize to your profile defaults. Our AI can help with category and listing type.
+            Tell us about your item. Logistics fields initialize to your profile defaults or sensible options. Our AI can help with category and listing type.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              
+
               <section className="space-y-6">
                 <h3 className="font-headline text-xl border-b pb-2 mb-4">Item Details</h3>
                 <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel className="font-headline">Item Name</FormLabel><FormControl><Input placeholder="e.g., Vintage Leather Journal" {...field} disabled={isLoadingOverall} /></FormControl><FormMessage /></FormItem>)} />
@@ -288,35 +321,37 @@ export default function NewItemPage() {
                 <FormField control={form.control} name="listingType" render={({ field }) => (<FormItem className="space-y-3"><FormLabel className="font-headline flex items-center gap-2">Listing Type {isInferringListingType && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><RadioGroup onValueChange={(value) => { field.onChange(value); form.setValue('listingType', value as 'offer' | 'want', {shouldDirty: true}); }} value={field.value} className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4" disabled={isLoadingOverall}><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="offer" id="offer" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="offer" className="font-normal flex items-center gap-2"><Gift className="h-5 w-5 text-green-600" /> Offering an item</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="want" id="want" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="want" className="font-normal flex items-center gap-2"><Search className="h-5 w-5 text-blue-600" /> Looking for an item</FormLabel></FormItem></RadioGroup></FormControl><FormDescription className="font-body">AI may suggest this.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="category" render={({ field }) => (<FormItem><FormLabel className="font-headline flex items-center gap-2">Category {isSuggestingCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isSuggestingCategory && form.formState.dirtyFields.category && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><Input placeholder={isSuggestingCategory ? "AI suggesting..." : "e.g., Books"} {...field} onChange={(e) => { field.onChange(e); form.setValue('category', e.target.value, {shouldDirty: true});}} disabled={isLoadingOverall} /></FormControl><FormDescription className="font-body">AI may suggest. Type to override.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="imageUrl" render={({ field }) => (<FormItem><FormLabel className="font-headline">Image URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="https://placehold.co/600x400.png" {...field} disabled={isLoadingOverall}/></FormControl><FormDescription className="font-body">Link to an image. Use placeholder if needed.</FormDescription><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="minimumMatchRatingOverride" render={({ field }) => (<FormItem><FormLabel className="font-headline">Minimum Match Rating</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOverall}><FormControl><SelectTrigger disabled={isLoadingOverall}><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Low">Low</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="High">High</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                 {/* Minimum Match Rating Field Removed */}
               </section>
 
               <Separator />
 
               <section className="space-y-6">
                 <h3 className="font-headline text-xl border-b pb-2 mb-4">Logistics</h3>
-                
+
                 <FormField control={form.control} name="selectedLocationIdentifier" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="font-headline flex items-center gap-2"><MapPin className="h-5 w-5 text-muted-foreground" />Item Location</FormLabel>
-                    <Select 
+                    <Select
                         onValueChange={(value) => {
                             field.onChange(value);
                             if (value !== ITEM_SPECIFIC_LOCATION_VALUE) {
                                 form.setValue('itemSpecificAddress', '', {shouldValidate: false});
                             }
-                        }} 
-                        value={field.value} 
+                        }}
+                        value={field.value}
                         disabled={isLoadingOverall}
                     >
                       <FormControl><SelectTrigger><SelectValue placeholder="Select a location option..." /></SelectTrigger></FormControl>
                       <SelectContent>
+                        <SelectItem value={NO_LOCATION_SPECIFIED_VALUE}>Location not specified for this item</SelectItem>
                         {currentUser.locations && currentUser.locations.length > 0 && currentUser.locations.map((loc: UserStoredLocation) => (
                           <SelectItem key={loc.id} value={loc.id}>{loc.name} ({loc.address || 'Address not set'})</SelectItem>
                         ))}
                         <SelectItem value={ITEM_SPECIFIC_LOCATION_VALUE}>Enter a specific address for this item</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormDescription className="font-body">Choose a stored location, enter a new one, or specify none.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -330,14 +365,89 @@ export default function NewItemPage() {
                     </FormItem>
                   )} />
                 )}
-                
+
+                <FormField control={form.control} name="timingType" render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel className="font-headline flex items-center gap-2"><ClockFast className="h-5 w-5 text-muted-foreground" />Availability Timing</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          if (value === 'flexible') {
+                            form.setValue('timingFixedDate', undefined, { shouldValidate: true });
+                          }
+                        }}
+                        value={field.value}
+                        className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4"
+                        disabled={isLoadingOverall}
+                      >
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl><RadioGroupItem value="flexible" id="timing-flexible" disabled={isLoadingOverall} /></FormControl>
+                          <FormLabel htmlFor="timing-flexible" className="font-normal">Flexible</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl><RadioGroupItem value="fixed_date" id="timing-fixed" disabled={isLoadingOverall} /></FormControl>
+                          <FormLabel htmlFor="timing-fixed" className="font-normal">Fixed Date</FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                {timingTypeWatch === 'fixed_date' && (
+                  <FormField
+                    control={form.control}
+                    name="timingFixedDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel className="font-headline">Fixed Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-[240px] pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                disabled={isLoadingOverall}
+                              >
+                                {field.value ? (
+                                  format(new Date(field.value), "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value ? new Date(field.value) : undefined}
+                              onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} // Store as YYYY-MM-DD
+                              disabled={(date) =>
+                                date < new Date(new Date().setHours(0,0,0,0)) || isLoadingOverall // Disable past dates
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+
                 <FormField
                   control={form.control}
                   name="deliveryMethods"
                   render={({ field }) => (
                     <FormItem>
                       <div className="mb-2">
-                        <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery Methods</FormLabel>
+                        <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery</FormLabel>
                         <FormDescription className="font-body">Select all that apply. Initializes to your profile defaults.</FormDescription>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
@@ -371,13 +481,13 @@ export default function NewItemPage() {
                     </FormItem>
                   )}
                 />
-                
+
                  <FormField
                   control={form.control}
                   name="logisticsNotes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-headline flex items-center gap-2"><Edit2 className="h-5 w-5 text-muted-foreground" />Logistics Notes (Optional)</FormLabel>
+                      <FormLabel className="font-headline flex items-center gap-2"><Edit2 className="h-5 w-5 text-muted-foreground" />Delivery Notes (Optional)</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Any additional details about pickup, shipping, or meeting up (e.g., 'Available for pickup on weekends only')."
@@ -392,7 +502,7 @@ export default function NewItemPage() {
                   )}
                 />
               </section>
-              
+
               {listingTypeWatch === 'offer' && (
                 <FormField
                   control={form.control}
@@ -444,7 +554,7 @@ export default function NewItemPage() {
                   </FormItem>
                 )}
               />
-              
+
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
                 {isLoadingOverall ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting...' : (isInferringListingType ? 'Inferring...' : 'Loading...'))}</>) : (`Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`)}
               </Button>
@@ -455,4 +565,3 @@ export default function NewItemPage() {
     </div>
   );
 }
-    

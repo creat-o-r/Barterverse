@@ -1,5 +1,5 @@
 
-import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics, ItemDeliveryMethod } from '@/types';
+import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics, ItemDeliveryMethod, ItemTiming, ItemLogisticsLocationType } from '@/types';
 import type { InferredUserPreferences } from '@/types';
 
 export const dummyUsers: User[] = [
@@ -24,7 +24,7 @@ export const dummyUsers: User[] = [
     logisticsPreferences: {
       defaultDeliveryMethods: ['willing_to_ship', 'public_meetup'],
       preferredStoredLocationId: 'user1_home',
-      openToChainDelivery: true, // Added preference
+      openToChainDelivery: true,
     },
   },
   {
@@ -47,7 +47,7 @@ export const dummyUsers: User[] = [
     logisticsPreferences: {
       defaultDeliveryMethods: ['pickup_only'],
       preferredStoredLocationId: 'user2_apt',
-      openToChainDelivery: false, // Added preference
+      openToChainDelivery: false,
     },
   },
   {
@@ -65,8 +65,7 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'staged' as TradeTimingPreference,
     minimumMatchRating: 'Low',
     logisticsPreferences: {
-      defaultDeliveryMethods: ['public_meetup', 'flexible_meetup'], 
-      // openToChainDelivery left undefined for this user
+      defaultDeliveryMethods: ['public_meetup', 'flexible_meetup'],
     },
   },
   {
@@ -84,8 +83,8 @@ export const dummyUsers: User[] = [
     tradeTimingPreference: 'flexible' as TradeTimingPreference,
     minimumMatchRating: 'High',
     logisticsPreferences: {
-      defaultDeliveryMethods: ['possible_delivery', 'willing_to_ship'], 
-      openToChainDelivery: true, // Added preference
+      defaultDeliveryMethods: ['possible_delivery', 'willing_to_ship'],
+      openToChainDelivery: true,
     }
   },
   {
@@ -104,7 +103,7 @@ export const dummyUsers: User[] = [
     minimumMatchRating: 'Medium',
     logisticsPreferences: {
         defaultDeliveryMethods: ['flexible_meetup', 'pickup_only'],
-        openToChainDelivery: false, // Added preference
+        openToChainDelivery: false,
     }
   },
 ];
@@ -121,13 +120,14 @@ export let dummyItems: Item[] = [
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'offer',
-    minimumMatchRatingOverride: 'High',
+    // minimumMatchRatingOverride: 'High', // Removed
     isGiftItForward: false,
     openToAnyOpportunity: false,
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
       deliveryMethods: ['willing_to_ship', 'public_meetup'],
+      timing: { type: 'flexible' },
       notes: "Can also meet downtown on weekdays."
     }
   },
@@ -148,6 +148,7 @@ export let dummyItems: Item[] = [
       locationType: 'item_specific_location',
       itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
       deliveryMethods: ['pickup_only'],
+      timing: { type: 'fixed_date', date: '2024-07-15' }
     }
   },
   {
@@ -162,11 +163,12 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'offer',
     isGiftItForward: true,
-    openToAnyOpportunity: true, // Example of true
+    openToAnyOpportunity: true,
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
       deliveryMethods: ['willing_to_ship'],
+      timing: { type: 'flexible' }
     }
   },
   {
@@ -204,7 +206,8 @@ export let dummyItems: Item[] = [
      logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Balcony Garden",
-      deliveryMethods: ['public_meetup', 'flexible_meetup'], 
+      deliveryMethods: ['public_meetup', 'flexible_meetup'],
+      timing: { type: 'flexible' }
     }
   },
   {
@@ -220,7 +223,7 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
-     logistics: { 
+     logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Workshop",
       deliveryMethods: ['willing_to_ship'],
@@ -237,12 +240,12 @@ export let dummyItems: Item[] = [
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'want',
-    minimumMatchRatingOverride: 'Medium',
-    openToAnyOpportunity: true, // Example for a 'want'
-    logistics: { 
-      locationType: 'profile_stored_location',
-      selectedUserStoredLocationId: 'user1_home',
-      deliveryMethods: ['willing_to_ship', 'public_meetup'], 
+    // minimumMatchRatingOverride: 'Medium', // Removed
+    openToAnyOpportunity: true,
+    logistics: {
+      locationType: 'not_specified', // Example of not specified location
+      deliveryMethods: ['willing_to_ship', 'public_meetup'],
+      timing: { type: 'flexible' }
     }
   },
   {
@@ -260,7 +263,7 @@ export let dummyItems: Item[] = [
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
-      deliveryMethods: ['pickup_only', 'willing_to_ship'], 
+      deliveryMethods: ['pickup_only', 'willing_to_ship'],
     }
   },
   {
@@ -279,7 +282,7 @@ export let dummyItems: Item[] = [
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Diana's Boutique",
-        deliveryMethods: ['possible_delivery', 'willing_to_ship'], 
+        deliveryMethods: ['possible_delivery', 'willing_to_ship'],
     }
   },
   {
@@ -295,7 +298,7 @@ export let dummyItems: Item[] = [
     listingType: 'want',
     openToAnyOpportunity: false,
     logistics: {
-        locationType: 'item_specific_location', 
+        locationType: 'item_specific_location',
         itemSpecificAddress: 'Diana Doodad Wants This Shipped To: 12Collector Lane',
         deliveryMethods: ['willing_to_ship'],
     }
@@ -370,9 +373,10 @@ export let dummyItems: Item[] = [
     listingType: 'want',
     openToAnyOpportunity: false,
     logistics: {
-        locationType: 'item_specific_location', 
+        locationType: 'item_specific_location',
         itemSpecificAddress: "Charlie Swapper wants this delivered locally if possible.",
         deliveryMethods: ['delivery_area', 'public_meetup'],
+        timing: { type: 'fixed_date', date: '2024-08-01' }
     }
   }
 ];
@@ -428,16 +432,17 @@ export function addNewItemToDummyData(
   }
 
   let finalLogistics: ItemLogistics;
-  if (itemData.logistics) { 
+  if (itemData.logistics) {
     finalLogistics = {
         locationType: itemData.logistics.locationType,
         selectedUserStoredLocationId: itemData.logistics.locationType === 'profile_stored_location' ? itemData.logistics.selectedUserStoredLocationId : undefined,
         itemSpecificAddress: itemData.logistics.locationType === 'item_specific_location' ? itemData.logistics.itemSpecificAddress : undefined,
-        deliveryMethods: itemData.logistics.deliveryMethods, 
+        deliveryMethods: itemData.logistics.deliveryMethods,
+        timing: itemData.logistics.timing, // Pass timing
         notes: itemData.logistics.notes,
     };
-  } else {
-    let defaultLocType: 'profile_stored_location' | 'item_specific_location' = 'item_specific_location';
+  } else { // Fallback if logistics somehow not provided from form (should be)
+    let defaultLocType: ItemLogisticsLocationType = 'not_specified';
     let defaultStoredId: string | undefined = undefined;
     if (owner.logisticsPreferences?.preferredStoredLocationId && owner.locations?.find(l => l.id === owner.logisticsPreferences?.preferredStoredLocationId)) {
         defaultLocType = 'profile_stored_location';
@@ -452,19 +457,20 @@ export function addNewItemToDummyData(
         selectedUserStoredLocationId: defaultStoredId,
         itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
         deliveryMethods: owner.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'],
+        timing: { type: 'flexible' }, // Default timing
         notes: '',
     };
   }
 
-
   const newItem: Item = {
-    ...itemData, // This will include isGiftItForward and openToAnyOpportunity from form data
+    ...itemData,
     id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     ownerName: owner.name,
     status: 'available',
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || 'https://placehold.co/600x400.png',
     logistics: finalLogistics,
+    // minimumMatchRatingOverride is removed from Item type
   };
 
   dummyItems.push(newItem);
@@ -478,4 +484,3 @@ export function addNewItemToDummyData(
   console.log('[DummyData] Total items now:', dummyItems.length);
   return newItem;
 }
-
