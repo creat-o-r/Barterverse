@@ -248,34 +248,55 @@ export default function MatchReportsPage() {
   const handleListModels = async () => {
     setIsLoadingListedModels(true);
     setListModelsError(null);
-    setListedModels(null); // Clear previous results immediately
-    setShowListedModels(true); // Show the collapsible section
+    setListedModels(null);
+    setShowListedModels(true);
     try {
       const response = await fetch('/api/list-models');
-      const data = await response.json();
 
       if (!response.ok) {
-        let errorMessage = data.error || `API request failed with status ${response.status}`;
-        if (data.details && data.details.includes("listModels on Class.prototype: false")) {
-             errorMessage = `Failed to list models: The Google AI SDK's 'listModels' method is not available in the server environment. This suggests an issue with the SDK installation or a build/bundling problem. Details: ${data.details}`;
-        } else if (data.details) {
-            errorMessage += ` Details: ${data.details}`;
+        let errorMessage = `API request failed with status ${response.status}`;
+        let errorData;
+        try {
+          // Try to parse error from server if it's JSON
+          errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          if (errorData.details && errorData.details.includes("listModels on Class.prototype: false")) {
+             errorMessage = `Failed to list models: The Google AI SDK's 'listModels' method is not available in the server environment. This suggests an issue with the SDK installation or a build/bundling problem. Details: ${errorData.details}`;
+          } else if (errorData.details) {
+            errorMessage += ` Details: ${errorData.details}`;
+          }
+          if (errorData.gaiError) errorMessage += ` Google AI Error: ${errorData.gaiError}`;
+        } catch (e) {
+          // If parsing error as JSON fails, maybe it's plain text or HTML
+          const textError = await response.text();
+          errorMessage = `API request failed with status ${response.status}. Server response: ${textError.substring(0, 200)}${textError.length > 200 ? '...' : ''}`;
         }
-        if (data.gaiError) errorMessage += ` Google AI Error: ${data.gaiError}`;
-        
         setListModelsError(errorMessage);
         toast({ title: "Error Listing Models", description: errorMessage, variant: "destructive", duration: 10000 });
-        setListedModels(null); // Explicitly set to null on error
-        return; // Important to return here so we don't try to set models from an error response
+        setListedModels(null);
+        return; 
       }
-      setListedModels(data.models);
-      setListModelsError(null); // Clear any previous error
+
+      // If response.ok, proceed to parse as JSON
+      const data = await response.json();
+      if (data.models) {
+        setListedModels(data.models);
+        setListModelsError(null); // Clear any previous error
+      } else {
+        // Successful response but no models array or unexpected structure
+        const noModelsMsg = "API returned success, but no models array was found in the response.";
+        setListModelsError(noModelsMsg);
+        toast({ title: "Error Listing Models", description: noModelsMsg, variant: "destructive" });
+        setListedModels(null);
+      }
+
     } catch (error: any) {
+      // This catch block handles network errors or issues before a response is received
       console.error("Failed to list models (client-side catch):", error);
-      const clientErrorMsg = error.message || "Could not fetch model list from API.";
+      const clientErrorMsg = error.message || "Could not fetch model list from API. Check network or server status.";
       setListModelsError(clientErrorMsg);
       toast({ title: "Error Listing Models", description: clientErrorMsg, variant: "destructive", duration: 10000 });
-      setListedModels(null); // Explicitly set to null on client-side catch
+      setListedModels(null);
     } finally {
       setIsLoadingListedModels(false);
     }
@@ -544,5 +565,7 @@ export default function MatchReportsPage() {
     </div>
   );
 }
+
+    
 
     
