@@ -40,8 +40,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function getMatchScoreColor(score?: string) {
@@ -68,15 +66,6 @@ const modelDisplayMap: Record<AIModelName, string> = {
   'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview (05-06)',
 };
 
-interface ListedModel {
-    name: string;
-    version: string;
-    displayName: string;
-    description: string;
-    inputTokenLimit: number;
-    outputTokenLimit: number;
-    supportedGenerationMethods: string[];
-}
 
 export default function MatchReportsPage() {
   const [reports, setReports] = useState<LoggedMatchSuggestion[]>([]);
@@ -94,11 +83,6 @@ export default function MatchReportsPage() {
   const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
   const [isClearingFeedbackLog, setIsClearingFeedbackLog] = useState(false);
   const [showClearFeedbackDialog, setShowClearFeedbackDialog] = useState(false);
-
-  const [listedModels, setListedModels] = useState<ListedModel[] | null>(null);
-  const [isLoadingListedModels, setIsLoadingListedModels] = useState(false);
-  const [listModelsError, setListModelsError] = useState<string | null>(null);
-  const [showListedModels, setShowListedModels] = useState(false);
 
   const { toast } = useToast();
 
@@ -129,7 +113,7 @@ export default function MatchReportsPage() {
       console.error("Failed to fetch AI settings:", error);
       toast({ title: "Error", description: "Could not load AI settings.", variant: "destructive" });
     } finally {
-      setIsLoadingReports(false);
+      setIsLoadingReports(false); // Reuse this state, might need dedicated one if fetches become independent
     }
   };
 
@@ -151,7 +135,7 @@ export default function MatchReportsPage() {
       } else { throw new Error(result.message || "Failed to update mode server-side"); }
     } catch (error: any) {
       toast({ title: "Update Failed", description: error.message || "Could not update AI matching mode.", variant: "destructive" });
-      fetchAdminSettings();
+      fetchAdminSettings(); // Re-fetch to reset UI to actual state
     } finally { setIsUpdatingMode(false); }
   };
 
@@ -245,64 +229,6 @@ export default function MatchReportsPage() {
     }
   };
 
-  const handleListModels = async () => {
-    setIsLoadingListedModels(true);
-    setListModelsError(null);
-    setListedModels(null);
-    setShowListedModels(true); // Show collapsible area immediately
-
-    try {
-      const response = await fetch('/api/list-models');
-
-      if (!response.ok) {
-        let errorMessage = `API request failed with status ${response.status}`;
-        try {
-          // Try to parse error from server if it's JSON (our API route should return JSON errors)
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-          if (errorData.details) errorMessage += ` Details: ${errorData.details}`;
-          if (errorData.gaiError) errorMessage += ` Google AI Error: ${errorData.gaiError}`;
-        } catch (e) {
-          // If parsing error as JSON fails, it might be an HTML error page or plain text
-          try {
-            const textError = await response.text();
-            errorMessage = `API request failed with status ${response.status}. Server response: ${textError.substring(0, 200)}${textError.length > 200 ? '...' : ''}`;
-          } catch (textE) {
-            // If getting text also fails, stick with the original status message
-          }
-        }
-        setListModelsError(errorMessage);
-        toast({ title: "Error Listing Models", description: errorMessage, variant: "destructive", duration: 10000 });
-        setListedModels(null);
-        setIsLoadingListedModels(false); // Ensure loading state is cleared
-        return; // Important: Exit after handling error
-      }
-
-      // If response.ok, proceed to parse as JSON
-      const data = await response.json(); // This should be safe now
-      if (data.models) {
-        setListedModels(data.models);
-        setListModelsError(null); // Clear any previous error
-      } else {
-        // Successful response but no models array or unexpected structure
-        const noModelsMsg = "API returned success, but no models array was found in the response.";
-        setListModelsError(noModelsMsg);
-        toast({ title: "Error Listing Models", description: noModelsMsg, variant: "destructive" });
-        setListedModels(null);
-      }
-
-    } catch (error: any) {
-      // This catch block handles network errors or issues before a response is received
-      console.error("Failed to list models (client-side fetch catch):", error);
-      const clientErrorMsg = error.message || "Could not fetch model list from API. Check network or server status.";
-      setListModelsError(clientErrorMsg);
-      toast({ title: "Error Listing Models", description: clientErrorMsg, variant: "destructive", duration: 10000 });
-      setListedModels(null);
-    } finally {
-      setIsLoadingListedModels(false);
-    }
-  };
-
   return (
     <div className="max-w-7xl mx-auto space-y-6 py-8">
       <Card>
@@ -388,60 +314,6 @@ export default function MatchReportsPage() {
                 <span>Model: <Badge variant="outline" className="capitalize">{modelDisplayMap[preferredModel] || preferredModel}</Badge>.</span>
             </div>
         </CardFooter>
-      </Card>
-
-      <Separator />
-
-      <Card>
-        <CardHeader>
-            <CardTitle className="font-headline text-xl flex items-center gap-3">
-                <PackageSearch className="h-6 w-6 text-primary" />
-                Google AI Model Diagnostics
-            </CardTitle>
-            <CardDescription className="font-body">
-                List models available to your GOOGLE_API_KEY via the Google AI SDK. Helps diagnose API key or model access issues.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Button onClick={handleListModels} disabled={isLoadingListedModels}>
-                {isLoadingListedModels && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                List Available Models
-            </Button>
-            {showListedModels && (
-                <Collapsible open={showListedModels} onOpenChange={setShowListedModels} className="mt-4">
-                    <CollapsibleContent>
-                        {isLoadingListedModels && <p className="text-muted-foreground font-body">Loading models...</p>}
-                        {listModelsError && (
-                            <div className="p-3 my-2 border border-destructive bg-destructive/10 rounded-md text-destructive text-sm flex items-start gap-2">
-                                <AlertCircleIcon className="h-4 w-4 shrink-0 mt-0.5" />
-                                <p className="whitespace-pre-wrap break-all">{listModelsError}</p>
-                            </div>
-                        )}
-                        {listedModels && listedModels.length > 0 && (
-                            <div className="mt-2 space-y-2">
-                                <h4 className="font-semibold">Available Models ({listedModels.length}):</h4>
-                                <ScrollArea className="h-[300px] border rounded-md p-2">
-                                    {listedModels.map(model => (
-                                        <div key={model.name} className="p-2 mb-1 border-b text-xs">
-                                            <p><strong>Display Name:</strong> {model.displayName}</p>
-                                            <p><strong>Name:</strong> {model.name}</p>
-                                            <p><strong>Version:</strong> {model.version}</p>
-                                            <p><strong>Methods:</strong> {model.supportedGenerationMethods.join(', ')}</p>
-                                            <p><strong>Input Tokens:</strong> {model.inputTokenLimit}</p>
-                                            <p><strong>Output Tokens:</strong> {model.outputTokenLimit}</p>
-                                            <p className="mt-1 text-muted-foreground italic line-clamp-2">{model.description}</p>
-                                        </div>
-                                    ))}
-                                </ScrollArea>
-                            </div>
-                        )}
-                        {listedModels && listedModels.length === 0 && !isLoadingListedModels && !listModelsError && (
-                            <p className="text-muted-foreground font-body mt-2">No models returned by the API for your GOOGLE_API_KEY.</p>
-                        )}
-                    </CollapsibleContent>
-                </Collapsible>
-            )}
-        </CardContent>
       </Card>
 
       <Separator />
@@ -566,9 +438,5 @@ export default function MatchReportsPage() {
     </div>
   );
 }
-
-    
-
-    
 
     
