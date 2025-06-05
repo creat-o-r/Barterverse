@@ -164,12 +164,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-      <section className="text-center py-8">
-        <h1 className="text-4xl md:text-5xl font-headline text-primary mb-4">Welcome to BarterVerse</h1>
-        <p className="text-lg text-muted-foreground font-body max-w-2xl mx-auto">
-          Discover unique items and connect with fellow traders. Your next great find is just a barter away!
-        </p>
-      </section>
+      {/* Removed Welcome Section */}
 
       {overallLoading && (
         <section>
@@ -238,10 +233,7 @@ export default function HomePage() {
                     itemSuggestion.error ? `Error for ${itemSuggestion.userItem.name}` :
                     `AI Matches for your ${itemSuggestion.userItem.name}`}
                     </CardTitle>
-                    <div className="flex items-center gap-2 text-xs">
-                        {itemSuggestion.usedMatchingMode && <Badge variant="outline" className="capitalize">Mode: {itemSuggestion.usedMatchingMode}</Badge>}
-                        <Badge variant={itemSuggestion.preferencesConsidered ? 'default' : 'secondary'}>Prefs: {itemSuggestion.preferencesConsidered ? 'On' : 'Off'}</Badge>
-                    </div>
+                    {/* Removed Mode/Prefs Badges */}
                 </div>
                  {!itemSuggestion.isLoading && itemSuggestion.error && (
                   <p className="text-sm text-destructive mt-1 font-body">{itemSuggestion.error}</p>

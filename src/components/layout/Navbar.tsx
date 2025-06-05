@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, Menu, ServerCrash, LogOut, MessageSquare } from 'lucide-react';
+import { Package, PlusCircle, UserCircle, Menu, LogOut, MessageSquare } from 'lucide-react'; // Removed ServerCrash
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,11 +25,11 @@ const primaryNavLinks = [
   },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
-const adminLinkConfig = { href: '/admin/match-reports', icon: <ServerCrash className="h-4 w-4" />, label: "Admin" };
+// Admin link config removed from here
 
 export default function Navbar() {
   const isLoggedIn = true; // Placeholder for auth state
-  const isAdmin = true; // Placeholder for admin state
+  // const isAdmin = true; // Placeholder for admin state - not used directly in Navbar anymore
   const unreadCount = 3; // Placeholder for unread chat count, ideally from state/props
 
   return (
@@ -53,7 +53,7 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* Right-aligned items: Profile, Admin Button, Mobile Menu Trigger */}
+        {/* Right-aligned items: Profile, Mobile Menu Trigger */}
         <div className="ml-auto flex items-center gap-2">
           {/* Profile Dropdown / Login Button - Desktop */}
           <div className="hidden md:block"> 
@@ -100,16 +100,8 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Admin Report Button - Desktop (Icon only, far right) */}
-          {isLoggedIn && isAdmin && (
-            <Button variant="ghost" size="icon" asChild className="hidden md:flex text-muted-foreground hover:text-foreground">
-              <Link href={adminLinkConfig.href} title={adminLinkConfig.label}>
-                {adminLinkConfig.icon}
-                <span className="sr-only">{adminLinkConfig.label}</span>
-              </Link>
-            </Button>
-          )}
-
+          {/* Admin Report Button - Desktop - REMOVED */}
+          
           {/* Mobile Navigation Trigger */}
           <div className="md:hidden">
             <Sheet>
@@ -118,9 +110,9 @@ export default function Navbar() {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="flex flex-col"> {/* Added flex flex-col to SheetContent */}
+              <SheetContent side="right" className="flex flex-col">
                 <SheetTitle className="sr-only">Mobile Navigation Menu</SheetTitle>
-                <nav className="flex flex-col gap-4 mt-8 flex-grow"> {/* Added flex-grow to nav */}
+                <nav className="flex flex-col gap-4 mt-8 flex-grow">
                   {primaryNavLinks.map((link) => (
                     <Button key={`mobile-${link.label}`} variant="ghost" asChild className="justify-start">
                       <Link href={link.href} className="relative flex items-center gap-3 text-base py-2">
@@ -134,7 +126,6 @@ export default function Navbar() {
                       </Link>
                     </Button>
                   ))}
-                  {/* Mobile Profile Link */}
                   {isLoggedIn && (
                     <Button variant="ghost" asChild className="justify-start">
                       <Link href={profileLinkConfig.href} className="flex items-center gap-3 text-base py-2">
@@ -143,17 +134,8 @@ export default function Navbar() {
                       </Link>
                     </Button>
                   )}
-                  {/* Mobile Admin Report Link */}
-                  {isLoggedIn && isAdmin && (
-                     <Button variant="ghost" asChild className="justify-start">
-                      <Link href={adminLinkConfig.href} className="flex items-center gap-3 text-base py-2" title={adminLinkConfig.label}>
-                        {adminLinkConfig.icon}
-                        <span>{adminLinkConfig.label}</span>
-                      </Link>
-                    </Button>
-                  )}
+                  {/* Mobile Admin Report Link - REMOVED */}
                 </nav>
-                {/* User Info and Auth moved to the bottom */}
                 <div className="mt-auto flex flex-col gap-2 pt-4 border-t">
                   {isLoggedIn ? (
                     <>
@@ -178,7 +160,7 @@ export default function Navbar() {
               </SheetContent>
             </Sheet>
           </div>
-        </div> {/* End of ml-auto group */}
+        </div>
       </div>
     </header>
   );
