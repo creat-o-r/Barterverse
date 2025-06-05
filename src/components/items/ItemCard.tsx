@@ -5,7 +5,7 @@ import type { Item } from '@/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Gift, Search, Link2 as LinkIcon, HeartHandshake } from 'lucide-react'; // Renamed Link2 to LinkIcon
+import { Eye, Gift, Search, Link2 as LinkIcon, HeartHandshake } from 'lucide-react';
 import type { AIMatchingMode } from '@/services/ai-config-service';
 import { cn } from '@/lib/utils';
 
@@ -49,47 +49,57 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
     opportunityLink = `/opportunities?${opportunityLinkParams.toString()}`;
   }
 
-  const CardBodyAndHeader = (
-    <>
-      <CardHeader className="p-0 relative">
-        <div className="aspect-[1/1] md:aspect-[4/3] relative w-full overflow-hidden">
-          <Image
-            src={item.imageUrl || 'https://placehold.co/600x400.png'}
-            alt={item.name}
-            fill
-            className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-            data-ai-hint={item.dataAiHint || "item image"}
-            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          />
-           {item.status !== 'available' && (
-            <Badge
-              variant={item.status === 'traded' ? 'destructive' : 'secondary'}
-              className="absolute top-2 right-2 capitalize z-10 text-xs"
-            >
-              {item.status}
-            </Badge>
-          )}
-           {matchScore && (
-             <Badge className={`absolute top-2 left-2 capitalize z-10 text-xs px-1.5 py-0.5 ${getMatchScoreColorStyles(matchScore)}`}>
-              Match: {matchScore}
-            </Badge>
-          )}
-          {item.listingType === 'offer' && item.isGiftItForward && (
-            <Badge variant="default" className="absolute bottom-2 right-2 capitalize z-10 text-[10px] md:text-xs bg-pink-500 hover:bg-pink-600 text-white">
-              <HeartHandshake className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" /> Gift
-            </Badge>
-           )}
-           {!matchScore && !(item.listingType === 'offer' && item.isGiftItForward) && ( 
-            <Badge
-                variant={item.listingType === 'offer' ? 'default' : 'secondary'}
-                className={`absolute bottom-2 left-2 capitalize z-10 text-[10px] md:text-xs ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-            >
-                {item.listingType === 'offer' ? <Gift className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" /> : <Search className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" />}
-                {item.listingType}
-            </Badge>
-           )}
-        </div>
-      </CardHeader>
+  const HeaderContent = (
+    <CardHeader className="p-0 relative">
+      <div className="aspect-[1/1] md:aspect-[4/3] relative w-full overflow-hidden">
+        <Image
+          src={item.imageUrl || 'https://placehold.co/600x400.png'}
+          alt={item.name}
+          fill
+          className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+          data-ai-hint={item.dataAiHint || "item image"}
+          sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+        />
+        {item.status !== 'available' && (
+          <Badge
+            variant={item.status === 'traded' ? 'destructive' : 'secondary'}
+            className="absolute top-2 right-2 capitalize z-10 text-xs"
+          >
+            {item.status}
+          </Badge>
+        )}
+        {matchScore && (
+          <Badge className={`absolute top-2 left-2 capitalize z-10 text-xs px-1.5 py-0.5 ${getMatchScoreColorStyles(matchScore)}`}>
+            Match: {matchScore}
+          </Badge>
+        )}
+        {item.listingType === 'offer' && item.isGiftItForward && (
+          <Badge variant="default" className="absolute bottom-2 right-2 capitalize z-10 text-[10px] md:text-xs bg-pink-500 hover:bg-pink-600 text-white">
+            <HeartHandshake className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" /> Gift
+          </Badge>
+        )}
+        {!matchScore && !(item.listingType === 'offer' && item.isGiftItForward) && (
+          <Badge
+            variant={item.listingType === 'offer' ? 'default' : 'secondary'}
+            className={`absolute bottom-2 left-2 capitalize z-10 text-[10px] md:text-xs ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+          >
+            {item.listingType === 'offer' ? <Gift className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" /> : <Search className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" />}
+            {item.listingType}
+          </Badge>
+        )}
+      </div>
+    </CardHeader>
+  );
+
+  return (
+    <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl group">
+      {opportunityLink ? (
+        <Link href={opportunityLink} className="block cursor-pointer">
+          {HeaderContent}
+        </Link>
+      ) : (
+        HeaderContent
+      )}
       <CardContent className="p-2 md:p-4 flex-grow">
         <CardTitle className="text-sm md:text-lg font-headline mb-1 md:mb-2 leading-tight line-clamp-2">
           <Link href={itemDetailLink} className="hover:text-primary transition-colors">
@@ -103,20 +113,6 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
             <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 md:text-xs md:px-2.5 md:py-0.5">{item.category}</Badge>
         </div>
       </CardContent>
-    </>
-  );
-
-  return (
-    <Card className="flex flex-col overflow-hidden h-full transition-all duration-300 ease-in-out hover:shadow-xl group">
-      {opportunityLink ? (
-        <Link href={opportunityLink} className="block flex flex-col flex-grow cursor-pointer">
-          {CardBodyAndHeader}
-        </Link>
-      ) : (
-        <div className="flex flex-col flex-grow">
-            {CardBodyAndHeader}
-        </div>
-      )}
       <CardFooter className="p-2 md:p-4 border-t flex flex-col items-stretch gap-2">
         <Button asChild variant="default" className="w-full bg-primary hover:bg-primary/90 h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm">
           <Link href={itemDetailLink} className="flex items-center gap-1 md:gap-2">
