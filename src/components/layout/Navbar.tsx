@@ -1,9 +1,11 @@
 
+'use client';
+
 import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, Filter } from 'lucide-react';
+import { Package, PlusCircle, UserCircle, MessageSquare, Filter, LogIn, UserPlus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,20 +88,23 @@ export default function Navbar() {
               </Link>
             </Button>
           ))}
-          {isLoggedIn && (
+          {isLoggedIn ? (
             <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
               <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-10 h-10">
                 {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
               </Link>
             </Button>
-          )}
-          {!isLoggedIn && (
+          ) : (
             <>
-              <Button variant="default" size="sm" asChild>
-                <Link href="/auth/signin">Login</Link>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/auth/signin" aria-label="Login" className="flex items-center justify-center w-10 h-10">
+                  <LogIn className="h-5 w-5" />
+                </Link>
               </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/auth/signup">Sign Up</Link>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/auth/signup" aria-label="Sign Up" className="flex items-center justify-center w-10 h-10">
+                  <UserPlus className="h-5 w-5" />
+                </Link>
               </Button>
             </>
           )}
@@ -163,9 +168,14 @@ export default function Navbar() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button asChild>
-                <Link href="/auth/signin">Login</Link>
-              </Button>
+               <div className="flex items-center gap-2">
+                <Button variant="default" size="sm" asChild>
+                  <Link href="/auth/signin">Login</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/auth/signup">Sign Up</Link>
+                </Button>
+              </div>
             )}
           </div>
         </div>
