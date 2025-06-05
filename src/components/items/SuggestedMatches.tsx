@@ -10,10 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { AIMatchingMode } from '@/services/ai-config-service';
+import { useToast } from "@/hooks/use-toast";
+
 
 interface SuggestedMatchesProps {
   currentItem: Item;
 }
+
+const FLOW_TIMEOUT_MS = 30000; // 30 seconds
 
 export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps) {
   const [suggestedItems, setSuggestedItems] = useState<(Item & { matchScore: string; reciprocalItemId?: string })[]>([]);
@@ -22,6 +26,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
   const [preferencesWereConsidered, setPreferencesWereConsidered] = useState<boolean>(false);
   const [matchModeUsed, setMatchModeUsed] = useState<AIMatchingMode | undefined>(undefined);
   const [internalReasoning, setInternalReasoning] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     async function fetchSuggestions() {
@@ -37,6 +42,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           const missingItemError = "Cannot fetch suggestions: current item information is missing.";
           setInternalReasoning(missingItemError);
           setFetchError(missingItemError);
+          toast({ title: "Suggestion Error", description: missingItemError, variant: "destructive" });
           return;
       }
 
@@ -81,8 +87,13 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
           availableItems: otherAvailableItems,
         };
 
-        const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
+        const flowPromise = suggestMatchingItems(inputForFlow);
+        const timeoutPromise = new Promise<ItemMatchOutput>((_, reject) => 
+            setTimeout(() => reject(new Error("AI_SUGGESTION_TIMEOUT")), FLOW_TIMEOUT_MS)
+        );
 
+        const result: ItemMatchOutput = await Promise.race([flowPromise, timeoutPromise]);
+        
         setPreferencesWereConsidered(result.preferencesConsidered || false);
         setMatchModeUsed(result.usedMatchingMode);
 
@@ -112,16 +123,28 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         } else if (result.reasoning && reasoningIsErrorOrSystemMessage) {
             setFetchError(result.reasoning);
             setInternalReasoning(result.reasoning);
+            toast({ title: "AI Suggestion Issue", description: result.reasoning, variant: "default", duration: 7000 });
         } else if (itemsWithScores.length > 0 && result.reasoning && !reasoningIsErrorOrSystemMessage){
             setInternalReasoning(result.reasoning);
         }
 
 
       } catch (err: any) {
-        console.error("Failed to fetch item matches from flow (client-side catch):", err);
-        const clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
+        console.error("Failed to fetch item matches (client-side catch):", err);
+        let clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
+        let toastSeverity: "destructive" | "default" = "destructive";
+
+        if (err.message === "AI_SUGGESTION_TIMEOUT") {
+            clientErrorMsg = "The AI is taking a bit too long to find matches for this item. You can try again or check back later.";
+            setInternalReasoning(`AI suggestion for "${currentItem.name}" timed out after ${FLOW_TIMEOUT_MS / 1000} seconds.`);
+            toastSeverity = "default";
+        } else {
+            setInternalReasoning(err.message || clientErrorMsg);
+        }
+        
         setFetchError(clientErrorMsg);
-        setInternalReasoning(clientErrorMsg);
+        toast({ title: "Suggestion Error", description: clientErrorMsg, variant: toastSeverity, duration: 7000 });
+
       } finally {
         setLoading(false);
       }
@@ -230,3 +253,4 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       </Card>
   );
 }
+

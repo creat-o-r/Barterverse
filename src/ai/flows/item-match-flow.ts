@@ -254,12 +254,10 @@ const itemMatchFlow = ai.defineFlow(
   async (input: ItemMatchInput): Promise<ItemMatchOutput> => {
     const flowName = 'itemMatchFlow';
     let preferencesConsideredBeyondDefaultMinRating = false;
+    // ALWAYS USE SIMPLE PROMPT FOR NOW TO DEBUG HANGING ISSUE
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
     let finalInputForPrompt: any = { ...input };
-
-    const currentMatchingMode = await getAIMatchingMode();
-    const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
-    let usedMatchingMode: 'simple' | 'advanced' = currentMatchingMode;
+    let usedMatchingMode: 'simple' | 'advanced' = 'simple'; // Forcing simple for now
 
     const itemsToConsider = input.availableItems.filter(item =>
         item.id !== input.currentItem.id && item.ownerId !== input.currentItem.ownerId
@@ -270,7 +268,7 @@ const itemMatchFlow = ai.defineFlow(
         const output: ItemMatchOutput = {
             suggestedMatches: [],
             reasoning: reasoning,
-            usedMatchingMode: usedMatchingMode,
+            usedMatchingMode: usedMatchingMode, // 'simple'
             preferencesConsidered: false,
         };
         logMatchSuggestion({
@@ -287,64 +285,63 @@ const itemMatchFlow = ai.defineFlow(
 
     finalInputForPrompt.availableItems = itemsToConsider.map(item => ({
         ...item,
-        isGiftItForward: item.isGiftItForward || false, // Ensure boolean
+        isGiftItForward: item.isGiftItForward || false,
         minimumMatchRatingOverride: item.minimumMatchRatingOverride,
     }));
     finalInputForPrompt.currentItem = {
         ...input.currentItem,
         minimumMatchRatingOverride: input.currentItem.minimumMatchRatingOverride,
-        isGiftItForward: input.currentItem.isGiftItForward || false, // Ensure boolean
+        isGiftItForward: input.currentItem.isGiftItForward || false,
     };
 
+    // TEMPORARILY BYPASS ADVANCED LOGIC
+    // const currentMatchingMode = await getAIMatchingMode();
+    // const usePrefsInMatchingGlobal = await getUseUserProfilePreferencesInMatching();
+    // usedMatchingMode = currentMatchingMode;
+    // preferencesConsideredBeyondDefaultMinRating = false;
 
-    if (currentMatchingMode === 'advanced') {
-      promptToUse = advancedItemMatchPrompt;
-      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
-      const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
+    // if (currentMatchingMode === 'advanced') {
+    //   promptToUse = advancedItemMatchPrompt;
+    //   const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+    //   const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
-      let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
-      if (userProfile?.interestedInThirdPartyFulfillment === true) {
-        fulfillmentDisplayText = "Yes";
-      } else if (userProfile?.interestedInThirdPartyFulfillment === false) {
-        fulfillmentDisplayText = "No";
-      }
+    //   let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
+    //   if (userProfile?.interestedInThirdPartyFulfillment === true) {
+    //     fulfillmentDisplayText = "Yes";
+    //   } else if (userProfile?.interestedInThirdPartyFulfillment === false) {
+    //     fulfillmentDisplayText = "No";
+    //   }
 
-      const userPrefsForPrompt: z.infer<typeof UserPreferencesSchema> = {
-        motivations: userProfile?.motivations,
-        locationPreference: userProfile?.locationPreference,
-        tradeTimingPreference: userProfile?.tradeTimingPreference,
-        interestedInThirdPartyFulfillment: userProfile?.interestedInThirdPartyFulfillment,
-        minimumMatchRating: effectiveUserMinRating,
-        fulfillmentPreferenceDisplay: fulfillmentDisplayText,
-      };
+    //   const userPrefsForPrompt: z.infer<typeof UserPreferencesSchema> = {
+    //     motivations: userProfile?.motivations,
+    //     locationPreference: userProfile?.locationPreference,
+    //     tradeTimingPreference: userProfile?.tradeTimingPreference,
+    //     interestedInThirdPartyFulfillment: userProfile?.interestedInThirdPartyFulfillment,
+    //     minimumMatchRating: effectiveUserMinRating,
+    //     fulfillmentPreferenceDisplay: fulfillmentDisplayText,
+    //   };
 
-      finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
+    //   finalInputForPrompt.triggeringUserPreferences = userPrefsForPrompt;
 
-      if (usePrefsInMatchingGlobal) {
-        const hasMeaningfulMotivations = !!(userProfile?.motivations && userProfile.motivations.length > 0);
-        const hasMeaningfulLocationPref = !!(userProfile?.locationPreference && (userProfile.locationPreference.isSensitive || (userProfile.locationPreference.notes && userProfile.locationPreference.notes.trim() !== '')));
-        const hasMeaningfulTimingPref = !!userProfile?.tradeTimingPreference;
-        const hasExplicit3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
-        const hasNonDefaultMinRating = !!(userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low');
+    //   if (usePrefsInMatchingGlobal) {
+    //     const hasMeaningfulMotivations = !!(userProfile?.motivations && userProfile.motivations.length > 0);
+    //     const hasMeaningfulLocationPref = !!(userProfile?.locationPreference && (userProfile.locationPreference.isSensitive || (userProfile.locationPreference.notes && userProfile.locationPreference.notes.trim() !== '')));
+    //     const hasMeaningfulTimingPref = !!userProfile?.tradeTimingPreference;
+    //     const hasExplicit3rdPartyPref = userProfile?.interestedInThirdPartyFulfillment !== undefined;
+    //     const hasNonDefaultMinRating = !!(userProfile?.minimumMatchRating && userProfile.minimumMatchRating !== 'Low');
 
-        preferencesConsideredBeyondDefaultMinRating =
-          hasMeaningfulMotivations ||
-          hasMeaningfulLocationPref ||
-          hasMeaningfulTimingPref ||
-          hasExplicit3rdPartyPref ||
-          hasNonDefaultMinRating;
-      } else {
-        preferencesConsideredBeyondDefaultMinRating = false;
-      }
-
-    } else {
-      usedMatchingMode = 'simple';
-      preferencesConsideredBeyondDefaultMinRating = false;
-    }
+    //     preferencesConsideredBeyondDefaultMinRating =
+    //       hasMeaningfulMotivations ||
+    //       hasMeaningfulLocationPref ||
+    //       hasMeaningfulTimingPref ||
+    //       hasExplicit3rdPartyPref ||
+    //       hasNonDefaultMinRating;
+    //   }
+    // }
 
     try {
-      console.log(`[${flowName}] (${usedMatchingMode} mode) Calling prompt with input:`, JSON.stringify(finalInputForPrompt, null, 2));
-      const { output: promptOutput } = await promptToUse(finalInputForPrompt);
+      console.log(`[${flowName}] (FORCED SIMPLE mode) Calling prompt with input:`, JSON.stringify(finalInputForPrompt, null, 2));
+      const { output: promptOutput } = await promptToUse(finalInputForPrompt); // Will use simpleItemMatchPrompt
 
       let defaultReasoning = `AI (${usedMatchingMode} mode) did not find strong matches for '${input.currentItem.name}' based on the current criteria. Users might explore other items or categories.`;
       if (itemsToConsider.length < 3) {
@@ -378,8 +375,8 @@ const itemMatchFlow = ai.defineFlow(
           itemId: aiSuggestion.itemId,
           matchScore: aiSuggestion.matchScore,
           ownerId: originalItem?.ownerId || 'unknown_owner',
-          isGiftItForward: aiSuggestion.isGiftItForward || originalItem?.isGiftItForward || false, // Prioritize AI output, fallback to original item
-          reciprocalItemId: aiSuggestion.reciprocalItemId, // Pass through the reciprocalItemId
+          isGiftItForward: aiSuggestion.isGiftItForward || originalItem?.isGiftItForward || false,
+          reciprocalItemId: aiSuggestion.reciprocalItemId,
         };
       }).filter(match => match.ownerId !== 'unknown_owner');
 
@@ -463,7 +460,7 @@ const itemMatchFlow = ai.defineFlow(
           message: errorDetails.message,
           stack: errorDetails.stack,
           details: errorDetails.details,
-          status: errorDetails.status || errorStatus, // Ensure status is captured
+          status: errorDetails.status || errorStatus,
           code: errorDetails.code,
         },
         userFacingMessage: userMessage,
@@ -494,3 +491,4 @@ const itemMatchFlow = ai.defineFlow(
 export async function suggestMatchingItems(input: ItemMatchInput): Promise<ItemMatchOutput> {
   return itemMatchFlow(input);
 }
+
