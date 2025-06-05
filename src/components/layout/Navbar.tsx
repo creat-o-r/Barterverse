@@ -3,7 +3,7 @@ import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, LogOut, MessageSquare } from 'lucide-react'; // Removed Menu
+import { Package, PlusCircle, UserCircle, MessageSquare, Filter } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
 
 // Define link configurations
 const primaryNavLinks = [
@@ -26,6 +34,36 @@ const primaryNavLinks = [
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
 
+
+function GlobalCategoryFilter() {
+  const { selectedCategory, setSelectedCategory, availableCategories } = useGlobalFilter();
+
+  return (
+    <div className="flex items-center gap-2">
+      <Filter className="h-4 w-4 text-muted-foreground" />
+      <Select
+        value={selectedCategory || "any"}
+        onValueChange={(value) => {
+          setSelectedCategory(value === "any" ? null : value);
+        }}
+      >
+        <SelectTrigger className="w-[180px] h-9 text-xs md:text-sm">
+          <SelectValue placeholder="Filter by category..." />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any Category</SelectItem>
+          {availableCategories.map(category => (
+            <SelectItem key={category} value={category}>
+              {category}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+
 export default function Navbar() {
   const isLoggedIn = true; // Placeholder for auth state
   const unreadCount = 3; // Placeholder for unread chat count
@@ -34,7 +72,7 @@ export default function Navbar() {
     <header className="bg-card shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center">
 
-        {/* Mobile Icon Navigation (replaces desktop nav on mobile) */}
+        {/* Mobile Icon Navigation */}
         <nav className="flex md:hidden items-center gap-1">
           {primaryNavLinks.map((link) => (
             <Button key={`mobile-icon-${link.label}`} variant="ghost" size="icon" asChild>
@@ -55,6 +93,16 @@ export default function Navbar() {
               </Link>
             </Button>
           )}
+          {!isLoggedIn && (
+            <>
+              <Button variant="default" size="sm" asChild>
+                <Link href="/auth/signin">Login</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/auth/signup">Sign Up</Link>
+              </Button>
+            </>
+          )}
         </nav>
 
         {/* Desktop Navigation - Main Links (left-aligned) */}
@@ -72,6 +120,10 @@ export default function Navbar() {
               </Link>
             </Button>
           ))}
+          {/* Global Category Filter for Desktop */}
+          <div className="ml-4">
+            <GlobalCategoryFilter />
+          </div>
         </nav>
 
         {/* Right-aligned items: Profile Dropdown / Login Button */}
@@ -108,27 +160,12 @@ export default function Navbar() {
                       <span>View Profile</span>
                     </Link>
                   </DropdownMenuItem>
-                  {/* Logout option removed from dropdown */}
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <Button asChild>
                 <Link href="/auth/signin">Login</Link>
               </Button>
-            )}
-          </div>
-
-          {/* Mobile Login/Signup Buttons (if not logged in, and no hamburger menu) */}
-          <div className="flex md:hidden items-center gap-2">
-            {!isLoggedIn && (
-              <>
-                <Button variant="default" size="sm" asChild>
-                  <Link href="/auth/signin">Login</Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/auth/signup">Sign Up</Link>
-                </Button>
-              </>
             )}
           </div>
         </div>

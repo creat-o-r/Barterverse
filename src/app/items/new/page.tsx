@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useGlobalFilter } from '@/contexts/GlobalFilterContext'; // Added
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
 const NO_LOCATION_SPECIFIED_VALUE = "no_location_specified_for_item";
@@ -52,17 +53,16 @@ const itemFormSchemaBase = z.object({
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
   imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
-  // minimumMatchRatingOverride: z.enum(['Low', 'Medium', 'High']), // Removed
   isGiftItForward: z.boolean().optional(),
   openToAnyOpportunity: z.boolean().optional(),
 
-  selectedLocationIdentifier: z.string().min(1, { message: "Please select a location option or 'Not Specified'."}), // Now always required, but can be NO_LOCATION_SPECIFIED_VALUE
+  selectedLocationIdentifier: z.string().min(1, { message: "Please select a location option or 'Not Specified'."}), 
   itemSpecificAddress: z.string().optional(),
   deliveryMethods: z.array(deliveryMethodEnum).min(1, { message: "Please select at least one delivery method." }),
   logisticsNotes: z.string().optional(),
 
   timingType: z.enum(['flexible', 'fixed_date']).optional(),
-  timingFixedDate: z.string().optional(), // Store as ISO string or similar
+  timingFixedDate: z.string().optional(), 
 });
 
 const itemFormSchema = itemFormSchemaBase.refine(data => {
@@ -99,13 +99,14 @@ const deliveryMethodMapConcrete: Record<ItemDeliveryMethod, string> = {
 export default function NewItemPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const { selectedCategory: globalSelectedCategory } = useGlobalFilter(); // Added
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const user = dummyUsers.find(u => u.id === 'user1'); // Simulating logged-in user
+    const user = dummyUsers.find(u => u.id === 'user1'); 
     setCurrentUser(user || null);
   }, []);
 
@@ -114,13 +115,12 @@ export default function NewItemPage() {
     defaultValues: {
       name: '',
       description: '',
-      category: '',
+      category: globalSelectedCategory || '', // Prefill from global context
       imageUrl: '',
       listingType: 'offer',
-      // minimumMatchRatingOverride: currentUser?.minimumMatchRating || 'Low', // Removed
       isGiftItForward: false,
       openToAnyOpportunity: false,
-      selectedLocationIdentifier: NO_LOCATION_SPECIFIED_VALUE, // Default to not specified
+      selectedLocationIdentifier: NO_LOCATION_SPECIFIED_VALUE, 
       itemSpecificAddress: '',
       deliveryMethods: ['pickup_only'],
       logisticsNotes: '',
@@ -129,26 +129,30 @@ export default function NewItemPage() {
     },
   });
 
+  // Effect to update category field if global filter changes and form field is not dirty
+  useEffect(() => {
+    if (globalSelectedCategory && !form.formState.dirtyFields.category) {
+      form.setValue('category', globalSelectedCategory, { shouldValidate: true });
+    }
+  }, [globalSelectedCategory, form, form.formState.dirtyFields.category]);
+
+
  useEffect(() => {
     if (currentUser && form.reset) {
-        const currentFormValues = form.getValues(); // Get potentially dirty form values
+        const currentFormValues = form.getValues(); 
 
         let defaultSelectedLocationId: string = NO_LOCATION_SPECIFIED_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
 
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
             defaultSelectedLocationId = preferredStoredLocId;
-        } else if (currentUser.locations && currentUser.locations.length > 0 && currentUser.locations[0].id) {
-            // If no preferred, but locations exist, take the first one as a sensible default (or keep NO_LOCATION_SPECIFIED_VALUE)
-            // For now, let's still prioritize NO_LOCATION_SPECIFIED_VALUE if no explicit preferred one
-            // defaultSelectedLocationId = currentUser.locations[0].id;
         }
-
+        
         const defaultDeliveryMethods = currentUser.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
 
         form.reset({
-            ...currentFormValues, // Keep existing form values if any
-            // minimumMatchRatingOverride: currentFormValues.minimumMatchRatingOverride || currentUser.minimumMatchRating || 'Low', // Removed
+            ...currentFormValues, 
+            category: globalSelectedCategory || currentFormValues.category || '', // Prioritize global, then current, then empty
             openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false,
             selectedLocationIdentifier: currentFormValues.selectedLocationIdentifier && currentFormValues.selectedLocationIdentifier !== NO_LOCATION_SPECIFIED_VALUE ? currentFormValues.selectedLocationIdentifier : defaultSelectedLocationId,
             itemSpecificAddress: (currentFormValues.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) ? (currentFormValues.itemSpecificAddress || '') : '',
@@ -158,7 +162,7 @@ export default function NewItemPage() {
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, form.reset]);
+  }, [currentUser, form.reset, globalSelectedCategory]);
 
   const listingTypeWatch = form.watch('listingType');
   const selectedLocationIdentifierWatch = form.watch('selectedLocationIdentifier');
@@ -170,7 +174,7 @@ export default function NewItemPage() {
 
     if (name.length < 3 || description.length < 10) return;
 
-    if (!form.formState.dirtyFields.category) {
+    if (!form.formState.dirtyFields.category && !globalSelectedCategory) { // Only suggest if not globally set and not dirty
         setIsSuggestingCategory(true);
         try {
             const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
@@ -197,7 +201,7 @@ export default function NewItemPage() {
             toast({ title: "AI System Error (Listing Type)", description: `Could not connect. ${error.message || ''}`, variant: "destructive" });
         } finally { setIsInferringListingType(false); }
     }
-  }, [form, toast]);
+  }, [form, toast, globalSelectedCategory]);
 
 
   async function onSubmit(data: ItemFormValues) {
@@ -245,7 +249,6 @@ export default function NewItemPage() {
         listingType: data.listingType,
         imageUrl: data.imageUrl || '',
         ownerId: currentUser.id,
-        // minimumMatchRatingOverride is removed
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false,
         openToAnyOpportunity: data.openToAnyOpportunity,
         logistics: itemLogistics,
@@ -268,7 +271,7 @@ export default function NewItemPage() {
         form.reset({
             name: '',
             description: '',
-            category: '',
+            category: globalSelectedCategory || '', // Reset with global or empty
             imageUrl: '',
             listingType: 'offer',
             isGiftItForward: false,
@@ -319,9 +322,8 @@ export default function NewItemPage() {
                 <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel className="font-headline">Item Name</FormLabel><FormControl><Input placeholder="e.g., Vintage Leather Journal" {...field} disabled={isLoadingOverall} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel className="font-headline">Description</FormLabel><FormControl><Textarea placeholder="Condition, features, etc." className="resize-none" rows={5} {...field} disabled={isLoadingOverall} onBlur={() => { field.onBlur(); if (!form.formState.dirtyFields.category || !form.formState.dirtyFields.listingType) { handleAiSuggestions(); }}} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="listingType" render={({ field }) => (<FormItem className="space-y-3"><FormLabel className="font-headline flex items-center gap-2">Listing Type {isInferringListingType && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><RadioGroup onValueChange={(value) => { field.onChange(value); form.setValue('listingType', value as 'offer' | 'want', {shouldDirty: true}); }} value={field.value} className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4" disabled={isLoadingOverall}><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="offer" id="offer" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="offer" className="font-normal flex items-center gap-2"><Gift className="h-5 w-5 text-green-600" /> Offering an item</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="want" id="want" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="want" className="font-normal flex items-center gap-2"><Search className="h-5 w-5 text-blue-600" /> Looking for an item</FormLabel></FormItem></RadioGroup></FormControl><FormDescription className="font-body">AI may suggest this.</FormDescription><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="category" render={({ field }) => (<FormItem><FormLabel className="font-headline flex items-center gap-2">Category {isSuggestingCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isSuggestingCategory && form.formState.dirtyFields.category && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><Input placeholder={isSuggestingCategory ? "AI suggesting..." : "e.g., Books"} {...field} onChange={(e) => { field.onChange(e); form.setValue('category', e.target.value, {shouldDirty: true});}} disabled={isLoadingOverall} /></FormControl><FormDescription className="font-body">AI may suggest. Type to override.</FormDescription><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="category" render={({ field }) => (<FormItem><FormLabel className="font-headline flex items-center gap-2">Category {isSuggestingCategory && !globalSelectedCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {(!isSuggestingCategory || globalSelectedCategory) && (form.formState.dirtyFields.category || globalSelectedCategory) && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><Input placeholder={isSuggestingCategory && !globalSelectedCategory ? "AI suggesting..." : (globalSelectedCategory && !form.formState.dirtyFields.category ? globalSelectedCategory : "e.g., Books")} {...field} onChange={(e) => { field.onChange(e); form.setValue('category', e.target.value, {shouldDirty: true});}} disabled={isLoadingOverall} /></FormControl><FormDescription className="font-body">{globalSelectedCategory && !form.formState.dirtyFields.category ? `Prefilled from global filter. ` : ``}AI may suggest if not globally set. Type to override.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="imageUrl" render={({ field }) => (<FormItem><FormLabel className="font-headline">Image URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="https://placehold.co/600x400.png" {...field} disabled={isLoadingOverall}/></FormControl><FormDescription className="font-body">Link to an image. Use placeholder if needed.</FormDescription><FormMessage /></FormItem>)} />
-                 {/* Minimum Match Rating Field Removed */}
               </section>
 
               <Separator />
@@ -351,7 +353,7 @@ export default function NewItemPage() {
                         <SelectItem value={ITEM_SPECIFIC_LOCATION_VALUE}>Enter a specific address for this item</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription className="font-body">Choose a stored location, enter a new one, or specify none.</FormDescription>
+                    <FormDescription className="font-body">Choose a stored location, enter a new one, or specify none. Optional.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -426,9 +428,9 @@ export default function NewItemPage() {
                             <Calendar
                               mode="single"
                               selected={field.value ? new Date(field.value) : undefined}
-                              onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} // Store as YYYY-MM-DD
+                              onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} 
                               disabled={(date) =>
-                                date < new Date(new Date().setHours(0,0,0,0)) || isLoadingOverall // Disable past dates
+                                date < new Date(new Date().setHours(0,0,0,0)) || isLoadingOverall 
                               }
                               initialFocus
                             />
