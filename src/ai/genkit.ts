@@ -1,23 +1,51 @@
 
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
-import fs from 'fs'; // Using synchronous fs for startup configuration
-import path from 'path';
+// import fs from 'fs'; // No longer needed for direct init
+// import path from 'path'; // No longer needed for direct init
 import type { AIModelName } from '@/services/ai-config-service'; // Import type
 
 console.log('[Genkit Init] genkit.ts: Module execution START.');
 
-// Define types needed for reading settings synchronously at startup
-interface AISettingsForGenkitFile {
-  matchingMode?: 'simple' | 'advanced';
-  useUserProfilePreferencesInMatching?: boolean;
-  enableAutomaticPreferenceInference?: boolean;
-  preferredModel?: AIModelName;
-}
+// Temporarily hardcode the model to simplify initialization and bypass file reading.
+const modelToUse: AIModelName = 'gemini-2.5-pro-preview-05-06';
+const genkitModelId = `googleai/${modelToUse}`;
 
-const defaultGenkitModelName: AIModelName = 'gemini-2.5-pro-preview-05-06';
-const validGenkitModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
+console.log(`[Genkit Init] Using HARDCODED effective model: ${genkitModelId}`);
 
+export const ai = genkit({
+  plugins: [googleAI()],
+  model: genkitModelId,
+  config: {
+    safetySettings: [
+      {
+        category: 'HARM_CATEGORY_HATE_SPEECH',
+        threshold: 'BLOCK_ONLY_HIGH',
+      },
+      {
+        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+        threshold: 'BLOCK_NONE',
+      },
+      {
+        category: 'HARM_CATEGORY_HARASSMENT',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      },
+      {
+        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      },
+      {
+        category: 'HARM_CATEGORY_CIVIC_INTEGRITY',
+        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+      }
+    ],
+  },
+});
+
+console.log('[Genkit Init] genkit.ts: Module execution END. Genkit "ai" object configured with hardcoded model.');
+
+// Commented out the dynamic model loading logic for now
+/*
 function getModelNameForGenkitInit(): AIModelName {
   console.log('[Genkit Init Debug] getModelNameForGenkitInit CALLED.');
   const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
@@ -64,38 +92,14 @@ function getModelNameForGenkitInit(): AIModelName {
   return defaultGenkitModelName;
 }
 
-const modelToUse = getModelNameForGenkitInit();
-const genkitModelId = `googleai/${modelToUse}`;
+const defaultGenkitModelName: AIModelName = 'gemini-2.5-pro-preview-05-06';
+const validGenkitModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
-console.log(`[Genkit Init] Initializing Genkit 'ai' object with effective model: ${genkitModelId}`);
-
-export const ai = genkit({
-  plugins: [googleAI()],
-  model: genkitModelId,
-  config: {
-    safetySettings: [
-      {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_ONLY_HIGH',
-      },
-      {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-      },
-      {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
-      {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
-      {
-        category: 'HARM_CATEGORY_CIVIC_INTEGRITY',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      }
-    ],
-  },
-});
-
-console.log('[Genkit Init] genkit.ts: Module execution END. Genkit "ai" object configured.');
+// Define types needed for reading settings synchronously at startup
+interface AISettingsForGenkitFile {
+  matchingMode?: 'simple' | 'advanced';
+  useUserProfilePreferencesInMatching?: boolean;
+  enableAutomaticPreferenceInference?: boolean;
+  preferredModel?: AIModelName;
+}
+*/
