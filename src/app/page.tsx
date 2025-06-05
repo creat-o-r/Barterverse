@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link'; // Added Link
 import ItemList from '@/components/items/ItemList';
 import SearchBar from '@/components/items/SearchBar';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
@@ -171,7 +172,7 @@ export default function HomePage() {
         <section>
           <Card>
             <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center gap-2">
+              <CardTitle className="font-headline text-xl flex items-center gap-2">
                 <Loader2 className="h-6 w-6 text-primary animate-spin" />
                 Loading Your Listings & AI Suggestions...
               </CardTitle>
@@ -207,9 +208,9 @@ export default function HomePage() {
         <section>
             <Card className="border-border border-dashed">
                  <CardHeader>
-                    <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                    <CardTitle className="font-headline text-xl flex items-center gap-2">
                         <Sparkles className="h-6 w-6 text-muted-foreground" />
-                        AI Trade Ideas
+                        Trade Ideas
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -224,22 +225,27 @@ export default function HomePage() {
 
       {!overallLoading && userItemSuggestions.length > 0 && userItemSuggestions[0].userItem.id !== 'no-active-listings' && (
         userItemSuggestions.map((itemSuggestion, idx) => {
-          const cardTitleText = itemSuggestion.userItem.listingType === 'offer'
-            ? `AI Matches for your Offer: "${itemSuggestion.userItem.name}"`
-            : `AI Matches for your Want: "${itemSuggestion.userItem.name}"`;
-
           return (
             <section key={itemSuggestion.userItem.id || idx}>
               <Card className={itemSuggestion.error ? "border-destructive" : (itemSuggestion.suggestedMatches.length === 0 && !itemSuggestion.isLoading ? "border-border border-dashed" : "border-border")}>
                 <CardHeader>
                   <div className="flex justify-between items-start flex-wrap gap-2">
-                      <CardTitle className={`font-headline text-2xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
+                      <CardTitle className={`font-headline text-xl flex items-center gap-2 ${itemSuggestion.error ? 'text-destructive' : ''}`}>
                       {itemSuggestion.isLoading ? <Loader2 className="h-6 w-6 text-primary animate-spin" /> : (itemSuggestion.error ? <AlertCircle className="h-6 w-6 text-destructive" /> : <Sparkles className={`h-6 w-6 ${itemSuggestion.suggestedMatches.length > 0 ? 'text-primary' : 'text-muted-foreground'}`} />)}
-                      {itemSuggestion.isLoading ? `Finding Matches for your ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"...` :
-                      itemSuggestion.error ? `Error for ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"` :
-                      cardTitleText}
-                      </CardTitle>
                       
+                      {itemSuggestion.isLoading ? (
+                        `Finding Matches for your ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"...`
+                      ) : itemSuggestion.error ? (
+                        `Error for ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"`
+                      ) : (
+                        <>
+                          Matches for your {itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}:{" "}
+                          <Link href={`/items/${itemSuggestion.userItem.id}`} className="text-primary hover:underline">
+                            &quot;{itemSuggestion.userItem.name}&quot;
+                          </Link>
+                        </>
+                      )}
+                      </CardTitle>
                   </div>
                    {!itemSuggestion.isLoading && itemSuggestion.error && (
                     <p className="text-sm text-destructive mt-1 font-body">{itemSuggestion.error}</p>
@@ -265,7 +271,7 @@ export default function HomePage() {
                     <ItemList items={itemSuggestion.suggestedMatches} mainContextItemId={itemSuggestion.userItem.id} />
                   ) : !itemSuggestion.error && (
                     <p className="text-muted-foreground font-body text-center py-4">
-                      {itemSuggestion.suggestedMatches.length === 0 ? `We couldn't find specific AI matches for your "${itemSuggestion.userItem.name}" right now.` : "No matches found."}
+                      {itemSuggestion.suggestedMatches.length === 0 ? `We couldn't find specific matches for your "${itemSuggestion.userItem.name}" right now.` : "No matches found."}
                     </p>
                   )}
                 </CardContent>
