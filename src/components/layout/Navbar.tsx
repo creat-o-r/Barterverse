@@ -5,7 +5,7 @@ import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus, Filter as FilterIconLucide } from 'lucide-react'; // Renamed Filter to FilterIconLucide to avoid conflict
+import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,7 +50,7 @@ function GlobalCategoryFilter() {
         }}
       >
         <SelectTrigger className="w-auto max-w-[120px] sm:max-w-[140px] text-xs h-9 px-2 md:w-[180px] md:text-sm md:px-3 md:h-10 md:max-w-none bg-background">
-          <SelectValue placeholder="Any Category" />
+          <SelectValue placeholder="Any" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="any">Any Category</SelectItem>
@@ -74,14 +74,14 @@ export default function Navbar() {
     <header className="bg-card shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center">
 
-        {/* Mobile Navigation (hidden on md and up) */}
+        {/* Mobile Navigation */}
         <div className="w-full flex md:hidden items-center h-full">
           {/* Left: Category Filter */}
           <div className="flex-none mr-2"> 
             <GlobalCategoryFilter />
           </div>
 
-          {/* Center: Primary Nav Icons (flow after filter) */}
+          {/* Center: Primary Nav Icons */}
           <nav className="flex items-center gap-1"> 
             {primaryNavLinks.map((link) => (
               <Button key={`mobile-icon-${link.label}`} variant="ghost" size="icon" asChild>
@@ -97,7 +97,7 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Right: Auth/Profile Icons (pushed to the far right) */}
+          {/* Right: Auth/Profile Icons */}
           <div className="flex-none flex items-center gap-0.5 ml-auto"> 
             {isLoggedIn ? (
               <>
@@ -124,9 +124,8 @@ export default function Navbar() {
           </div>
         </div>
         
-        {/* Desktop Navigation (hidden on sm and down) */}
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          {/* Desktop Category Filter first */}
           <div className="mr-4"> 
              <GlobalCategoryFilter />
           </div>
@@ -145,7 +144,6 @@ export default function Navbar() {
           ))}
         </nav>
 
-        {/* Right-aligned items: Profile Dropdown / Login Button - Desktop */}
         <div className="ml-auto hidden md:flex items-center">
           {isLoggedIn ? (
             <DropdownMenu>
