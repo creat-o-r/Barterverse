@@ -53,7 +53,7 @@ function GlobalCategoryFilter() {
           <SelectValue placeholder="Any" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="any">Any Category</SelectItem>
+          <SelectItem value="any">Any</SelectItem>
           {availableCategories.map(category => (
             <SelectItem key={category} value={category}>
               {category}
