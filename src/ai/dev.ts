@@ -3,23 +3,22 @@
 
 console.log('[AI Dev Init] dev.ts: Module execution START.');
 
-// import { config as dotenvConfig } from 'dotenv'; // Keep commented out
-// try {
-//   console.log('[AI Dev Init] dev.ts: Attempting dotenvConfig() (CURRENTLY DISABLED).');
-//   // const result = dotenvConfig();
-//   // if (result.error) {
-//   //   console.warn('[AI Dev Init] dev.ts: dotenvConfig() error -', result.error.message);
-//   // } else {
-//   //   console.log('[AI Dev Init] dev.ts: dotenvConfig() success. Parsed keys (if any):', Object.keys(result.parsed || {}));
-//   //   if (Object.keys(result.parsed || {}).length === 0 && !process.env.GOOGLE_API_KEY) {
-//   //     console.warn('[AI Dev Init] dev.ts: .env file was empty or not found, AND GOOGLE_API_KEY is not set in broader environment.');
-//   //   }
-//   // }
-//   console.log('[AI Dev Init] dev.ts: dotenvConfig() SKIPPED.');
-// } catch (e:any) {
-//   console.error('[AI Dev Init] dev.ts: CRITICAL error during dotenvConfig() call -', e.message, e.stack);
-//   // Optionally, re-throw if this should halt: throw e;
-// }
+import { config as dotenvConfig } from 'dotenv'; // Keep commented out
+try {
+  console.log('[AI Dev Init] dev.ts: Attempting dotenvConfig().');
+  const result = dotenvConfig();
+  if (result.error) {
+    console.warn('[AI Dev Init] dev.ts: dotenvConfig() error -', result.error.message);
+  } else {
+    console.log('[AI Dev Init] dev.ts: dotenvConfig() success. Parsed keys (if any):', Object.keys(result.parsed || {}));
+    if (Object.keys(result.parsed || {}).length === 0 && !process.env.GOOGLE_API_KEY) {
+      console.warn('[AI Dev Init] dev.ts: .env file was empty or not found, AND GOOGLE_API_KEY is not set in broader environment.');
+    }
+  }
+} catch (e:any) {
+  console.error('[AI Dev Init] dev.ts: CRITICAL error during dotenvConfig() call -', e.message, e.stack);
+  // Optionally, re-throw if this should halt: throw e;
+}
 
 console.log('[AI Dev Init] dev.ts: Importing flows (currently all commented out for testing)...');
 try {
@@ -46,4 +45,3 @@ try {
 }
 
 console.log('[AI Dev Init] dev.ts: Module execution END.');
-
