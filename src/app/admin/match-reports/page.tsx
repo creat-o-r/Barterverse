@@ -249,36 +249,37 @@ export default function MatchReportsPage() {
     setIsLoadingListedModels(true);
     setListModelsError(null);
     setListedModels(null);
-    setShowListedModels(true);
+    setShowListedModels(true); // Show collapsible area immediately
+
     try {
       const response = await fetch('/api/list-models');
 
       if (!response.ok) {
         let errorMessage = `API request failed with status ${response.status}`;
-        let errorData;
         try {
-          // Try to parse error from server if it's JSON
-          errorData = await response.json();
+          // Try to parse error from server if it's JSON (our API route should return JSON errors)
+          const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-          if (errorData.details && errorData.details.includes("listModels on Class.prototype: false")) {
-             errorMessage = `Failed to list models: The Google AI SDK's 'listModels' method is not available in the server environment. This suggests an issue with the SDK installation or a build/bundling problem. Details: ${errorData.details}`;
-          } else if (errorData.details) {
-            errorMessage += ` Details: ${errorData.details}`;
-          }
+          if (errorData.details) errorMessage += ` Details: ${errorData.details}`;
           if (errorData.gaiError) errorMessage += ` Google AI Error: ${errorData.gaiError}`;
         } catch (e) {
-          // If parsing error as JSON fails, maybe it's plain text or HTML
-          const textError = await response.text();
-          errorMessage = `API request failed with status ${response.status}. Server response: ${textError.substring(0, 200)}${textError.length > 200 ? '...' : ''}`;
+          // If parsing error as JSON fails, it might be an HTML error page or plain text
+          try {
+            const textError = await response.text();
+            errorMessage = `API request failed with status ${response.status}. Server response: ${textError.substring(0, 200)}${textError.length > 200 ? '...' : ''}`;
+          } catch (textE) {
+            // If getting text also fails, stick with the original status message
+          }
         }
         setListModelsError(errorMessage);
         toast({ title: "Error Listing Models", description: errorMessage, variant: "destructive", duration: 10000 });
         setListedModels(null);
-        return; 
+        setIsLoadingListedModels(false); // Ensure loading state is cleared
+        return; // Important: Exit after handling error
       }
 
       // If response.ok, proceed to parse as JSON
-      const data = await response.json();
+      const data = await response.json(); // This should be safe now
       if (data.models) {
         setListedModels(data.models);
         setListModelsError(null); // Clear any previous error
@@ -292,7 +293,7 @@ export default function MatchReportsPage() {
 
     } catch (error: any) {
       // This catch block handles network errors or issues before a response is received
-      console.error("Failed to list models (client-side catch):", error);
+      console.error("Failed to list models (client-side fetch catch):", error);
       const clientErrorMsg = error.message || "Could not fetch model list from API. Check network or server status.";
       setListModelsError(clientErrorMsg);
       toast({ title: "Error Listing Models", description: clientErrorMsg, variant: "destructive", duration: 10000 });
@@ -565,6 +566,8 @@ export default function MatchReportsPage() {
     </div>
   );
 }
+
+    
 
     
 
