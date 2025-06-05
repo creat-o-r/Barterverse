@@ -61,11 +61,13 @@ async function writeLogs(logs: LoggedMatchSuggestion[]): Promise<void> {
 }
 
 export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'timestamp' | 'modelUsed'>): Promise<void> {
-  const modelUsed = await getPreferredAIModel(); // Get current default model
+  console.log('[Match Report Service Debug] logMatchSuggestion CALLED.');
+  const modelConfigured = await getPreferredAIModel(); 
+  console.log(`[Match Report Service Debug] logMatchSuggestion - getPreferredAIModel() returned: '${modelConfigured}' to be logged as modelUsed.`);
   const newLog: LoggedMatchSuggestion = {
     ...data,
     timestamp: new Date().toISOString(),
-    modelUsed: modelUsed, // Store the model used
+    modelUsed: modelConfigured, 
     preferencesConsidered: data.preferencesConsidered === undefined ? false : data.preferencesConsidered,
   };
 
@@ -77,7 +79,7 @@ export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'time
   }
 
   await writeLogs(currentLogs);
-  console.log('[Match Report Service] Logged Match Suggestion to file:', JSON.stringify(newLog, null, 2));
+  console.log('[Match Report Service] Logged Match Suggestion to file. Data logged:', JSON.stringify(newLog, null, 2).substring(0, 500) + "...");
 }
 
 export async function getLoggedMatchSuggestions(): Promise<LoggedMatchSuggestion[]> {
