@@ -5,23 +5,24 @@ import fs from 'fs'; // Using synchronous fs for startup configuration
 import path from 'path';
 import type { AIModelName } from '@/services/ai-config-service'; // Import type
 
+console.log('[Genkit Init] genkit.ts: Module execution START.');
+
 // Define types needed for reading settings synchronously at startup
-// Renamed local type to avoid conflict if AIModelName from service is imported
 interface AISettingsForGenkitFile {
   matchingMode?: 'simple' | 'advanced';
   useUserProfilePreferencesInMatching?: boolean;
   enableAutomaticPreferenceInference?: boolean;
-  preferredModel?: AIModelName; // Use imported AIModelName type
+  preferredModel?: AIModelName;
 }
 
-// Default model if settings file is missing or model is invalid
 const defaultGenkitModelName: AIModelName = 'gemini-2.5-pro-preview-05-06';
-// Valid models for Genkit initialization
 const validGenkitModels: AIModelName[] = ['gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-2.5-pro-preview-05-06'];
 
 function getModelNameForGenkitInit(): AIModelName {
+  console.log('[Genkit Init Debug] getModelNameForGenkitInit CALLED.');
   const SETTINGS_FILE_PATH = path.join(process.cwd(), '.ai-settings.json');
   console.log(`[Genkit Init Debug] Attempting to read settings from: ${SETTINGS_FILE_PATH}`);
+  console.log(`[Genkit Init Debug] Current working directory (process.cwd()): ${process.cwd()}`);
 
   try {
     if (fs.existsSync(SETTINGS_FILE_PATH)) {
@@ -31,34 +32,42 @@ function getModelNameForGenkitInit(): AIModelName {
         console.warn(`[Genkit Init Debug] .ai-settings.json is empty. Using default Genkit model: ${defaultGenkitModelName}`);
         return defaultGenkitModelName;
       }
-      console.log(`[Genkit Init Debug] Raw content of .ai-settings.json: ${fileContent.substring(0, 200)}`);
-      const parsedSettings = JSON.parse(fileContent) as AISettingsForGenkitFile;
-      console.log(`[Genkit Init Debug] Parsed settings from .ai-settings.json:`, parsedSettings);
+      console.log(`[Genkit Init Debug] Raw content of .ai-settings.json (first 200 chars): ${fileContent.substring(0, 200)}`);
+      
+      let parsedSettings: AISettingsForGenkitFile | undefined;
+      try {
+        parsedSettings = JSON.parse(fileContent) as AISettingsForGenkitFile;
+        console.log(`[Genkit Init Debug] Parsed settings from .ai-settings.json:`, parsedSettings);
+      } catch (jsonParseError: any) {
+        console.error(`[Genkit Init Debug] CRITICAL JSON.parse error for .ai-settings.json. Content was: "${fileContent.substring(0,500)}". Error:`, jsonParseError.message, jsonParseError.stack);
+        console.warn(`[Genkit Init Debug] Using default Genkit model: ${defaultGenkitModelName} due to JSON parse failure.`);
+        return defaultGenkitModelName;
+      }
+
 
       if (parsedSettings.preferredModel && validGenkitModels.includes(parsedSettings.preferredModel)) {
         console.log(`[Genkit Init Debug] Preferred model from file: '${parsedSettings.preferredModel}'. Using it.`);
         return parsedSettings.preferredModel;
       } else if (parsedSettings.preferredModel) {
-        console.warn(`[Genkit Init Debug] preferredModel '${parsedSettings.preferredModel}' from file is NOT VALID or not in validGenkitModels. Using default Genkit model: ${defaultGenkitModelName}`);
+        console.warn(`[Genkit Init Debug] preferredModel '${parsedSettings.preferredModel}' from file is NOT VALID or not in validGenkitModels. Using default: ${defaultGenkitModelName}`);
       } else {
-        console.warn(`[Genkit Init Debug] 'preferredModel' field missing in .ai-settings.json. Using default Genkit model: ${defaultGenkitModelName}`);
+        console.warn(`[Genkit Init Debug] 'preferredModel' field missing in .ai-settings.json. Using default: ${defaultGenkitModelName}`);
       }
     } else {
       console.log(`[Genkit Init Debug] .ai-settings.json not found. Using default Genkit model: ${defaultGenkitModelName}.`);
     }
-  } catch (error) {
-    console.error(`[Genkit Init Debug] Error reading/parsing .ai-settings.json. Using default Genkit model: ${defaultGenkitModelName}. Error:`, error);
+  } catch (error: any) {
+    console.error(`[Genkit Init Debug] Error reading/parsing .ai-settings.json (outer catch). Using default Genkit model: ${defaultGenkitModelName}. Error:`, error.message, error.stack);
   }
 
-  console.log(`[Genkit Init Debug] Falling back to default Genkit model name: ${defaultGenkitModelName}`);
+  console.log(`[Genkit Init Debug] Falling back to default Genkit model name in getModelNameForGenkitInit: ${defaultGenkitModelName}`);
   return defaultGenkitModelName;
 }
 
 const modelToUse = getModelNameForGenkitInit();
 const genkitModelId = `googleai/${modelToUse}`;
 
-// This is the key log to check which model Genkit is actually initialized with.
-console.log(`[Genkit Init] Initializing with default model: ${genkitModelId}`);
+console.log(`[Genkit Init] Initializing Genkit 'ai' object with effective model: ${genkitModelId}`);
 
 export const ai = genkit({
   plugins: [googleAI()],
@@ -71,7 +80,7 @@ export const ai = genkit({
       },
       {
         category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE', 
+        threshold: 'BLOCK_NONE',
       },
       {
         category: 'HARM_CATEGORY_HARASSMENT',
@@ -82,9 +91,11 @@ export const ai = genkit({
         threshold: 'BLOCK_MEDIUM_AND_ABOVE',
       },
       {
-        category: 'HARM_CATEGORY_CIVIC_INTEGRITY', 
+        category: 'HARM_CATEGORY_CIVIC_INTEGRITY',
         threshold: 'BLOCK_MEDIUM_AND_ABOVE',
       }
     ],
   },
 });
+
+console.log('[Genkit Init] genkit.ts: Module execution END. Genkit "ai" object configured.');
