@@ -3,10 +3,10 @@
 
 console.log('[AI Dev Init] dev.ts: Module execution START.');
 
-import { config as dotenvConfig } from 'dotenv'; // Keep commented out
+import { config as dotenvConfig } from 'dotenv'; // UNCOMMENTED
 try {
   console.log('[AI Dev Init] dev.ts: Attempting dotenvConfig().');
-  const result = dotenvConfig();
+  const result = dotenvConfig(); // UNCOMMENTED
   if (result.error) {
     console.warn('[AI Dev Init] dev.ts: dotenvConfig() error -', result.error.message);
   } else {
@@ -20,10 +20,10 @@ try {
   // Optionally, re-throw if this should halt: throw e;
 }
 
-console.log('[AI Dev Init] dev.ts: Importing flows (currently all commented out for testing)...');
+console.log('[AI Dev Init] dev.ts: Importing flows...');
 try {
-  // import '@/ai/flows/smart-suggestion-tool.ts';
-  // console.log('[AI Dev Init] dev.ts: Imported smart-suggestion-tool.ts');
+  import '@/ai/flows/smart-suggestion-tool.ts'; // UNCOMMENTED
+  console.log('[AI Dev Init] dev.ts: Imported smart-suggestion-tool.ts');
   // import '@/ai/flows/trade-negotiation-chat.ts';
   // console.log('[AI Dev Init] dev.ts: Imported trade-negotiation-chat.ts');
   // import '@/ai/flows/item-match-flow.ts';
@@ -38,7 +38,7 @@ try {
   // console.log('[AI Dev Init] dev.ts: Imported infer-user-preferences-flow.ts');
   // import '@/ai/flows/explain-match-rationale-flow.ts';
   // console.log('[AI Dev Init] dev.ts: Imported explain-match-rationale-flow.ts');
-  console.log('[AI Dev Init] dev.ts: All flows are currently commented out. If server starts, uncomment them one by one.');
+  // console.log('[AI Dev Init] dev.ts: All other flows are currently commented out.'); // Updated message
 } catch (e: any) {
   console.error('[AI Dev Init] dev.ts: CRITICAL error during flow imports -', e.message, e.stack);
   // Optionally, re-throw if this should halt: throw e;
