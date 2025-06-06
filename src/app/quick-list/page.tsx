@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { dummyUsers, dummyItems } from '@/lib/dummy-data';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge'; // Added missing import
+import { Badge } from '@/components/ui/badge';
 
 export default function QuickListPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -241,4 +241,3 @@ export default function QuickListPage() {
     </div>
   );
 }
-
