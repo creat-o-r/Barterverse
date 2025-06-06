@@ -1,0 +1,242 @@
+
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Send, User, Bot, Loader2, ListChecks, Package, Tag, ImageIcon } from 'lucide-react';
+import Image from 'next/image';
+import type { Item, ChatMessage } from '@/types';
+import { generalChat } from '@/ai/flows/general-chat-flow';
+import { cn } from '@/lib/utils';
+import { useToast } from "@/hooks/use-toast";
+import { dummyUsers, dummyItems } from '@/lib/dummy-data';
+import Link from 'next/link';
+import { Separator } from '@/components/ui/separator';
+
+export default function QuickListPage() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [userListings, setUserListings] = useState<Item[]>([]);
+  const [isLoadingListings, setIsLoadingListings] = useState(true);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const currentUserId = dummyUsers[0].id; // Simulate current user
+
+  useEffect(() => {
+    setIsLoadingListings(true);
+    const listings = dummyItems.filter(item => item.ownerId === currentUserId && (item.status === 'available' || item.status === 'pending'));
+    setUserListings(listings);
+    setIsLoadingListings(false);
+
+    setMessages([
+      {
+        id: 'initial-quicklist-ai-message',
+        senderId: 'llm',
+        text: "Welcome to Quick List! Describe the items you want to list (e.g., 'List a red bike, good condition, for trade' or 'I want to sell three vintage t-shirts').\n\n(Note: Currently, I can chat but can't actually create listings yet. This is a preview of the Quick List feature!)",
+        timestamp: new Date(),
+        isAIMessage: true,
+      },
+    ]);
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollViewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
+      if (scrollViewport) {
+        scrollViewport.scrollTop = scrollViewport.scrollHeight;
+      }
+    }
+  }, [messages]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      senderId: currentUserId,
+      text: newMessage,
+      timestamp: new Date(),
+    };
+    setMessages((prevMessages) => [...prevMessages, userMessage]);
+    setNewMessage('');
+    setIsLoading(true);
+
+    try {
+      const chatHistoryForFlow = messages
+        .map(msg => `${msg.isAIMessage ? 'AI' : 'User'}: ${msg.text}`)
+        .join('\n');
+      
+      const aiResponse = await generalChat({
+        chatHistory: chatHistoryForFlow + `\nUser: ${userMessage.text}`, // Append current message for context
+        userMessage: userMessage.text,
+      });
+
+      const aiMessage: ChatMessage = {
+        id: Date.now().toString() + '-ai',
+        senderId: 'llm',
+        text: aiResponse.response,
+        timestamp: new Date(),
+        isAIMessage: true,
+      };
+      setMessages((prevMessages) => [...prevMessages, aiMessage]);
+    } catch (error) {
+      console.error('Error calling general AI chat:', error);
+      toast({
+        title: "Chat Error",
+        description: "Could not get a response from the assistant. Please try again.",
+        variant: "destructive",
+      });
+       const errorMessage: ChatMessage = {
+        id: Date.now().toString() + '-err',
+        senderId: 'llm',
+        text: "Sorry, I couldn't connect to the AI. Please try again.",
+        timestamp: new Date(),
+        isAIMessage: true,
+      };
+      setMessages((prevMessages) => [...prevMessages, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh_-_8rem)]"> {/* Adjust height based on actual nav/footer */}
+      {/* Chat Area */}
+      <Card className="flex-grow md:flex-grow-[2] flex flex-col h-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="font-headline text-2xl flex items-center gap-2">
+            <ListChecks className="h-7 w-7 text-primary" />
+            Quick List Chat
+          </CardTitle>
+          <CardDescription className="font-body">
+            Chat with the AI to list your items quickly. Describe what you have, and the AI will help (soon!).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow flex flex-col p-0 overflow-hidden">
+          <ScrollArea className="flex-grow p-4 space-y-4" ref={scrollAreaRef}>
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  'flex items-end gap-2 mb-4',
+                  message.senderId === currentUserId ? 'justify-end' : 'justify-start'
+                )}
+              >
+                {message.senderId !== currentUserId && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback><Bot size={18}/></AvatarFallback>
+                  </Avatar>
+                )}
+                <div
+                  className={cn(
+                    'max-w-[70%] p-3 rounded-lg text-sm font-body',
+                    message.senderId === currentUserId
+                      ? 'bg-primary text-primary-foreground rounded-br-none'
+                      : 'bg-muted text-muted-foreground rounded-bl-none'
+                  )}
+                >
+                  <p className="whitespace-pre-wrap">{message.text}</p>
+                   <p className={cn(
+                    "text-xs mt-1",
+                    message.senderId === currentUserId ? 'text-primary-foreground/70' : 'text-muted-foreground/70',
+                    message.senderId === currentUserId ? 'text-right' : 'text-left'
+                  )}>
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                {message.senderId === currentUserId && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={dummyUsers.find(u=>u.id === currentUserId)?.avatarUrl} />
+                    <AvatarFallback>{dummyUsers.find(u=>u.id === currentUserId)?.name.charAt(0) || 'U'}</AvatarFallback>
+                  </Avatar>
+                )}
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex items-end gap-2 mb-4 justify-start">
+                <Avatar className="h-8 w-8">
+                    <AvatarFallback><Bot size={18}/></AvatarFallback>
+                </Avatar>
+                <div className="max-w-[70%] p-3 rounded-lg text-sm font-body bg-muted text-muted-foreground rounded-bl-none">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+          <form onSubmit={handleSendMessage} className="flex items-center p-3 border-t bg-background">
+            <Input
+              type="text"
+              placeholder="e.g., 'List 3 books and a blue bicycle for trade...'"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="flex-grow mr-2"
+              disabled={isLoading}
+            />
+            <Button type="submit" size="icon" disabled={isLoading || !newMessage.trim()} className="bg-primary hover:bg-primary/90">
+              <Send className="h-5 w-5" />
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* User's Listings Area */}
+      <Card className="md:flex-grow-[1] flex flex-col h-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="font-headline text-xl flex items-center gap-2">
+            <Package className="h-6 w-6 text-accent" />
+            Your Current Listings
+          </CardTitle>
+           <CardDescription className="font-body text-xs">
+            Items you are offering or want.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-grow p-0 overflow-hidden">
+          <ScrollArea className="h-full p-4">
+            {isLoadingListings ? (
+              <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : userListings.length === 0 ? (
+              <p className="text-center text-muted-foreground font-body py-10">You have no active listings.</p>
+            ) : (
+              <div className="space-y-3">
+                {userListings.map(item => (
+                  <div key={item.id} className="p-3 border rounded-md bg-muted/30 hover:shadow-sm transition-shadow">
+                    <div className="flex items-start gap-3">
+                        <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                            {item.imageUrl ? (
+                                <Image src={item.imageUrl} alt={item.name} fill className="object-cover" data-ai-hint={item.dataAiHint || "item image"} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                    <ImageIcon className="w-6 h-6" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-grow min-w-0">
+                             <Link href={`/items/${item.id}`} className="hover:text-primary">
+                                <h4 className="text-sm font-semibold truncate font-headline" title={item.name}>{item.name}</h4>
+                            </Link>
+                            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                <Tag className="h-3 w-3 shrink-0" /> {item.category}
+                            </p>
+                            <Badge variant={item.listingType === 'offer' ? 'default' : 'secondary'} className="text-[10px] mt-1 capitalize px-1.5 py-0.5">
+                                {item.listingType}
+                            </Badge>
+                        </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
