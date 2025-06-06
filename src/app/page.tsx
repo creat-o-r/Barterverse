@@ -77,7 +77,7 @@ export default function HomePage() {
           category: item.category,
           ownerId: item.ownerId,
           listingType: item.listingType,
-          isGiftItForward: item.isGiftItForward, 
+          isGiftItForward: item.isGiftItForward,
         }));
 
         if (otherItemsForMatching.length === 0) {
@@ -88,7 +88,7 @@ export default function HomePage() {
               suggestedMatches: [],
               reasoning: `No other items currently available from other users to suggest matches for your "${userItem.name}".`,
               preferencesConsidered: false,
-              usedMatchingMode: 'simple', 
+              usedMatchingMode: 'simple',
             } as Pick<ItemMatchOutput, 'suggestedMatches' | 'reasoning' | 'preferencesConsidered' | 'usedMatchingMode'>,
           };
         }
@@ -103,7 +103,7 @@ export default function HomePage() {
               category: userItem.category,
               ownerId: userItem.ownerId,
               listingType: userItem.listingType,
-              isGiftItForward: userItem.isGiftItForward, 
+              isGiftItForward: userItem.isGiftItForward,
             },
             availableItems: otherItemsForMatching,
           });
@@ -128,9 +128,9 @@ export default function HomePage() {
             if (success && data) {
               const itemsWithScores = (data.suggestedMatches || []).map(match => {
                 const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-                return itemDetails ? { 
-                  ...itemDetails, 
-                  matchScore: match.matchScore, 
+                return itemDetails ? {
+                  ...itemDetails,
+                  matchScore: match.matchScore,
                   isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward,
                   reciprocalItemId: match.reciprocalItemId // Include reciprocalItemId
                 } : null;
@@ -154,7 +154,6 @@ export default function HomePage() {
           } else if (settledResult.status === 'rejected') {
             // Handle rejected promises if necessary, though current map logic already returns an error structure
             // For instance, if a promise in suggestionPromises itself rejects unexpectedly before returning the structured error.
-            // This part might be redundant if all errors are caught within the map's async function.
             // const failedIndex = (settledResult.reason as any)?.index; // If you can determine index from reason
             // if (failedIndex !== undefined && newSuggestions[failedIndex]) {
             //   newSuggestions[failedIndex] = {
@@ -250,7 +249,7 @@ export default function HomePage() {
                         `Error for ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"`
                       ) : (
                         <>
-                          {itemSuggestion.userItem.listingType === 'offer' ? 'Matches your Offer' : 'Matches for your Want'}:{" "}
+                          {itemSuggestion.userItem.listingType === 'offer' ? 'Matches your Offer' : 'Matches your Want'}:{" "}
                           <Link href={`/items/${itemSuggestion.userItem.id}`} className="text-primary hover:underline">
                             &quot;{itemSuggestion.userItem.name}&quot;
                           </Link>
