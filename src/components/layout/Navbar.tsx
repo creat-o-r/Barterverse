@@ -7,14 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -146,37 +138,12 @@ export default function Navbar() {
 
         <div className="ml-auto hidden md:flex items-center">
           {isLoggedIn ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 text-sm px-3 py-2">
-                  {React.cloneElement(profileLinkConfig.icon, { className: "h-4 w-4" })}
-                  {profileLinkConfig.label}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src="https://placehold.co/100x100.png?text=U" alt="User" data-ai-hint="profile avatar" />
-                      <AvatarFallback>U</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">Current User</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        user@example.com
-                      </p>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href={profileLinkConfig.href}>
-                    <UserCircle className="mr-2 h-4 w-4" />
-                    <span>View Profile</span>
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button variant="ghost" asChild className="flex items-center gap-2 text-sm px-3 py-2">
+              <Link href={profileLinkConfig.href}>
+                {React.cloneElement(profileLinkConfig.icon, { className: "h-4 w-4" })}
+                {profileLinkConfig.label}
+              </Link>
+            </Button>
           ) : (
              <div className="flex items-center gap-2">
               <Button variant="default" size="sm" asChild>
