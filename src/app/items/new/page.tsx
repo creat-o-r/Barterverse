@@ -33,7 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { useGlobalFilter } from '@/contexts/GlobalFilterContext'; // Added
+import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
 const NO_LOCATION_SPECIFIED_VALUE = "no_location_specified_for_item";
@@ -99,7 +99,7 @@ const deliveryMethodMapConcrete: Record<ItemDeliveryMethod, string> = {
 export default function NewItemPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const { selectedCategory: globalSelectedCategory } = useGlobalFilter(); // Added
+  const { selectedCategory: globalSelectedCategory } = useGlobalFilter();
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -115,7 +115,7 @@ export default function NewItemPage() {
     defaultValues: {
       name: '',
       description: '',
-      category: globalSelectedCategory || '', // Prefill from global context
+      category: globalSelectedCategory || '',
       imageUrl: '',
       listingType: 'offer',
       isGiftItForward: false,
@@ -129,7 +129,6 @@ export default function NewItemPage() {
     },
   });
 
-  // Effect to update category field if global filter changes and form field is not dirty
   useEffect(() => {
     if (globalSelectedCategory && !form.formState.dirtyFields.category) {
       form.setValue('category', globalSelectedCategory, { shouldValidate: true });
@@ -152,7 +151,7 @@ export default function NewItemPage() {
 
         form.reset({
             ...currentFormValues, 
-            category: globalSelectedCategory || currentFormValues.category || '', // Prioritize global, then current, then empty
+            category: globalSelectedCategory || currentFormValues.category || '',
             openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false,
             selectedLocationIdentifier: currentFormValues.selectedLocationIdentifier && currentFormValues.selectedLocationIdentifier !== NO_LOCATION_SPECIFIED_VALUE ? currentFormValues.selectedLocationIdentifier : defaultSelectedLocationId,
             itemSpecificAddress: (currentFormValues.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) ? (currentFormValues.itemSpecificAddress || '') : '',
@@ -174,7 +173,7 @@ export default function NewItemPage() {
 
     if (name.length < 3 || description.length < 10) return;
 
-    if (!form.formState.dirtyFields.category && !globalSelectedCategory) { // Only suggest if not globally set and not dirty
+    if (!form.formState.dirtyFields.category && !globalSelectedCategory) {
         setIsSuggestingCategory(true);
         try {
             const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
@@ -271,7 +270,7 @@ export default function NewItemPage() {
         form.reset({
             name: '',
             description: '',
-            category: globalSelectedCategory || '', // Reset with global or empty
+            category: globalSelectedCategory || '', 
             imageUrl: '',
             listingType: 'offer',
             isGiftItForward: false,
@@ -367,10 +366,51 @@ export default function NewItemPage() {
                     </FormItem>
                   )} />
                 )}
+                
+                <FormField
+                  control={form.control}
+                  name="deliveryMethods"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="mb-2">
+                        <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery</FormLabel>
+                        <FormDescription className="font-body">Select all that apply. Initializes to your profile defaults.</FormDescription>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                        {Object.entries(deliveryMethodMapConcrete).map(([key, label]) => (
+                          <FormItem key={key} className="flex flex-row items-center space-x-3 space-y-0 p-2 border rounded-md hover:bg-muted/50 transition-colors">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(key as ItemDeliveryMethod)}
+                                onCheckedChange={(checked) => {
+                                  const currentValues = field.value || [];
+                                  let newValues;
+                                  if (checked) {
+                                    newValues = [...currentValues, key as ItemDeliveryMethod];
+                                  } else {
+                                    newValues = currentValues.filter(value => value !== key);
+                                  }
+                                  newValues = [...new Set(newValues)];
+                                  field.onChange(newValues);
+                                }}
+                                disabled={isLoadingOverall}
+                                id={`delivery-${key}`}
+                              />
+                            </FormControl>
+                            <FormLabel htmlFor={`delivery-${key}`} className="font-normal text-sm cursor-pointer flex-grow">
+                              {label}
+                            </FormLabel>
+                          </FormItem>
+                        ))}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField control={form.control} name="timingType" render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel className="font-headline flex items-center gap-2"><Clock className="h-5 w-5 text-muted-foreground" />Availability Timing</FormLabel>
+                    <FormLabel className="font-headline flex items-center gap-2"><Clock className="h-5 w-5 text-muted-foreground" />Timing</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={(value) => {
@@ -442,54 +482,12 @@ export default function NewItemPage() {
                   />
                 )}
 
-
-                <FormField
-                  control={form.control}
-                  name="deliveryMethods"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="mb-2">
-                        <FormLabel className="font-headline flex items-center gap-2"><Truck className="h-5 w-5 text-muted-foreground" />Delivery</FormLabel>
-                        <FormDescription className="font-body">Select all that apply. Initializes to your profile defaults.</FormDescription>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                        {Object.entries(deliveryMethodMapConcrete).map(([key, label]) => (
-                          <FormItem key={key} className="flex flex-row items-center space-x-3 space-y-0 p-2 border rounded-md hover:bg-muted/50 transition-colors">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(key as ItemDeliveryMethod)}
-                                onCheckedChange={(checked) => {
-                                  const currentValues = field.value || [];
-                                  let newValues;
-                                  if (checked) {
-                                    newValues = [...currentValues, key as ItemDeliveryMethod];
-                                  } else {
-                                    newValues = currentValues.filter(value => value !== key);
-                                  }
-                                  newValues = [...new Set(newValues)];
-                                  field.onChange(newValues);
-                                }}
-                                disabled={isLoadingOverall}
-                                id={`delivery-${key}`}
-                              />
-                            </FormControl>
-                            <FormLabel htmlFor={`delivery-${key}`} className="font-normal text-sm cursor-pointer flex-grow">
-                              {label}
-                            </FormLabel>
-                          </FormItem>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                  <FormField
                   control={form.control}
                   name="logisticsNotes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="font-headline flex items-center gap-2"><Edit2 className="h-5 w-5 text-muted-foreground" />Delivery Notes (Optional)</FormLabel>
+                      <FormLabel className="font-headline flex items-center gap-2"><Edit2 className="h-5 w-5 text-muted-foreground" />Logistics Notes (Optional)</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="Any additional details about pickup, shipping, or meeting up (e.g., 'Available for pickup on weekends only')."
