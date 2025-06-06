@@ -7,7 +7,7 @@ import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod,
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, ClockFast } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
@@ -98,7 +98,7 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
 
       {logistics.timing && (
         <div>
-            <h4 className="font-headline text-md flex items-center gap-1.5"><ClockFast className="h-4 w-4 text-muted-foreground" /> Timing:</h4>
+            <h4 className="font-headline text-md flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground" /> Timing:</h4>
             <p className="text-sm text-foreground/90 font-body pl-5">{timingDisplay}</p>
         </div>
       )}

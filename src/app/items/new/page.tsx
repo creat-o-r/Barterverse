@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search, HeartHandshake, MapPin, Truck, Edit2, Network, CalendarDays, ClockFast } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search, HeartHandshake, MapPin, Truck, Edit2, Network, CalendarDays, Clock } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
@@ -370,7 +370,7 @@ export default function NewItemPage() {
 
                 <FormField control={form.control} name="timingType" render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel className="font-headline flex items-center gap-2"><ClockFast className="h-5 w-5 text-muted-foreground" />Availability Timing</FormLabel>
+                    <FormLabel className="font-headline flex items-center gap-2"><Clock className="h-5 w-5 text-muted-foreground" />Availability Timing</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={(value) => {
