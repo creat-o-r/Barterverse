@@ -16,7 +16,7 @@ export default function ItemList({ items, mainContextItemId, usedMatchingMode, p
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       {items.map((item) => (
         <div key={item.id} className="h-full">
           <ItemCard

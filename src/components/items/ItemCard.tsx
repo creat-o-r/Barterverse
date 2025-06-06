@@ -63,27 +63,27 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
         {item.status !== 'available' && (
           <Badge
             variant={item.status === 'traded' ? 'destructive' : 'secondary'}
-            className="absolute top-2 right-2 capitalize z-10 text-xs"
+            className="absolute top-1.5 right-1.5 capitalize z-10 text-[9px] px-1 py-0 md:text-xs md:top-2 md:right-2"
           >
             {item.status}
           </Badge>
         )}
         {matchScore && (
-          <Badge className={`absolute top-2 left-2 capitalize z-10 text-xs px-1.5 py-0.5 ${getMatchScoreColorStyles(matchScore)}`}>
+          <Badge className={`absolute top-1.5 left-1.5 capitalize z-10 text-[9px] px-1 py-0 md:text-xs md:top-2 md:left-2 md:px-1.5 md:py-0.5 ${getMatchScoreColorStyles(matchScore)}`}>
             Match: {matchScore}
           </Badge>
         )}
         {item.listingType === 'offer' && item.isGiftItForward && (
-          <Badge variant="default" className="absolute bottom-2 right-2 capitalize z-10 text-[10px] md:text-xs bg-pink-500 hover:bg-pink-600 text-white">
-            <HeartHandshake className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" /> Gift
+          <Badge variant="default" className="absolute bottom-1.5 right-1.5 capitalize z-10 text-[9px] px-1 py-0 md:text-xs md:bottom-2 md:right-2 bg-pink-500 hover:bg-pink-600 text-white">
+            <HeartHandshake className="h-2 w-2 md:h-2.5 md:w-2.5 mr-0.5 md:mr-1" /> Gift
           </Badge>
         )}
         {!matchScore && !(item.listingType === 'offer' && item.isGiftItForward) && (
           <Badge
             variant={item.listingType === 'offer' ? 'default' : 'secondary'}
-            className={`absolute bottom-2 left-2 capitalize z-10 text-[10px] md:text-xs ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+            className={`absolute bottom-1.5 left-1.5 capitalize z-10 text-[9px] px-1 py-0 md:text-xs md:bottom-2 md:left-2 ${item.listingType === 'offer' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
           >
-            {item.listingType === 'offer' ? <Gift className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" /> : <Search className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" />}
+            {item.listingType === 'offer' ? <Gift className="h-2 w-2 md:h-2.5 md:w-2.5 mr-0.5 md:mr-1" /> : <Search className="h-2 w-2 md:h-2.5 md:w-2.5 mr-0.5 md:mr-1" />}
             {item.listingType}
           </Badge>
         )}
@@ -100,30 +100,30 @@ export default function ItemCard({ item, opportunityContextItemId, usedMatchingM
       ) : (
         HeaderContent
       )}
-      <CardContent className="p-2 md:p-4 flex-grow">
-        <CardTitle className="text-sm md:text-lg font-headline mb-1 md:mb-2 leading-tight line-clamp-2">
+      <CardContent className="p-1.5 md:p-3 flex-grow">
+        <CardTitle className="text-xs sm:text-sm md:text-base font-headline mb-0.5 md:mb-1 leading-tight line-clamp-2">
           <Link href={itemDetailLink} className="hover:text-primary transition-colors">
             {item.name}
           </Link>
         </CardTitle>
-        <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 font-body mb-1 md:mb-2">
+        <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground line-clamp-2 font-body mb-0.5 md:mb-1">
           {item.description}
         </p>
         <div className="flex items-center gap-1 md:gap-2 flex-wrap">
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 md:text-xs md:px-2.5 md:py-0.5">{item.category}</Badge>
+            <Badge variant="outline" className="text-[9px] px-1 py-0 md:text-xs md:px-2 md:py-0.5">{item.category}</Badge>
         </div>
       </CardContent>
-      <CardFooter className="p-2 md:p-4 border-t flex flex-col items-stretch gap-2">
-        <Button asChild variant="default" className="w-full bg-primary hover:bg-primary/90 h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm">
-          <Link href={itemDetailLink} className="flex items-center gap-1 md:gap-2">
-            <Eye className="h-3.5 w-3.5 md:h-4 md:w-4" />
+      <CardFooter className="p-1.5 md:p-3 border-t flex flex-col items-stretch gap-1.5 md:gap-2">
+        <Button asChild variant="default" className="w-full bg-primary hover:bg-primary/90 h-7 px-2 text-[10px] md:h-8 md:text-xs md:px-3">
+          <Link href={itemDetailLink} className="flex items-center gap-1 md:gap-1.5">
+            <Eye className="h-3 w-3 md:h-3.5 md:w-3.5" />
             View Item
           </Link>
         </Button>
         {opportunityLink && (
-          <Button asChild variant="outline" size="sm" className="w-full h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm">
-            <Link href={opportunityLink} className="flex items-center gap-1 md:gap-2">
-              <LinkIcon className="h-3.5 w-3.5 md:h-4 md:w-4" />
+          <Button asChild variant="outline" size="sm" className="w-full h-7 px-2 text-[10px] md:h-8 md:text-xs md:px-3">
+            <Link href={opportunityLink} className="flex items-center gap-1 md:gap-1.5">
+              <LinkIcon className="h-3 w-3 md:h-3.5 md:w-3.5" />
               View Opportunity
             </Link>
           </Button>

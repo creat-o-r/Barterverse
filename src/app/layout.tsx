@@ -28,7 +28,7 @@ export default function RootLayout({
       <body className="font-body antialiased flex flex-col min-h-screen">
         <ClientLayoutWrapper>
           <Navbar />
-          <main className="flex-grow container mx-auto px-4 py-8">
+          <main className="flex-grow container mx-auto px-2 py-4 md:px-4 md:py-8">
             {children}
           </main>
           <Footer />
