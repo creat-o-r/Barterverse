@@ -14,7 +14,7 @@ export default function Footer() {
           &copy; {new Date().getFullYear()} BarterVerse. All rights reserved.
         </p>
         <p className="text-xs font-body mt-1">
-          Trade anything, build community.
+          match anything with anyone
         </p>
         <div className="mt-3 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
           {isAdmin && (
