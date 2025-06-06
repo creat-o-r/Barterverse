@@ -77,7 +77,6 @@ export default function HomePage() {
           category: item.category,
           ownerId: item.ownerId,
           listingType: item.listingType,
-          minimumMatchRatingOverride: item.minimumMatchRatingOverride,
           isGiftItForward: item.isGiftItForward, 
         }));
 
@@ -104,7 +103,6 @@ export default function HomePage() {
               category: userItem.category,
               ownerId: userItem.ownerId,
               listingType: userItem.listingType,
-              minimumMatchRatingOverride: userItem.minimumMatchRatingOverride,
               isGiftItForward: userItem.isGiftItForward, 
             },
             availableItems: otherItemsForMatching,
@@ -239,7 +237,7 @@ export default function HomePage() {
                         `Error for ${itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}: "${itemSuggestion.userItem.name}"`
                       ) : (
                         <>
-                          Matches for your {itemSuggestion.userItem.listingType === 'offer' ? 'Offer' : 'Want'}:{" "}
+                          {itemSuggestion.userItem.listingType === 'offer' ? 'Matches your Offer' : 'Matches for your Want'}:{" "}
                           <Link href={`/items/${itemSuggestion.userItem.id}`} className="text-primary hover:underline">
                             &quot;{itemSuggestion.userItem.name}&quot;
                           </Link>
