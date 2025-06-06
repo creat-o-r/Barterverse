@@ -34,7 +34,7 @@ export default function HomePage() {
 
   useEffect(() => {
     async function fetchAllUserItemMatches() {
-      setOverallLoading(true);
+      setOverallLoading(true); // Ensure overallLoading is true at the start
       setUserItemSuggestions([]);
 
       const currentUser = dummyUsers[0]; // Simulate current user
@@ -52,7 +52,7 @@ export default function HomePage() {
           preferencesConsidered: false,
           usedMatchingMode: undefined,
         }]);
-        setOverallLoading(false);
+        setOverallLoading(false); // Correctly set to false here for early exit
         return;
       }
 
@@ -65,7 +65,7 @@ export default function HomePage() {
         usedMatchingMode: undefined,
       }));
       setUserItemSuggestions(initialSuggestions);
-      setOverallLoading(false);
+      // Do NOT set overallLoading to false here yet.
 
       const suggestionPromises = currentUserActiveListings.map(async (userItem, index) => {
         const otherItemsForMatching = dummyItems.filter(
@@ -151,10 +151,23 @@ export default function HomePage() {
                 error: promiseError || "Failed to process suggestions for this item.",
               };
             }
+          } else if (settledResult.status === 'rejected') {
+            // Handle rejected promises if necessary, though current map logic already returns an error structure
+            // For instance, if a promise in suggestionPromises itself rejects unexpectedly before returning the structured error.
+            // This part might be redundant if all errors are caught within the map's async function.
+            // const failedIndex = (settledResult.reason as any)?.index; // If you can determine index from reason
+            // if (failedIndex !== undefined && newSuggestions[failedIndex]) {
+            //   newSuggestions[failedIndex] = {
+            //     ...newSuggestions[failedIndex],
+            //     isLoading: false,
+            //     error: "An unexpected error occurred while fetching suggestions."
+            //   };
+            // }
           }
         });
         return newSuggestions;
       });
+      setOverallLoading(false); // Set overallLoading to false after all promises have settled and state is updated
     }
 
     fetchAllUserItemMatches();
