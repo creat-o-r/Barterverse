@@ -325,8 +325,8 @@ export default function OpportunityMatchPage() {
 
   let tradeId = '';
   let chatButtonText = 'Start Negotiation';
-  let pageTitle = "Trade Opportunity";
-  let pageDescription = "AI suggests a potential match. Explore the details and see if it's a fit!";
+  let pageTitle = "Opportunity";
+  let pageDescription = ""; // Default description is now empty for non-gift scenarios
   let actionButtonIcon = <MessageSquare className="mr-2 h-5 w-5" />;
   let actionButtonLink: string | undefined = undefined; 
 
@@ -346,7 +346,8 @@ export default function OpportunityMatchPage() {
     actionButtonLink = `/items/${suggestedItem.id}`; 
     actionButtonIcon = <Gift className="mr-2 h-5 w-5" />;
   } else {
-    pageTitle = "Trade Opportunity";
+    // pageTitle remains "Opportunity"
+    // pageDescription remains ""
     if (mainItem.ownerId === currentUser.id) { 
       tradeId = `trade-${currentUser.id}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
       chatButtonText = `Negotiate for "${suggestedItem.name}"`;
