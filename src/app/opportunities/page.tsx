@@ -326,7 +326,7 @@ export default function OpportunityMatchPage() {
   let tradeId = '';
   let chatButtonText = 'Start Negotiation';
   let pageTitle = "Opportunity";
-  let pageDescription = ""; // Default description is now empty for non-gift scenarios
+  let pageDescription = ""; 
   let actionButtonIcon = <MessageSquare className="mr-2 h-5 w-5" />;
   let actionButtonLink: string | undefined = undefined; 
 
@@ -346,8 +346,6 @@ export default function OpportunityMatchPage() {
     actionButtonLink = `/items/${suggestedItem.id}`; 
     actionButtonIcon = <Gift className="mr-2 h-5 w-5" />;
   } else {
-    // pageTitle remains "Opportunity"
-    // pageDescription remains ""
     if (mainItem.ownerId === currentUser.id) { 
       tradeId = `trade-${currentUser.id}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
       chatButtonText = `Negotiate for "${suggestedItem.name}"`;
@@ -364,22 +362,23 @@ export default function OpportunityMatchPage() {
   }
    
   const scoreCriteria = matchScore ? generalMatchScoreCriteria[matchScore] : null;
+  const HeaderIcon = mainIsGiftOffer || suggestedIsGiftOffer ? HeartHandshake : Handshake;
+
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       <Card>
         <CardHeader className="text-center pb-4">
-          {mainIsGiftOffer || suggestedIsGiftOffer ? <HeartHandshake className="mx-auto h-10 w-10 text-pink-500 mb-2" /> : <Handshake className="mx-auto h-10 w-10 text-primary mb-2" />}
-          <CardTitle className="font-headline text-3xl">{pageTitle}</CardTitle>
+          <CardTitle className="font-headline text-3xl flex items-center justify-center gap-2">
+            <HeaderIcon className="h-8 w-8 text-primary" />
+            {pageTitle}
+          </CardTitle>
           <CardDescription className="font-body">
             {pageDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           
-          <div className="text-center my-4">
-            <h3 className="font-headline text-2xl text-foreground/90">Proposed Exchange</h3>
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-stretch gap-4 md:gap-6">
             <OpportunityItemCard
                 item={mainItem}
@@ -542,3 +541,4 @@ export default function OpportunityMatchPage() {
     </div>
   );
 }
+
