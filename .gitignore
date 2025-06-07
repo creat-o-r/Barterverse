@@ -52,3 +52,6 @@ dist
 
 # AI Settings file
 .ai-settings.json
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
