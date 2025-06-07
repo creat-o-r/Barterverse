@@ -1,3 +1,4 @@
+
 This project_snapshot.txt file has been updated at your request on DATE_TIME_PLACEHOLDER.
 
 You asked to save the chat history here before clearing it.
@@ -8,3 +9,148 @@ Please ensure you've copied any necessary information from the chat window on yo
 You can also refer to the Firebase Studio interface for the complete project code.
 
 - Your App Prototyper AI
+
+---
+## LLM Prompt: Rebuild BarterVerse Application From Scratch (Phased Approach)
+
+**Objective:** Recreate the "BarterVerse" application, a Next.js-based bartering platform with AI-powered features. Follow the phases outlined below.
+
+**Core Technologies:**
+*   Next.js (App Router)
+*   React (Functional Components, Hooks)
+*   TypeScript
+*   Tailwind CSS
+*   ShadCN UI Components (for UI elements like Button, Card, Input, Dialog, etc.)
+*   Genkit (for all AI-related backend logic, using Gemini models via `@genkit-ai/googleai`)
+*   Lucide-React (for icons)
+*   Date-fns (for date formatting)
+*   Zod (for schema validation, especially in AI flows)
+
+**General Guidelines:**
+*   Use Server Components by default where appropriate.
+*   Implement robust error handling and user-friendly loading states.
+*   Prioritize clean, readable, and well-organized code.
+*   All AI flows must be defined in `src/ai/flows/` and use the global `ai` object from `src/ai/genkit.ts`.
+*   Data persistence will initially be mocked using `src/lib/dummy-data.ts` for users and items. AI configurations and logs will be stored in local `.json` or `.jsonl` files in the project root.
+*   Adhere to Next.js best practices, including image optimization with `next/image` and `https://placehold.co` for placeholders with `data-ai-hint`.
+*   Follow the UI styling guidelines previously established (ShadCN theme in `globals.css`, Tailwind semantic classes).
+
+---
+**Phase 1: Project Setup & UI Foundation**
+1.  Initialize a new Next.js project configured with TypeScript, Tailwind CSS.
+2.  Install and configure ShadCN UI. Set up `components.json`.
+3.  Create a basic layout structure: `src/app/layout.tsx` (with `ClientLayoutWrapper` for Toaster and `GlobalFilterProvider`), `src/components/layout/Navbar.tsx`, `src/components/layout/Footer.tsx`.
+4.  Define the application's color scheme and typography in `src/app/globals.css` (using HSL CSS variables for ShadCN theming) and `tailwind.config.ts` (font families: Belleza for headlines, Alegreya for body).
+5.  Create basic versions of common UI components if not fully covered by ShadCN (or ensure ShadCN components are correctly aliased and available).
+
+**Phase 2: Static Pages & Basic Navigation**
+1.  Implement the homepage (`src/app/page.tsx`) with a basic structure for displaying item lists (placeholders for now).
+2.  Create Sign In (`/auth/signin`) and Sign Up (`/auth/signup`) pages with forms (UI only, no authentication logic).
+3.  Populate the Navbar with initial links: Home, List Item, Chats, Profile.
+4.  Implement a basic Footer.
+
+**Phase 3: Core Data Structures & Dummy Data**
+1.  Define all necessary TypeScript types in `src/types/index.ts` for `Item`, `User` (including `UserProfilePreferences`, `UserStoredLocation`, `UserLogisticsPreferences`), `TradeOffer`, `ChatMessage`, `ItemLogistics`, `ItemTiming`, etc. Ensure all fields present in the final app are included.
+2.  Create `src/lib/dummy-data.ts` and populate it with a few `dummyUsers` and `dummyItems`. Include functions like `addNewItemToDummyData` and `updateUserPreferencesInDummyData`.
+
+**Phase 4: Core Bartering Feature UIs (Display & Forms)**
+1.  **Item Listing Page (`/items/new`):**
+    *   Implement the form using `react-hook-form` and `zodResolver` for validation based on `itemFormSchema` (including fields for name, description, category, image URL, listing type (offer/want), `isGiftItForward`, `openToAnyOpportunity`, and detailed logistics: `selectedLocationIdentifier`, `itemSpecificAddress`, `deliveryMethods`, `logisticsNotes`, `timingType`, `timingFixedDate`).
+    *   Initialize logistics fields based on user's profile defaults (from `dummyUsers`).
+2.  **Item Detail Page (`/items/[id]`):**
+    *   Display full item details: name, description, image, category, listing type, owner info (avatar, name, rating, link to profile), and detailed logistics information (using `LogisticsDisplay` component logic).
+    *   Include a section for trade initiation (placeholder button/link).
+3.  **User Profile Page (`/profile/[userId]` and `/profile/me`):**
+    *   Display user information: avatar, name, rating, trades, bio.
+    *   List items offered and items wanted by the user.
+    *   Display user's trading preferences and logistics preferences.
+4.  **Homepage (`/app/page.tsx`):**
+    *   Implement UI to display a list of all available items from other users.
+    *   Include structure for "AI Suggested Matches" for the current user's items (will be populated in a later phase).
+5.  **Chats Page (`/chats`):**
+    *   Basic UI for listing active trade chats (placeholder).
+    *   Section for "Direct Assistant Chat".
+6.  **Trades Overview Page (`/trades`):**
+    *   Basic UI for listing all trades (pending, accepted, completed, etc. - placeholder data).
+7.  **Trade Detail Page (`/trades/[tradeId]`):**
+    *   Structure to display details of the two items in trade and the users involved.
+    *   Placeholder for the chat window.
+
+**Phase 5: Client-Side Interactivity & AI Stubs**
+1.  Connect the "List an Item" form to `addNewItemToDummyData` for client-side item creation.
+2.  Implement basic client-side loading states and toast notifications for form submissions.
+3.  Create all AI flow files in `src/ai/flows/` with correct Zod input/output schemas and exported wrapper functions. Implement them as stubs that return mock data or simple, non-AI responses:
+    *   `suggest-category-flow.ts`
+    *   `infer-listing-type-flow.ts`
+    *   `item-match-flow.ts`
+    *   `explain-match-rationale-flow.ts`
+    *   `infer-user-preferences-flow.ts`
+    *   `general-chat-flow.ts`
+    *   `trade-negotiation-chat.ts`
+    *   (Optional if time permits: `smart-suggestion-tool.ts`)
+4.  Initialize Genkit in `src/ai/genkit.ts` with the Google AI plugin and default safety settings.
+5.  Create `src/ai/dev.ts` to import all flows for the Genkit CLI.
+
+**Phase 6: AI - Item Creation Assistance & Basic Chat**
+1.  Fully implement the Genkit logic for `suggestCategoryFlow` and `inferListingTypeFlow`. Prompts should guide the LLM to suggest a category or infer 'offer'/'want' based on item name/description.
+2.  Integrate these flows into the "List an Item" page: trigger category suggestion on blur from description if category is empty; trigger listing type inference similarly.
+3.  Fully implement `generalChatFlow`.
+4.  Integrate `GeneralChatWindow.tsx` component into the `/chats` page (Direct Assistant Chat section), powered by `generalChatFlow`.
+5.  Fully implement `tradeNegotiationChatFlow` (including the mock `suggestTradeCombinations` tool initially).
+6.  Integrate `ChatWindow.tsx` component into the `/trades/[tradeId]` page, powered by `tradeNegotiationChatFlow`, correctly passing item context.
+
+**Phase 7: AI - Item Matching & Rationale**
+1.  Implement `itemMatchFlow.ts`. Start with a "simple" matching logic (keyword, category based). Then, implement the "advanced" logic considering `listingType` (offer vs. want), `isGiftItForward`, `openToAnyOpportunity`, user preferences (stubbed for now if not fully available), and reciprocity (identifying if User B has an item User A wants - `reciprocalItemId`).
+2.  Integrate `suggestMatchingItems` into the Homepage (`/app/page.tsx`) to display AI-suggested matches for each of the current user's active listings.
+3.  Create and integrate the `SuggestedMatches.tsx` component on the Item Detail page (`/items/[id]`) to show matches for the viewed item (if not owned by current user).
+4.  Implement `explainMatchRationaleFlow.ts` to generate a textual explanation for why two items (and potentially a third reciprocal item) are a good match.
+5.  Create the Opportunities page (`/app/opportunities/page.tsx`) that uses `explainMatchRationale` to display a detailed view of a specific match (Item A, Item B, optional Item C, and the AI's rationale). Link to this from `SuggestedMatches` and `ItemList` where appropriate.
+
+**Phase 8: AI - User Preference Inference & Integration**
+1.  Fully implement `inferUserPreferencesFlow.ts`. The prompt should analyze user's listed items, current explicit preferences (if any), simulated chat snippets, and engagement notes to suggest updates to their `UserProfilePreferences`.
+2.  On the User Profile page (`/profile/me`), add a button "AI, Update My Preferences" (visible if `enableAutomaticPreferenceInference` is true via admin config). Clicking this should:
+    *   Call `inferUserPreferences`.
+    *   Display the AI's suggestions and reasoning.
+    *   (Mock) Update the user's preferences in `dummy-data.ts`.
+3.  Ensure the "advanced" mode of `itemMatchFlow.ts` can correctly use the `triggeringUserPreferences` (including `minimumMatchRating`, motivations, etc.) passed to its prompt.
+
+**Phase 9: Admin Panel & System Configuration**
+1.  Create the Admin page (`/admin/match-reports/page.tsx`).
+2.  Implement `src/services/ai-config-service.ts`:
+    *   Functions to get/set `AIMatchingMode`, `useUserProfilePreferencesInMatching`, `enableAutomaticPreferenceInference`, `preferredAIModel`.
+    *   Store these settings in a root `.ai-settings.json` file.
+3.  Implement `src/services/match-report-service.ts`:
+    *   Functions to log match suggestions (including items, score, reasoning, mode used, prefs considered, AI model used) to `.match-suggestions.log.json`.
+    *   Function to retrieve these logs.
+4.  Implement `src/services/feedback-service.ts`:
+    *   Functions to log user feedback on match scores/reasoning to `.feedback-reports.log.json`.
+    *   Functions to retrieve and clear these logs.
+5.  Implement `src/services/ai-diagnostic-log-service.ts`:
+    *   Function to log detailed diagnostic information (input, error, user-facing message) for AI flow failures to `.ai-diagnostics.log.jsonl`.
+    *   Function to retrieve these logs.
+6.  Build the UI for the Admin Panel:
+    *   Toggles/selectors to change AI configurations.
+    *   Display for match suggestion logs.
+    *   Buttons to copy/clear feedback logs and copy diagnostic logs.
+    *   Section for "Live AI Preference Inference" test (similar to `AdminAIPreferenceInsights.tsx`).
+7.  Integrate `TemporaryAdminMatchTestPanelClient.tsx` on the Item Detail page for owners to test matching for their items.
+
+**Phase 10: Quick List Feature**
+1.  Create the Quick List page (`/app/quick-list/page.tsx`):
+    *   Two-column layout: Chat on one side, user's current listings on the other.
+    *   Chat interface (initially using `generalChatFlow`, with a disclaimer that actual listing creation isn't live yet).
+2.  Add contextual links to Quick List:
+    *   From the "List an Item" page.
+    *   From the Homepage, if a user's item has few or no matches.
+3.  *(Future Enhancement for a later prompt/session: Develop a dedicated Genkit flow specifically for parsing natural language from the Quick List chat to identify multiple items and their details for batch listing. This flow would output structured item data ready for creation.)*
+
+**Phase 11: Final Polish & Refinements**
+1.  Implement the `GlobalFilterContext` and `GlobalCategoryFilter` component in the Navbar to allow users to filter item views by category. Ensure the "New Item" page pre-fills the category if a global filter is active.
+2.  Review and implement all necessary loading states (e.g., spinners, skeleton loaders) and error messages throughout the application for a smooth UX.
+3.  Ensure all images use `https://placehold.co` and include a relevant `data-ai-hint` attribute.
+4.  Thoroughly test all user flows and AI integrations.
+5.  Perform an accessibility check (ARIA attributes, keyboard navigation).
+6.  Final review of UI consistency and styling.
+
+This phased approach should guide the LLM in incrementally building the BarterVerse application.
+---
