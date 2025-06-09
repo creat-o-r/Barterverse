@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Sparkles, Loader2, Gift, Search, HeartHandshake, MapPin, Truck, Edit2, Network, CalendarDays, Clock } from 'lucide-react';
+import { PlusCircle, Sparkles, Loader2, Gift, Search, HeartHandshake, MapPin, Truck, Edit2, Network, CalendarDays, Clock, ListPlus } from 'lucide-react'; // Added ListPlus
 import { useToast } from "@/hooks/use-toast";
 import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-category-flow';
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
@@ -28,6 +28,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data';
 import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming } from '@/types';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link'; // Added Link
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -313,6 +314,17 @@ export default function NewItemPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-6 p-4 bg-muted/50 rounded-md border border-dashed">
+            <p className="text-sm font-body text-center">
+              Have many items to list? Try our{' '}
+              <Button variant="link" asChild className="p-0 h-auto text-primary inline-flex items-center gap-1">
+                <Link href="/quick-list">
+                  <ListPlus className="h-4 w-4" /> Quick List feature
+                </Link>
+              </Button>
+              {' '}for a faster, chat-based experience!
+            </p>
+          </div>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
 

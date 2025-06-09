@@ -9,10 +9,11 @@ import { dummyItems, dummyUsers } from '@/lib/dummy-data';
 import type { Item } from '@/types';
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, ListPlus } from 'lucide-react'; // Added ListPlus
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button'; // Added Button for Quick List link
 
 interface UserItemSuggestion {
   userItem: Item;
@@ -34,25 +35,24 @@ export default function HomePage() {
 
   useEffect(() => {
     async function fetchAllUserItemMatches() {
-      setOverallLoading(true); // Ensure overallLoading is true at the start
+      setOverallLoading(true); 
       setUserItemSuggestions([]);
 
-      const currentUser = dummyUsers[0]; // Simulate current user
-      // Fetch both 'offer' and 'want' items for the current user
+      const currentUser = dummyUsers[0]; 
       const currentUserActiveListings = dummyItems.filter(
         (item) => item.ownerId === currentUser.id && (item.listingType === 'offer' || item.listingType === 'want') && (item.status === 'available' || item.status === 'pending')
       );
 
       if (currentUserActiveListings.length === 0) {
         setUserItemSuggestions([{
-          userItem: { id: 'no-active-listings', name: 'No Active Listings Found', description: "You haven't listed any items yet, or none are currently active.", imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' }, // Placeholder type
+          userItem: { id: 'no-active-listings', name: 'No Active Listings Found', description: "You haven't listed any items yet, or none are currently active.", imageUrl: '', category: '', ownerId: '', ownerName: '', status: 'available', listingType: 'offer' }, 
           suggestedMatches: [],
           isLoading: false,
           error: null,
           preferencesConsidered: false,
           usedMatchingMode: undefined,
         }]);
-        setOverallLoading(false); // Correctly set to false here for early exit
+        setOverallLoading(false); 
         return;
       }
 
@@ -65,8 +65,7 @@ export default function HomePage() {
         usedMatchingMode: undefined,
       }));
       setUserItemSuggestions(initialSuggestions);
-      // Do NOT set overallLoading to false here yet.
-
+      
       const suggestionPromises = currentUserActiveListings.map(async (userItem, index) => {
         const otherItemsForMatching = dummyItems.filter(
           (item) => item.id !== userItem.id && item.ownerId !== currentUser.id && (item.status === 'available' || item.status === 'pending')
@@ -78,6 +77,7 @@ export default function HomePage() {
           ownerId: item.ownerId,
           listingType: item.listingType,
           isGiftItForward: item.isGiftItForward,
+          openToAnyOpportunity: item.openToAnyOpportunity,
         }));
 
         if (otherItemsForMatching.length === 0) {
@@ -104,6 +104,7 @@ export default function HomePage() {
               ownerId: userItem.ownerId,
               listingType: userItem.listingType,
               isGiftItForward: userItem.isGiftItForward,
+              openToAnyOpportunity: userItem.openToAnyOpportunity,
             },
             availableItems: otherItemsForMatching,
           });
@@ -132,7 +133,7 @@ export default function HomePage() {
                   ...itemDetails,
                   matchScore: match.matchScore,
                   isGiftItForward: match.isGiftItForward || itemDetails.isGiftItForward,
-                  reciprocalItemId: match.reciprocalItemId // Include reciprocalItemId
+                  reciprocalItemId: match.reciprocalItemId 
                 } : null;
               }).filter(Boolean) as (Item & { matchScore: string; reciprocalItemId?: string })[];
 
@@ -151,22 +152,11 @@ export default function HomePage() {
                 error: promiseError || "Failed to process suggestions for this item.",
               };
             }
-          } else if (settledResult.status === 'rejected') {
-            // Handle rejected promises if necessary, though current map logic already returns an error structure
-            // For instance, if a promise in suggestionPromises itself rejects unexpectedly before returning the structured error.
-            // const failedIndex = (settledResult.reason as any)?.index; // If you can determine index from reason
-            // if (failedIndex !== undefined && newSuggestions[failedIndex]) {
-            //   newSuggestions[failedIndex] = {
-            //     ...newSuggestions[failedIndex],
-            //     isLoading: false,
-            //     error: "An unexpected error occurred while fetching suggestions."
-            //   };
-            // }
-          }
+          } 
         });
         return newSuggestions;
       });
-      setOverallLoading(false); // Set overallLoading to false after all promises have settled and state is updated
+      setOverallLoading(false); 
     }
 
     fetchAllUserItemMatches();
@@ -235,6 +225,7 @@ export default function HomePage() {
 
       {!overallLoading && userItemSuggestions.length > 0 && userItemSuggestions[0].userItem.id !== 'no-active-listings' && (
         userItemSuggestions.map((itemSuggestion, idx) => {
+          const showQuickListPrompt = !itemSuggestion.isLoading && !itemSuggestion.error && itemSuggestion.suggestedMatches.length <= 1;
           return (
             <section key={itemSuggestion.userItem.id || idx}>
               <Card className={itemSuggestion.error ? "border-destructive" : (itemSuggestion.suggestedMatches.length === 0 && !itemSuggestion.isLoading ? "border-border border-dashed" : "border-border")}>
@@ -284,6 +275,20 @@ export default function HomePage() {
                       {itemSuggestion.suggestedMatches.length === 0 ? `We couldn't find specific matches for your "${itemSuggestion.userItem.name}" right now.` : "No matches found."}
                     </p>
                   )}
+                  {showQuickListPrompt && (
+                    <div className="mt-4 p-3 bg-accent/10 rounded-md border border-accent/30 border-dashed text-center">
+                      <p className="text-sm font-body text-accent-foreground/90">
+                        Looking for more trade opportunities? List more items! <br />
+                        Try our{' '}
+                        <Button variant="link" asChild className="p-0 h-auto text-accent inline-flex items-center gap-1 text-sm">
+                          <Link href="/quick-list">
+                            <ListPlus className="h-4 w-4" /> Quick List feature
+                          </Link>
+                        </Button>
+                        {' '}to add multiple items easily.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               {idx < userItemSuggestions.length -1 && <Separator className="my-8" />}
@@ -304,4 +309,3 @@ export default function HomePage() {
     </div>
   );
 }
-
