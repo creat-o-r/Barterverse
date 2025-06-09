@@ -1,5 +1,5 @@
 
-import { use, Suspense } from 'react';
+import { use, Suspense, useState } from 'react'; // Added useState for Collapsible
 import Image from 'next/image';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
@@ -7,13 +7,15 @@ import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod,
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock, ListChecks, ChevronDown } from 'lucide-react'; // Added ListChecks, ChevronDown
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
 import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'; // Added Collapsible
+import { cn } from '@/lib/utils'; // Added cn
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
   const item = dummyItems.find((i) => i.id === itemId);
@@ -44,7 +46,6 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
     locationDisplay = logistics.itemSpecificAddress;
   } else if (logistics.locationType !== 'not_specified') {
-    // Fallback if type is set but no specific details (e.g. profile default implied)
     const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
     const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
     if (defaultLoc) {
@@ -113,6 +114,46 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   );
 }
 
+function SpecificationsDisplay({ specifications }: { specifications?: Record<string, string> }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!specifications || Object.keys(specifications).length === 0) {
+    return null; // Don't render anything if no specs
+  }
+
+  const specCount = Object.keys(specifications).length;
+  const summaryKeys = Object.keys(specifications).slice(0, 3).join(', ');
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mb-4">
+      <CollapsibleTrigger asChild>
+        <Button variant="outline" className="w-full justify-between text-sm hover:bg-muted/50">
+          <div className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4" />
+            <span>
+              Specifications {isOpen ? `(${specCount} details)` : `(Summary: ${summaryKeys}${specCount > 3 ? '...' : ''})`}
+            </span>
+          </div>
+          <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 p-4 border rounded-md bg-muted/10">
+        <ul className="space-y-1.5 font-body text-sm">
+          {Object.entries(specifications).map(([key, value]) => (
+            <li key={key} className="flex">
+              <strong className="font-semibold w-1/3 min-w-[100px] pr-2">{key}:</strong>
+              <span className="flex-1">{value}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-muted-foreground mt-3 italic">
+            Note: Specifications are for informational purposes. AI may help populate this in the future.
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 
 async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   const itemDetails = await getItemDetails(itemId);
@@ -135,19 +176,21 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   return (
     <div className="space-y-8">
       <Card className="overflow-hidden shadow-lg">
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted">
-            <Image
-              src={item.imageUrl || 'https://placehold.co/600x400.png'}
-              alt={item.name}
-              fill
-              className="object-cover"
-              data-ai-hint={item.dataAiHint || "item image"}
-              priority
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
-          </div>
-          <div className="p-6 flex flex-col">
+        {/* Image Section - Full width at the top of the card */}
+        <div className="relative aspect-video w-full bg-muted">
+          <Image
+            src={item.imageUrl || 'https://placehold.co/600x400.png'}
+            alt={item.name}
+            fill
+            className="object-cover"
+            data-ai-hint={item.dataAiHint || "item image"}
+            priority
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          />
+        </div>
+
+        {/* Details Section - Below the image */}
+        <div className="p-6">
             <CardHeader className="p-0 pb-4">
               <CardTitle className="font-headline text-3xl mb-2">{item.name}</CardTitle>
               <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -167,7 +210,6 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                     <HeartHandshake className="mr-1 h-3 w-3" /> Gift It Forward
                   </Badge>
                 )}
-                {/* Minimum Match Rating Override badge removed */}
                  {item.openToAnyOpportunity && (
                   <Badge variant="outline" className="text-xs border-accent/50 text-accent">
                     Open to Any Opportunity
@@ -178,6 +220,9 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
             <CardContent className="p-0 flex-grow">
               <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap break-words mb-4">{item.description}</p>
+              
+              <SpecificationsDisplay specifications={item.specifications} />
+
               <Separator className="my-4" />
               <div className="space-y-3 mb-4">
                 <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
@@ -220,7 +265,6 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
               {item.status === 'pending' && <Badge variant="secondary" className="w-full text-center py-2 text-sm">Trade Pending</Badge>}
             </CardFooter>
           </div>
-        </div>
       </Card>
 
       {!isCurrentUserOwner && item.status === 'available' && !(item.listingType === 'offer' && item.isGiftItForward) && (
@@ -237,38 +281,38 @@ function ItemPageLoadingState() {
   return (
     <div className="space-y-8 animate-pulse">
       <Card className="overflow-hidden shadow-lg">
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted rounded-l-lg md:rounded-l-lg md:rounded-r-none"></div>
-          <div className="p-6 flex flex-col">
-            <div className="p-0 pb-4">
-              <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="h-5 w-5 bg-muted-foreground/20 rounded-full"></div>
-                <div className="h-6 bg-muted-foreground/20 rounded w-1/3"></div>
+        <div className="relative aspect-video w-full bg-muted rounded-t-lg"></div>
+        <div className="p-6">
+            <div className="h-8 bg-muted-foreground/20 rounded w-3/4 mb-2"></div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-5 w-5 bg-muted-foreground/20 rounded-full"></div>
+              <div className="h-6 bg-muted-foreground/20 rounded w-1/3"></div>
+            </div>
+            <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div>
+          
+            <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
+            <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
+            <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div>
+
+            <div className="my-4 h-px bg-border"></div>
+            <div className="h-10 bg-muted-foreground/20 rounded w-full mb-4"></div> {/* Placeholder for specs collapsible */}
+
+            <div className="my-4 h-px bg-border"></div>
+            <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-muted-foreground/20"></div>
+              <div>
+                <div className="h-5 bg-muted-foreground/20 rounded w-24 mb-1"></div>
+                <div className="h-4 bg-muted-foreground/20 rounded w-32"></div>
               </div>
-              <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div>
             </div>
-            <div className="p-0 flex-grow">
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
-              <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div>
-              <div className="my-4 h-px bg-border"></div>
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-muted-foreground/20"></div>
-                <div>
-                  <div className="h-5 bg-muted-foreground/20 rounded w-24 mb-1"></div>
-                  <div className="h-4 bg-muted-foreground/20 rounded w-32"></div>
-                </div>
-              </div>
-               <div className="my-4 h-px bg-border"></div>
-              <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
-              <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
-              <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div>
-            </div>
-            <div className="p-0 pt-6">
-              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>
-            </div>
+             <div className="my-4 h-px bg-border"></div>
+            <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
+            <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
+            <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div>
+          
+          <div className="pt-6">
+            <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>
           </div>
         </div>
       </Card>

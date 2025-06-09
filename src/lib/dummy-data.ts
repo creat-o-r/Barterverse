@@ -120,9 +120,15 @@ export let dummyItems: Item[] = [
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'offer',
-    // minimumMatchRatingOverride: 'High', // Removed
     isGiftItForward: false,
     openToAnyOpportunity: false,
+    specifications: {
+      "Material": "Genuine Leather",
+      "Binding": "Hand-stitched",
+      "Pages": "Approx. 200, unlined cream paper",
+      "Size": "A5 (5.8 x 8.3 inches)",
+      "Condition": "Slightly used, excellent",
+    },
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
@@ -144,6 +150,12 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
+    specifications: {
+        "Platform": "ConsoleX Retro",
+        "Includes": "2 controllers, 3 game cartridges (Pixel Adventure, Space Blasters, Retro Racer)",
+        "Condition": "Used - Good, fully functional",
+        "Output": "AV, RF",
+    },
     logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: 'Storage Unit #15, SelfStore Co.',
@@ -164,6 +176,12 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: true,
     openToAnyOpportunity: true,
+    specifications: {
+        "Material": "100% Merino Wool",
+        "Color": "Rainbow Stripes",
+        "Length": "Approx. 6 feet",
+        "Care": "Hand-wash cold",
+    },
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_home',
@@ -184,6 +202,12 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
+    specifications: {
+        "Brand": "SoundWave",
+        "Model": "MiniBlast X",
+        "Connectivity": "Bluetooth 5.0, AUX",
+        "Battery Life": "Up to 12 hours",
+    },
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
@@ -240,10 +264,9 @@ export let dummyItems: Item[] = [
     ownerName: 'Alice Trader',
     status: 'available',
     listingType: 'want',
-    // minimumMatchRatingOverride: 'Medium', // Removed
     openToAnyOpportunity: true,
     logistics: {
-      locationType: 'not_specified', // Example of not specified location
+      locationType: 'not_specified', 
       deliveryMethods: ['willing_to_ship', 'public_meetup'],
       timing: { type: 'flexible' }
     }
@@ -423,7 +446,7 @@ export function updateUserPreferencesInDummyData(
 }
 
 export function addNewItemToDummyData(
-  itemData: Omit<Item, 'id' | 'ownerName' | 'status' | 'dataAiHint'> & { ownerId: string }
+  itemData: Omit<Item, 'id' | 'ownerName' | 'status' | 'dataAiHint' | 'specifications'> & { ownerId: string }
 ): Item {
   const owner = dummyUsers.find(user => user.id === itemData.ownerId);
   if (!owner) {
@@ -438,10 +461,10 @@ export function addNewItemToDummyData(
         selectedUserStoredLocationId: itemData.logistics.locationType === 'profile_stored_location' ? itemData.logistics.selectedUserStoredLocationId : undefined,
         itemSpecificAddress: itemData.logistics.locationType === 'item_specific_location' ? itemData.logistics.itemSpecificAddress : undefined,
         deliveryMethods: itemData.logistics.deliveryMethods,
-        timing: itemData.logistics.timing, // Pass timing
+        timing: itemData.logistics.timing, 
         notes: itemData.logistics.notes,
     };
-  } else { // Fallback if logistics somehow not provided from form (should be)
+  } else { 
     let defaultLocType: ItemLogisticsLocationType = 'not_specified';
     let defaultStoredId: string | undefined = undefined;
     if (owner.logisticsPreferences?.preferredStoredLocationId && owner.locations?.find(l => l.id === owner.logisticsPreferences?.preferredStoredLocationId)) {
@@ -457,7 +480,7 @@ export function addNewItemToDummyData(
         selectedUserStoredLocationId: defaultStoredId,
         itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
         deliveryMethods: owner.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'],
-        timing: { type: 'flexible' }, // Default timing
+        timing: { type: 'flexible' }, 
         notes: '',
     };
   }
@@ -470,7 +493,7 @@ export function addNewItemToDummyData(
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || 'https://placehold.co/600x400.png',
     logistics: finalLogistics,
-    // minimumMatchRatingOverride is removed from Item type
+    specifications: {}, // Initialize with empty specifications
   };
 
   dummyItems.push(newItem);

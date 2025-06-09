@@ -11,10 +11,10 @@ export type Item = {
   status: 'available' | 'traded' | 'pending';
   listingType: 'offer' | 'want';
   isThirdPartyFulfillment?: boolean;
-  // minimumMatchRatingOverride?: 'Low' | 'Medium' | 'High'; // Removed
   isGiftItForward?: boolean;
   openToAnyOpportunity?: boolean;
   logistics?: ItemLogistics;
+  specifications?: Record<string, string>; // Added specifications field
 };
 
 export type UserMotivation = 'help-others' | 'maximize-trades' | 'convenience-focused' | 'community-building' | 'unique-finds';
