@@ -123,11 +123,14 @@ export let dummyItems: Item[] = [
     isGiftItForward: false,
     openToAnyOpportunity: false,
     specifications: {
+      "Product Type": "Journal",
       "Material": "Genuine Leather",
       "Binding": "Hand-stitched",
       "Pages": "Approx. 200, unlined cream paper",
       "Size": "A5 (5.8 x 8.3 inches)",
       "Condition": "Slightly used, excellent",
+      "Brand": "Artisan Made (Unbranded)",
+      "Color": "Dark Brown"
     },
     logistics: {
       locationType: 'profile_stored_location',
@@ -151,10 +154,13 @@ export let dummyItems: Item[] = [
     isGiftItForward: false,
     openToAnyOpportunity: false,
     specifications: {
-        "Platform": "ConsoleX Retro",
+        "Product Type": "Gaming Console",
+        "Brand": "ConsoleX",
+        "Model": "RetroPlay 2000",
         "Includes": "2 controllers, 3 game cartridges (Pixel Adventure, Space Blasters, Retro Racer)",
         "Condition": "Used - Good, fully functional",
         "Output": "AV, RF",
+        "Year": "1995"
     },
     logistics: {
       locationType: 'item_specific_location',
@@ -177,10 +183,12 @@ export let dummyItems: Item[] = [
     isGiftItForward: true,
     openToAnyOpportunity: true,
     specifications: {
+        "Product Type": "Scarf",
         "Material": "100% Merino Wool",
         "Color": "Rainbow Stripes",
         "Length": "Approx. 6 feet",
         "Care": "Hand-wash cold",
+        "Condition": "New, Handmade"
     },
     logistics: {
       locationType: 'profile_stored_location',
@@ -207,6 +215,7 @@ export let dummyItems: Item[] = [
         "Model": "MiniBlast X",
         "Connectivity": "Bluetooth 5.0, AUX",
         "Battery Life": "Up to 12 hours",
+        "Condition": "Like New"
     },
     logistics: {
       locationType: 'profile_stored_location',
@@ -227,6 +236,12 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
+     specifications: {
+        "Product Type": "Live Plants",
+        "Quantity": "5",
+        "Pot Material": "Ceramic",
+        "Care Level": "Easy"
+     },
      logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Balcony Garden",
@@ -247,6 +262,10 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
+     specifications: {
+        "Material": "Recycled Denim",
+        "Feature": "Eco-friendly, Durable"
+     },
      logistics: {
       locationType: 'item_specific_location',
       itemSpecificAddress: "Charlie's Workshop",
@@ -265,8 +284,14 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     openToAnyOpportunity: true,
+    specifications: {
+        "Title": "Dune",
+        "Author": "Frank Herbert",
+        "Edition": "First Edition",
+        "Desired Condition": "Good or Very Good"
+    },
     logistics: {
-      locationType: 'not_specified', 
+      locationType: 'not_specified',
       deliveryMethods: ['willing_to_ship', 'public_meetup'],
       timing: { type: 'flexible' }
     }
@@ -283,6 +308,11 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     openToAnyOpportunity: false,
+    specifications: {
+        "Brand": "Fujifilm",
+        "Model": "X100V",
+        "Desired Condition": "Good working condition"
+    },
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user2_apt',
@@ -302,6 +332,12 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
+    specifications: {
+        "Decade": "1950s",
+        "Material": "Wool Felt",
+        "Size": "Medium",
+        "Condition": "Excellent Vintage"
+    },
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Diana's Boutique",
@@ -320,6 +356,11 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     openToAnyOpportunity: false,
+    specifications: {
+        "Title": "The Uncanny X-Men",
+        "Era": "Mid-1980s",
+        "Desired Grade": "8.0 or higher"
+    },
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: 'Diana Doodad Wants This Shipped To: 12Collector Lane',
@@ -339,6 +380,12 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: true,
     openToAnyOpportunity: true,
+    specifications: {
+        "Capacity": "4 Person",
+        "Type": "Dome Tent",
+        "Condition": "Used - Great (Used Twice)",
+        "Includes": "Rainfly, Carrying Bag"
+    },
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Garage",
@@ -358,6 +405,10 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
+    specifications: {
+        "Weight Range": "5-50 lbs (Adjustable)",
+        "Use": "Home Workouts"
+    },
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Ethan's Home Gym",
@@ -377,6 +428,12 @@ export let dummyItems: Item[] = [
     listingType: 'offer',
     isGiftItForward: false,
     openToAnyOpportunity: false,
+    specifications: {
+        "Quantity": "Approx. 50 records",
+        "Genre": "Classic Rock",
+        "Era": "1970s-1980s",
+        "Condition": "Mixed"
+    },
     logistics: {
       locationType: 'profile_stored_location',
       selectedUserStoredLocationId: 'user1_work',
@@ -395,6 +452,11 @@ export let dummyItems: Item[] = [
     status: 'available',
     listingType: 'want',
     openToAnyOpportunity: false,
+    specifications: {
+        "Type": "Beginner Skateboard (Complete)",
+        "User": "Adult",
+        "Desired Condition": "Good"
+    },
     logistics: {
         locationType: 'item_specific_location',
         itemSpecificAddress: "Charlie Swapper wants this delivered locally if possible.",
@@ -446,7 +508,7 @@ export function updateUserPreferencesInDummyData(
 }
 
 export function addNewItemToDummyData(
-  itemData: Omit<Item, 'id' | 'ownerName' | 'status' | 'dataAiHint' | 'specifications'> & { ownerId: string }
+  itemData: Omit<Item, 'id' | 'ownerName' | 'status' | 'dataAiHint'> & { ownerId: string }
 ): Item {
   const owner = dummyUsers.find(user => user.id === itemData.ownerId);
   if (!owner) {
@@ -461,10 +523,10 @@ export function addNewItemToDummyData(
         selectedUserStoredLocationId: itemData.logistics.locationType === 'profile_stored_location' ? itemData.logistics.selectedUserStoredLocationId : undefined,
         itemSpecificAddress: itemData.logistics.locationType === 'item_specific_location' ? itemData.logistics.itemSpecificAddress : undefined,
         deliveryMethods: itemData.logistics.deliveryMethods,
-        timing: itemData.logistics.timing, 
+        timing: itemData.logistics.timing,
         notes: itemData.logistics.notes,
     };
-  } else { 
+  } else {
     let defaultLocType: ItemLogisticsLocationType = 'not_specified';
     let defaultStoredId: string | undefined = undefined;
     if (owner.logisticsPreferences?.preferredStoredLocationId && owner.locations?.find(l => l.id === owner.logisticsPreferences?.preferredStoredLocationId)) {
@@ -480,7 +542,7 @@ export function addNewItemToDummyData(
         selectedUserStoredLocationId: defaultStoredId,
         itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
         deliveryMethods: owner.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'],
-        timing: { type: 'flexible' }, 
+        timing: { type: 'flexible' },
         notes: '',
     };
   }
@@ -493,7 +555,7 @@ export function addNewItemToDummyData(
     dataAiHint: itemData.name.toLowerCase().split(' ').slice(0, 2).join(' ') || 'new item',
     imageUrl: itemData.imageUrl || 'https://placehold.co/600x400.png',
     logistics: finalLogistics,
-    specifications: {}, // Initialize with empty specifications
+    specifications: itemData.specifications || {}, // Initialize with provided or empty object
   };
 
   dummyItems.push(newItem);
@@ -507,3 +569,4 @@ export function addNewItemToDummyData(
   console.log('[DummyData] Total items now:', dummyItems.length);
   return newItem;
 }
+
