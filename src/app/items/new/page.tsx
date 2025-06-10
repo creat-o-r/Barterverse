@@ -57,13 +57,17 @@ const itemFormSchemaBase = z.object({
   isGiftItForward: z.boolean().optional(),
   openToAnyOpportunity: z.boolean().optional(),
 
-  selectedLocationIdentifier: z.string().min(1, { message: "Please select a location option or 'Not Specified'."}), 
+  selectedLocationIdentifier: z.string().min(1, { message: "Please select a location option or 'Not Specified'."}),
   itemSpecificAddress: z.string().optional(),
   deliveryMethods: z.array(deliveryMethodEnum).min(1, { message: "Please select at least one delivery method." }),
   logisticsNotes: z.string().optional(),
 
   timingType: z.enum(['flexible', 'fixed_date']).optional(),
-  timingFixedDate: z.string().optional(), 
+  timingFixedDate: z.string().optional(),
+  dynamicSpecifications: z.array(z.object({
+    attributeName: z.string().min(1, "Attribute name cannot be empty."),
+    attributeValue: z.string().min(1, "Attribute value cannot be empty.")
+  })).optional(),
 });
 
 const itemFormSchema = itemFormSchemaBase.refine(data => {
@@ -107,7 +111,7 @@ export default function NewItemPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const user = dummyUsers.find(u => u.id === 'user1'); 
+    const user = dummyUsers.find(u => u.id === 'user1');
     setCurrentUser(user || null);
   }, []);
 
@@ -121,12 +125,13 @@ export default function NewItemPage() {
       listingType: 'offer',
       isGiftItForward: false,
       openToAnyOpportunity: false,
-      selectedLocationIdentifier: NO_LOCATION_SPECIFIED_VALUE, 
+      selectedLocationIdentifier: NO_LOCATION_SPECIFIED_VALUE,
       itemSpecificAddress: '',
       deliveryMethods: ['pickup_only'],
       logisticsNotes: '',
       timingType: 'flexible',
       timingFixedDate: undefined,
+      dynamicSpecifications: [],
     },
   });
 
@@ -139,7 +144,7 @@ export default function NewItemPage() {
 
  useEffect(() => {
     if (currentUser && form.reset) {
-        const currentFormValues = form.getValues(); 
+        const currentFormValues = form.getValues();
 
         let defaultSelectedLocationId: string = NO_LOCATION_SPECIFIED_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
@@ -151,7 +156,7 @@ export default function NewItemPage() {
         const defaultDeliveryMethods = currentUser.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
 
         form.reset({
-            ...currentFormValues, 
+            ...currentFormValues,
             category: globalSelectedCategory || currentFormValues.category || '',
             openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false,
             selectedLocationIdentifier: currentFormValues.selectedLocationIdentifier && currentFormValues.selectedLocationIdentifier !== NO_LOCATION_SPECIFIED_VALUE ? currentFormValues.selectedLocationIdentifier : defaultSelectedLocationId,
@@ -159,6 +164,7 @@ export default function NewItemPage() {
             deliveryMethods: currentFormValues.deliveryMethods?.length ? currentFormValues.deliveryMethods : defaultDeliveryMethods,
             timingType: currentFormValues.timingType || 'flexible',
             timingFixedDate: currentFormValues.timingFixedDate || undefined,
+            dynamicSpecifications: currentFormValues.dynamicSpecifications || [],
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,6 +258,7 @@ export default function NewItemPage() {
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false,
         openToAnyOpportunity: data.openToAnyOpportunity,
         logistics: itemLogistics,
+        // specifications will be handled in a later step
       };
       const addedItem = addNewItemToDummyData(newItemData);
 
@@ -271,7 +278,7 @@ export default function NewItemPage() {
         form.reset({
             name: '',
             description: '',
-            category: globalSelectedCategory || '', 
+            category: globalSelectedCategory || '',
             imageUrl: '',
             listingType: 'offer',
             isGiftItForward: false,
@@ -282,6 +289,7 @@ export default function NewItemPage() {
             logisticsNotes: '',
             timingType: 'flexible',
             timingFixedDate: undefined,
+            dynamicSpecifications: [],
         });
       } else {
         form.reset();
@@ -480,9 +488,9 @@ export default function NewItemPage() {
                             <Calendar
                               mode="single"
                               selected={field.value ? new Date(field.value) : undefined}
-                              onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} 
+                              onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])}
                               disabled={(date) =>
-                                date < new Date(new Date().setHours(0,0,0,0)) || isLoadingOverall 
+                                date < new Date(new Date().setHours(0,0,0,0)) || isLoadingOverall
                               }
                               initialFocus
                             />
