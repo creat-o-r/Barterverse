@@ -54,9 +54,6 @@ export default function SpecificationsDisplay({ specifications }: Specifications
               </li>
             ))}
           </ul>
-          <p className="text-xs italic text-muted-foreground mt-3 pt-2 border-t border-dashed">
-            Note: Specifications are for informational purposes. AI may help populate this in the future.
-          </p>
         </div>
       </CollapsibleContent>
     </Collapsible>
