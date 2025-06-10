@@ -20,7 +20,7 @@ export default function SpecificationsDisplay({ specifications }: Specifications
 
   const specKeys = Object.keys(specifications);
   const summaryText = specKeys.length > 0
-    ? `(Summary: ${specKeys.slice(0, 2).join(', ')}${specKeys.length > 2 ? '...' : ''} - ${specKeys.length} detail${specKeys.length === 1 ? '' : 's'})`
+    ? `(Summary: ${specKeys.slice(0, 2).map(key => key.charAt(0).toUpperCase() + key.slice(1)).join(', ')}${specKeys.length > 2 ? '...' : ''} - ${specKeys.length} detail${specKeys.length === 1 ? '' : 's'})`
     : '(No details provided)';
 
   return (
@@ -46,11 +46,10 @@ export default function SpecificationsDisplay({ specifications }: Specifications
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 p-4 border rounded-md bg-muted/10">
-          <ul className="space-y-1.5 font-body text-sm">
+          <ul className="space-y-1.5 font-body text-sm list-disc pl-5">
             {Object.entries(specifications).map(([key, value]) => (
-              <li key={key} className="flex">
-                <strong className="font-semibold w-1/3 min-w-[100px] pr-2 capitalize">{key}:</strong>
-                <span className="flex-1">{value}</span>
+              <li key={key}>
+                <strong className="font-semibold capitalize">{key}:</strong> {value}
               </li>
             ))}
           </ul>
