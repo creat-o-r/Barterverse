@@ -2,6 +2,7 @@
 import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import type { Metadata, ResolvingMetadata } from 'next';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data';
 import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod, ItemTiming } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,67 @@ import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdmi
 import { Separator } from '@/components/ui/separator';
 import SocialShareButtons from '@/components/items/SocialShareButtons';
 import { format } from 'date-fns';
+
+// Placeholder for the site's base URL
+const SITE_BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://yourdomain.com'; // Should be configured via env var
+
+type Props = {
+  params: { id: string };
+};
+
+export async function generateMetadata(
+  { params }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const itemId = params.id;
+  const itemDetails = await getItemDetails(itemId); // Use existing function
+
+  if (!itemDetails) {
+    return {
+      title: 'Item Not Found',
+      description: 'The item you are looking for could not be found.',
+    };
+  }
+
+  const { item } = itemDetails;
+  const pageUrl = `${SITE_BASE_URL}/items/${item.id}`;
+  const imageUrl = item.imageUrl ? (item.imageUrl.startsWith('http') ? item.imageUrl : `${SITE_BASE_URL}${item.imageUrl.startsWith('/') ? '' : '/'}${item.imageUrl}`) : `${SITE_BASE_URL}/placeholder-image.jpg`; // Ensure absolute URL for image
+
+  const title = item.name || 'Item Listing';
+  const description = item.description ? item.description.substring(0, 160) : 'Check out this item!'; // Limit description length
+
+  return {
+    title: title,
+    description: description,
+    alternates: { // Good for SEO
+      canonical: pageUrl,
+    },
+    openGraph: {
+      title: title,
+      description: description,
+      url: pageUrl,
+      siteName: 'TradeUp', // Or your site's name
+      images: imageUrl ? [
+        {
+          url: imageUrl,
+          width: 800, // Provide dimensions if known, otherwise omit
+          height: 600,
+          alt: title,
+        },
+      ] : [],
+      type: 'object', // 'product' could also be relevant if using product schema
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: title,
+      description: description,
+      images: imageUrl ? [imageUrl] : [],
+      // site: '@YourTwitterHandle', // Optional: if you have a site Twitter handle
+      // creator: itemDetails.owner.twitterHandle, // Optional: if owner has a Twitter handle
+    },
+    // Other metadata like icons, etc., can be inherited from parent or set here
+  };
+}
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
   const item = dummyItems.find((i) => i.id === itemId);
