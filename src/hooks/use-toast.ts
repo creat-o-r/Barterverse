@@ -25,6 +25,9 @@ const actionTypes = {
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const
 
+// Export for testing and potential external use
+export { actionTypes }
+
 let count = 0
 
 function genId() {
@@ -191,4 +194,4 @@ function useToast() {
   }
 }
 
-export { useToast, toast }
+export { useToast, toast, TOAST_LIMIT }
