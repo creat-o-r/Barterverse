@@ -13,6 +13,7 @@ import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationCo
 import SuggestedMatches from '@/components/items/SuggestedMatches';
 import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient';
 import { Separator } from '@/components/ui/separator';
+import SocialShareButtons from '@/components/items/SocialShareButtons';
 import { format } from 'date-fns';
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
@@ -178,6 +179,11 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
 
             <CardContent className="p-0 flex-grow">
               <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap break-words mb-4">{item.description}</p>
+              <SocialShareButtons
+                itemName={item.name}
+                itemUrl={typeof window !== 'undefined' ? window.location.href : ''}
+                 itemImageUrl={item.imageUrl}
+              />
               <Separator className="my-4" />
               <div className="space-y-3 mb-4">
                 <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
