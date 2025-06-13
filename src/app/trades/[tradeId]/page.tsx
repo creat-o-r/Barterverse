@@ -1,202 +1,336 @@
 
-// This is a placeholder page for a specific trade.
-// In a real application, this page would show trade details, item comparison, and the chat window.
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Repeat, Info, UserCircle, Gift, Search } from 'lucide-react';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User } from '@/types';
-import Image from 'next/image';
+'use client';
+
+import { useEffect, useState, FormEvent, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import ChatWindow from '@/components/chat/ChatWindow';
-import { Button } from '@/components/ui/button'; 
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/lib/firebase';
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp,
+  onSnapshot,
+  query,
+  orderBy,
+  Timestamp,
+  updateDoc,
+  arrayUnion
+} from 'firebase/firestore';
+import type { TradeChat, ChatMessage as ChatMessageType, Item as ItemType, UserProfileDocument } from '@/types';
 
-interface TradeContext {
-  tradeId: string;
-  currentUser: User;
-  otherUser: User;
-  itemOfferedByOther: Item; // The item the current user is interested in (owned by otherUser)
-  itemCurrentUserMightOffer: Item | null; // An item current User might offer in exchange
-}
-
-async function getTradeContext(tradeId: string, currentUserId: string): Promise<TradeContext | null> {
-  const parts = tradeId.split('-');
-  if (parts.length < 6 || parts[0] !== 'trade' || parts[2] !== 'wants' || parts[4] !== 'from') {
-    console.warn("Invalid tradeId format for context:", tradeId);
-    return null;
-  }
-
-  const initiatorId = parts[1]; // User who wants the item
-  const targetItemId = parts[3]; // The item being wanted
-  const targetItemOwnerId = parts[5]; // Owner of the targetItem
-
-  const currentUser = dummyUsers.find(u => u.id === currentUserId);
-  if (!currentUser) return null;
-
-  let otherUser: User | undefined;
-  let itemOfferedByOther: Item | undefined; // This is targetItem, owned by targetItemOwner
-  let itemCurrentUserMightOffer: Item | null = null; 
-
-  if (currentUserId === initiatorId) {
-    // Current user is initiating, wants targetItem from targetItemOwner
-    otherUser = dummyUsers.find(u => u.id === targetItemOwnerId);
-    itemOfferedByOther = dummyItems.find(i => i.id === targetItemId && i.ownerId === targetItemOwnerId);
-    // Try to find an item current user owns to pre-fill as potential offer
-    itemCurrentUserMightOffer = dummyItems.find(i => i.ownerId === currentUserId && i.listingType === 'offer' && i.status === 'available') || null;
-
-  } else if (currentUserId === targetItemOwnerId) {
-    // Current user owns the targetItem, initiatorId wants it
-    otherUser = dummyUsers.find(u => u.id === initiatorId);
-    itemOfferedByOther = dummyItems.find(i => i.id === targetItemId && i.ownerId === currentUserId); // This item is current user's
-    // Try to find an item initiator owns to pre-fill as what they might offer
-    itemCurrentUserMightOffer = dummyItems.find(i => i.ownerId === initiatorId && i.listingType === 'offer' && i.status === 'available') || null;
-  } else {
-    console.warn(`User ${currentUserId} not directly involved in tradeId ${tradeId} as initiator or target owner.`);
-    return null; 
-  }
-
-  if (!otherUser || !itemOfferedByOther) {
-    console.warn("Could not determine otherUser or itemOfferedByOther for tradeId:", tradeId);
-    return null;
-  }
-  
-  // Re-evaluate roles for ChatWindow props:
-  // ChatWindow's 'currentItem' = The item the 'otherUser' is offering (that 'currentUser' is interested in).
-  // ChatWindow's 'requestedItemInitial' = The item 'currentUser' might offer in return.
-
-  let chatWindowCurrentItem: Item;
-  let chatWindowRequestedItem: Item | null;
-
-  if (currentUserId === initiatorId) { // Current user wants itemOfferedByOther
-      chatWindowCurrentItem = itemOfferedByOther;
-      chatWindowRequestedItem = itemCurrentUserMightOffer; // What current user might offer
-  } else { // currentUserId === targetItemOwnerId. Other user (initiatorId) wants itemOfferedByOther (which is current user's item)
-      chatWindowCurrentItem = itemCurrentUserMightOffer!; // This is what the other user (initiator) offers. Could be null.
-                                                        // If null, it means the other user has no obvious item.
-                                                        // ChatWindow needs a currentItem. If initiator has no obvious item to offer,
-                                                        // the "currentItem" for chat is still targetItem (owned by current user).
-                                                        // The negotiation is "about" the targetItem.
-      if (itemCurrentUserMightOffer) { // If initiator has an item to offer
-         chatWindowCurrentItem = itemCurrentUserMightOffer;
-         chatWindowRequestedItem = itemOfferedByOther; // What current user (targetItemOwner) might give up
-      } else { // Initiator has no obvious item to offer. Negotiation is about current user's item.
-         chatWindowCurrentItem = itemOfferedByOther; // This is the item current user owns, that other user wants
-         chatWindowRequestedItem = null; // Other user's offer is TBD
-      }
-  }
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Loader2, MessageSquare, Send, ArrowLeft, Info, Package } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 
-  return {
-    tradeId,
-    currentUser,
-    otherUser,
-    itemOfferedByOther: chatWindowCurrentItem, 
-    itemCurrentUserMightOffer: chatWindowRequestedItem,
+export default function TradeChatPage() {
+  const params = useParams();
+  const tradeId = params.tradeId as string;
+  const { user: authUser, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const [tradeChat, setTradeChat] = useState<TradeChat | null>(null);
+  const [involvedItems, setInvolvedItems] = useState<ItemType[]>([]);
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
+  const [newMessageText, setNewMessageText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false); // For suggestion loading state
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-}
+
+  useEffect(scrollToBottom, [messages]);
+
+  // Fetch TradeChat details and listen for messages
+  useEffect(() => {
+    if (!tradeId || !authUser) {
+      if (!authLoading && !authUser) router.replace('/auth/signin');
+      return;
+    }
+
+    setIsLoading(true);
+    const chatDocRef = doc(db, 'tradeChats', tradeId);
+
+    // Fetch chat details once
+    getDoc(chatDocRef).then(async (docSnap) => {
+      if (docSnap.exists()) {
+        const chatData = { id: docSnap.id, ...docSnap.data() } as TradeChat;
+        // Convert Timestamps
+        chatData.createdAt = (chatData.createdAt as unknown as Timestamp)?.toDate() || new Date();
+        chatData.updatedAt = (chatData.updatedAt as unknown as Timestamp)?.toDate() || new Date();
+        if (chatData.lastMessageTimestamp) {
+          chatData.lastMessageTimestamp = (chatData.lastMessageTimestamp as unknown as Timestamp)?.toDate();
+        }
+        setTradeChat(chatData);
+
+        // Fetch details for involved items
+        if (chatData.itemIds && chatData.itemIds.length > 0) {
+          const itemPromises = chatData.itemIds.map(itemId => getDoc(doc(db, 'items', itemId)));
+          const itemDocs = await Promise.all(itemPromises);
+          const itemsData = itemDocs.filter(snap => snap.exists()).map(snap => ({id: snap.id, ...snap.data()} as ItemType));
+          setInvolvedItems(itemsData);
+        }
+
+      } else {
+        toast({ title: "Error", description: "Chat not found.", variant: "destructive" });
+        router.push('/chats');
+      }
+    }).catch(error => {
+      console.error("Error fetching chat details:", error);
+      toast({ title: "Error", description: "Could not load chat details.", variant: "destructive" });
+    });
+
+    // Listen for messages
+    const messagesQuery = query(collection(db, 'tradeChats', tradeId, 'chatMessages'), orderBy('timestamp', 'asc'));
+    const unsubscribe = onSnapshot(messagesQuery, (querySnapshot) => {
+      const fetchedMessages: ChatMessageType[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedMessages.push({
+          ...data,
+          id: doc.id,
+          timestamp: (data.timestamp as Timestamp)?.toDate() || new Date(),
+        } as ChatMessageType);
+      });
+      setMessages(fetchedMessages);
+      setIsLoading(false); // Stop loading after initial messages load
+    }, (error) => {
+      console.error("Error fetching messages:", error);
+      toast({ title: "Error", description: "Could not load messages.", variant: "destructive" });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [tradeId, authUser, router, toast, authLoading]);
+
+  const handleSendMessage = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newMessageText.trim() || !authUser || !tradeChat) return;
+
+    setIsSending(true);
+    const messageData: Omit<ChatMessageType, 'id'> = {
+      chatId: tradeId,
+      senderId: authUser.uid,
+      text: newMessageText.trim(),
+      timestamp: serverTimestamp() as Timestamp, // Firestore will convert this
+      isLLM: false,
+    };
+
+    try {
+      // Add message to subcollection
+      const messagesColRef = collection(db, 'tradeChats', tradeId, 'chatMessages');
+      await addDoc(messagesColRef, messageData);
+
+      // Update parent TradeChat document
+      const chatDocRef = doc(db, 'tradeChats', tradeId);
+      await updateDoc(chatDocRef, {
+        lastMessageText: newMessageText.trim(),
+        lastMessageTimestamp: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        // Optional: Increment unread count for other participant(s)
+        // [`unreadCount.${otherParticipantId}`]: increment(1)
+      });
+
+      setNewMessageText(''); // Clear input field
+
+      // Placeholder for LLM response trigger
+      // console.log("LLM response would be triggered here for message:", newMessageText.trim());
+      // if (shouldTriggerLLM(newMessageText.trim())) {
+      //   await triggerLLMAssistant(tradeId, newMessageText.trim(), authUser.uid);
+      // }
+
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({ title: "Error", description: "Could not send message.", variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleGetSuggestion = async () => {
+    if (!authUser || !tradeChat || involvedItems.length === 0) {
+      toast({ title: "Error", description: "Not enough information to get a suggestion.", variant: "destructive" });
+      return;
+    }
+    setIsSuggesting(true);
+
+    // Determine requesterItem and counterpartyItem.
+    // This logic assumes the first item in tradeChat.itemIds is the primary item of interest (counterparty's).
+    // And that the requester is the authUser.
+    // A more robust solution might involve explicit selection or context.
+    const primaryItemId = tradeChat.itemIds[0];
+    const counterpartyItemDetails = involvedItems.find(item => item.id === primaryItemId);
+
+    // For requesterItem, we don't have an explicit "offered item" in this simplified chat context yet.
+    // So, we might pass it as undefined or try to find one from authUser's items if fetched.
+    // For now, we'll pass undefined for requesterItem, or a placeholder if the schema requires it.
+    // The LLM prompt will need to handle cases where one side hasn't explicitly offered.
+
+    // Simplified: Assume counterpartyItem is the first item in involvedItems (if any)
+    // and its owner is the other participant. Requester's item is not explicitly defined here.
+    const counterparty = tradeChat.participantInfo.find(p => p.userId !== authUser.uid);
+    let identifiedCounterpartyItem: ItemType | undefined;
+    let identifiedRequesterItem: ItemType | undefined; // This would ideally be an item the authUser is offering
+
+    if (counterparty && involvedItems.length > 0) {
+      // Find an item owned by the counterparty from involvedItems
+      identifiedCounterpartyItem = involvedItems.find(item => item.ownerId === counterparty.userId && tradeChat.itemIds.includes(item.id));
+      // Find an item owned by the authUser from involvedItems (if any were added to tradeChat.itemIds)
+      identifiedRequesterItem = involvedItems.find(item => item.ownerId === authUser.uid && tradeChat.itemIds.includes(item.id));
+    }
+     // Fallback if only one item is in involvedItems, assume it's the counterparty's
+    if (!identifiedCounterpartyItem && involvedItems.length === 1) {
+      identifiedCounterpartyItem = involvedItems[0];
+    }
 
 
-export default async function TradeDetailPage({ params }: { params: { tradeId: string } }) {
-  const currentUserId = dummyUsers[0].id; 
-  const tradeContext = await getTradeContext(params.tradeId, currentUserId);
+    const input = {
+      userId: authUser.uid,
+      chatId: tradeId,
+      // Pass simplified item details
+      requesterItem: identifiedRequesterItem ? { id: identifiedRequesterItem.id, title: identifiedRequesterItem.title, description: identifiedRequesterItem.description, category: identifiedRequesterItem.category } : undefined,
+      counterpartyItem: identifiedCounterpartyItem ? { id: identifiedCounterpartyItem.id, title: identifiedCounterpartyItem.title, description: identifiedCounterpartyItem.description, category: identifiedCounterpartyItem.category } : undefined,
+      chatHistory: messages.slice(-5).map(m => `${m.senderId === authUser.uid ? 'You' : (tradeChat.participantInfo.find(p=>p.userId === m.senderId)?.displayName || 'Partner')}: ${m.text}`).join('\n'),
+      userPreferences: "Interested in a fair trade.", // Placeholder
+    };
 
-  if (!tradeContext) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline text-2xl text-destructive">Trade Not Found</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="font-body">The details for this trade could not be loaded. It might be an invalid link or the trade no longer exists.</p>
-          <Button asChild variant="link" className="mt-4">
-            <Link href="/chats">Back to Chats</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
+    try {
+      const response = await fetch('/api/suggest-trade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const suggestionOutput = await response.json();
+
+      if (suggestionOutput.suggestionText) {
+        const aiMessageData: Omit<ChatMessageType, 'id'> = {
+          chatId: tradeId,
+          senderId: 'LLM-System', // Special sender ID for AI suggestions
+          text: suggestionOutput.suggestionText,
+          timestamp: serverTimestamp() as Timestamp,
+          isLLM: true,
+        };
+        const messagesColRef = collection(db, 'tradeChats', tradeId, 'chatMessages');
+        await addDoc(messagesColRef, aiMessageData);
+        // Optionally update TradeChat's last message for AI suggestions too
+         await updateDoc(doc(db, 'tradeChats', tradeId), {
+            lastMessageText: `Trade Assistant: ${suggestionOutput.suggestionText.substring(0,50)}...`,
+            lastMessageTimestamp: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+      }
+      if(suggestionOutput.suggestedTrades && suggestionOutput.suggestedTrades.length > 0){
+        // TODO: Handle structured suggestions if needed (e.g. display them in a special card)
+        console.log("Structured suggestions received:", suggestionOutput.suggestedTrades);
+      }
+
+    } catch (error: any) {
+      console.error("Error getting suggestion:", error);
+      toast({ title: "Suggestion Error", description: error.message || "Could not get suggestion.", variant: "destructive" });
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const getOtherParticipant = () => {
+    if (!tradeChat || !authUser) return null;
+    return tradeChat.participantInfo.find(p => p.userId !== authUser.uid);
+  };
+
+  if (isLoading || authLoading) {
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Loading chat...</div>;
   }
 
-  const { tradeId, currentUser, otherUser, itemOfferedByOther, itemCurrentUserMightOffer } = tradeContext;
+  if (!tradeChat) {
+    return <div className="text-center py-10">Chat not found or access denied.</div>;
+  }
   
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline text-3xl flex items-center gap-2">
-            <Repeat className="h-8 w-8 text-primary" />
-            Trade Negotiation
-          </CardTitle>
-          <CardDescription className="font-body">
-            Discussing trade with <Link href={`/profile/${otherUser.id}`} className="text-primary hover:underline font-semibold">{otherUser.name}</Link> for <span className="font-semibold">&quot;{itemOfferedByOther.name}&quot;</span>.
-            {itemCurrentUserMightOffer && ` You might offer your "${itemCurrentUserMightOffer.name}".`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle className="font-headline text-xl flex items-center gap-2">
-                    {itemOfferedByOther.listingType === 'offer' ? <Gift className="text-green-600" /> : <Search className="text-blue-600" />}
-                    {otherUser.name} Offers / Wants
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="relative aspect-video w-full mb-2 rounded-md overflow-hidden">
-                    <Image src={itemOfferedByOther.imageUrl || 'https://placehold.co/600x400.png'} alt={itemOfferedByOther.name} fill className="object-cover" data-ai-hint={itemOfferedByOther.dataAiHint || "item offered by other"} sizes="(max-width: 768px) 100vw, 50vw"/>
-                </div>
-                <h4 className="font-semibold text-lg">{itemOfferedByOther.name}</h4>
-                <p className="text-sm text-muted-foreground line-clamp-2">{itemOfferedByOther.description}</p>
-                <Button variant="outline" size="sm" asChild className="mt-2">
-                    <Link href={`/items/${itemOfferedByOther.id}`}>View Item</Link>
-                </Button>
-              </CardContent>
-            </Card>
-            
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle className="font-headline text-xl flex items-center gap-2">
-                    <UserCircle className="text-primary" />
-                     Your Potential Offer / Fulfillment
-                </CardTitle>
-                </CardHeader>
-              <CardContent>
-                {itemCurrentUserMightOffer ? (
-                  <>
-                    <div className="relative aspect-video w-full mb-2 rounded-md overflow-hidden">
-                        <Image src={itemCurrentUserMightOffer.imageUrl || 'https://placehold.co/600x400.png'} alt={itemCurrentUserMightOffer.name} fill className="object-cover" data-ai-hint={itemCurrentUserMightOffer.dataAiHint || "item you might offer"} sizes="(max-width: 768px) 100vw, 50vw"/>
-                    </div>
-                    <h4 className="font-semibold text-lg">{itemCurrentUserMightOffer.name}</h4>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{itemCurrentUserMightOffer.description}</p>
-                     <Button variant="outline" size="sm" asChild className="mt-2">
-                        <Link href={`/items/${itemCurrentUserMightOffer.id}`}>View Your Item</Link>
-                    </Button>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground font-body">You can discuss what you'd like to offer from your items, or how you can fulfill their want, in the chat below.
-                  Browse <Link href={`/profile/${currentUser.id}`} className="text-primary hover:underline">your inventory</Link>.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
+  const otherParticipant = getOtherParticipant();
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline text-2xl flex items-center gap-2">
-            <MessageSquare className="h-7 w-7 text-primary" />
-            Negotiation Chat
-          </CardTitle>
+  return (
+    <div className="container mx-auto max-w-3xl py-6">
+      <Card className="h-[calc(100vh-10rem)] flex flex-col">
+        <CardHeader className="border-b p-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className="mr-2">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={otherParticipant?.photoURL || undefined} />
+              <AvatarFallback>{(otherParticipant?.displayName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <CardTitle className="text-lg font-semibold">{otherParticipant?.displayName || 'Trade Partner'}</CardTitle>
+              {involvedItems.length > 0 && (
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Package size={14}/> Discussing: {involvedItems.map(item => item.title).join(', ')}
+                </div>
+              )}
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <ChatWindow 
-            currentItem={itemOfferedByOther} 
-            requestedItemInitial={itemCurrentUserMightOffer} 
-            otherUserId={otherUser.id}
-            otherUserName={otherUser.name}
-            tradeId={tradeId}
-          />
+
+        <CardContent className="flex-grow overflow-y-auto p-4 space-y-4">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${msg.senderId === authUser?.uid ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[70%] p-3 rounded-lg shadow-md ${
+                  msg.senderId === authUser?.uid
+                    ? 'bg-primary text-primary-foreground'
+                    : (msg.isLLM ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white' : 'bg-muted')
+                }`}
+              >
+                {msg.isLLM && <p className="text-xs font-semibold mb-1">Trade Assistant Suggestion:</p>}
+                <p className="text-sm">{msg.text}</p>
+                <p className={`text-xs mt-1 ${msg.senderId === authUser?.uid ? 'text-primary-foreground/70' : 'text-muted-foreground/70'}`}>
+                  {format(msg.timestamp, 'p, MMM d')}
+                </p>
+              </div>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
         </CardContent>
+
+        <CardFooter className="p-4 border-t flex flex-col gap-2">
+          <Button onClick={handleGetSuggestion} variant="outline" size="sm" className="w-full mb-2" disabled={isSuggesting || isSending}>
+            {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Info className="mr-2 h-4 w-4" />}
+            Get AI Suggestion
+          </Button>
+          <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
+            <Input
+              type="text"
+              placeholder="Type your message..."
+              value={newMessageText}
+              onChange={(e) => setNewMessageText(e.target.value)}
+              className="flex-1"
+              disabled={isSending || isSuggesting}
+            />
+            <Button type="submit" disabled={isSending || isSuggesting || !newMessageText.trim()}>
+              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span className="ml-2 sr-only">Send</span>
+            </Button>
+          </form>
+        </CardFooter>
       </Card>
     </div>
   );

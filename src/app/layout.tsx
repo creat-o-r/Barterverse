@@ -5,6 +5,7 @@ import './globals.css';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import ClientLayoutWrapper from '@/components/layout/ClientLayoutWrapper';
+import { AuthProvider } from '../contexts/AuthContext'; // Adjusted path
 
 // Metadata can now be exported from here as it's a Server Component
 export const metadata: Metadata = {
@@ -26,13 +27,15 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased flex flex-col min-h-screen">
-        <ClientLayoutWrapper>
-          <Navbar />
-          <main className="flex-grow container mx-auto px-2 py-4 md:px-4 md:py-8">
-            {children}
-          </main>
-          <Footer />
-        </ClientLayoutWrapper>
+        <AuthProvider>
+          <ClientLayoutWrapper>
+            <Navbar />
+            <main className="flex-grow container mx-auto px-2 py-4 md:px-4 md:py-8">
+              {children}
+            </main>
+            <Footer />
+          </ClientLayoutWrapper>
+        </AuthProvider>
       </body>
     </html>
   );

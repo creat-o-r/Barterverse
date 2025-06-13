@@ -1,175 +1,151 @@
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Repeat, CheckCircle, XCircle, Hourglass, Bot } from 'lucide-react';
-import type { TradeOffer } from '@/types'; 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
-import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
-import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import type { TradeChat, Item as ItemType } from '@/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MessageSquare, Package, Loader2 } from 'lucide-react';
+import { formatDistanceToNowStrict } from 'date-fns';
 
-// Reusing dummyTrades for now, ideally this comes from a service
-const dummyTrades: TradeOffer[] = [
-  {
-    id: 'trade-user1-wants-item2-from-user2', // Alice wants Bob's Retro Gaming Console
-    offeringUserId: 'user2', // Bob is "offering" item2
-    receivingUserId: 'user1', // Alice is "receiving" item2 if trade succeeds
-    offeredItemId: 'item2', // The item Bob has
-    requestedItemId: 'item3', // What Alice might offer in return (Hand-knitted Scarf)
-    status: 'pending',
-    createdAt: new Date(Date.now() - 86400000 * 2),
-    updatedAt: new Date(Date.now() - 86400000 * 1),
-  },
-  {
-    id: 'trade-user1-wants-item5-from-user3', // Alice wants Charlie's Succulents
-    offeringUserId: 'user3', // Charlie is "offering" item5
-    receivingUserId: 'user1', // Alice is "receiving" item5
-    offeredItemId: 'item5', // The item Charlie has
-    requestedItemId: 'item1', // What Alice might offer (Vintage Journal)
-    status: 'accepted',
-    createdAt: new Date(Date.now() - 86400000 * 5),
-    updatedAt: new Date(Date.now() - 86400000 * 3),
-  },
-   {
-    id: 'trade-user1-wants-item9-from-user4', // Alice wants Diana's Fedora Hat
-    offeringUserId: 'user4', // Diana has item9
-    receivingUserId: 'user1', // Alice wants item9
-    offeredItemId: 'item9', // Diana's Fedora
-    requestedItemId: 'item13', // Alice offers Vinyl Records
-    status: 'pending',
-    createdAt: new Date(Date.now() - 86400000 * 1),
-    updatedAt: new Date(),
-  },
-  {
-    id: 'trade-user2-wants-item1-from-user1', // Bob wants Alice's Vintage Journal
-    offeringUserId: 'user1', // Alice has item1
-    receivingUserId: 'user2', // Bob wants item1
-    offeredItemId: 'item1',
-    requestedItemId: 'item4', // Bob offers Bluetooth speaker
-    status: 'pending',
-    createdAt: new Date(Date.now() - 86400000 * 0.5),
-    updatedAt: new Date(Date.now() - 86400000 * 0.2),
-  },
-];
+export default function ChatsListPage() {
+  const { user: authUser, loading: authLoading } = useAuth();
+  const [chats, setChats] = useState<TradeChat[]>([]);
+  const [involvedItemsDetails, setInvolvedItemsDetails] = useState<Record<string, ItemType>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-// Helper to get item name
-const getItemName = (itemId: string) => dummyItems.find(item => item.id === itemId)?.name || 'Unknown Item';
+  useEffect(() => {
+    if (authLoading) return;
+    if (!authUser) {
+      setIsLoading(false);
+      // Optionally redirect to login or show message
+      return;
+    }
 
-// Helper to get user name (simplified)
-const getUserName = (userId: string, currentUserId: string) => {
-    if (userId === currentUserId) return "You";
-    return dummyUsers.find(user => user.id === userId)?.name || `User (${userId.substring(0,4)})`;
-}
+    setIsLoading(true);
+    const chatsQuery = query(
+      collection(db, 'tradeChats'),
+      where('participantIds', 'array-contains', authUser.uid),
+      orderBy('updatedAt', 'desc') // Or lastMessageTimestamp
+    );
 
-const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
-  switch (status) {
-    case 'pending': return <Hourglass className="h-5 w-5 text-yellow-500" />;
-    case 'accepted': return <CheckCircle className="h-5 w-5 text-green-500" />;
-    default: return <MessageSquare className="h-5 w-5 text-gray-500" />;
+    getDocs(chatsQuery)
+      .then(async (querySnapshot) => {
+        const fetchedChats: TradeChat[] = [];
+        const itemIdsToFetch = new Set<string>();
+
+        querySnapshot.forEach((doc) => {
+          const chatData = { id: doc.id, ...doc.data() } as TradeChat;
+          // Convert Timestamps
+          chatData.createdAt = (chatData.createdAt as unknown as Timestamp)?.toDate() || new Date();
+          chatData.updatedAt = (chatData.updatedAt as unknown as Timestamp)?.toDate() || new Date();
+          if (chatData.lastMessageTimestamp) {
+            chatData.lastMessageTimestamp = (chatData.lastMessageTimestamp as unknown as Timestamp)?.toDate();
+          }
+          fetchedChats.push(chatData);
+          chatData.itemIds.forEach(id => itemIdsToFetch.add(id));
+        });
+        setChats(fetchedChats);
+
+        // Fetch details for all unique involved items
+        if (itemIdsToFetch.size > 0) {
+          const itemPromises = Array.from(itemIdsToFetch).map(itemId => getDoc(doc(db, 'items', itemId)));
+          const itemDocs = await Promise.all(itemPromises);
+          const itemsMap: Record<string, ItemType> = {};
+          itemDocs.forEach(snap => {
+            if (snap.exists()) {
+              itemsMap[snap.id] = {id: snap.id, ...snap.data()} as ItemType;
+            }
+          });
+          setInvolvedItemsDetails(itemsMap);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching chats:", error);
+        // Handle error (e.g., show toast)
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [authUser, authLoading]);
+
+  if (isLoading || authLoading) {
+    return <div className="flex justify-center items-center h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Loading chats...</div>;
   }
-};
 
-export default function ChatsPage() {
-  // Simulate current user, in a real app this comes from auth
-  const currentUserId = 'user1'; 
+  if (!authUser) {
+    return <div className="text-center py-10">Please <Link href="/auth/signin" className="text-primary hover:underline">sign in</Link> to view your chats.</div>;
+  }
 
-  const activeChats = dummyTrades.filter(trade => 
-    (trade.offeringUserId === currentUserId || trade.receivingUserId === currentUserId) &&
-    (trade.status === 'pending' || trade.status === 'accepted')
-  );
+  if (chats.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-8 py-8 text-center">
+        <MessageSquare className="h-24 w-24 text-muted-foreground mx-auto" />
+        <h1 className="text-3xl font-headline">No Chats Yet</h1>
+        <p className="text-muted-foreground font-body">
+          Start a negotiation on an item page to see your chats here.
+        </p>
+        <Button asChild>
+          <Link href="/items">Browse Items</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline text-3xl flex items-center gap-3">
-            <MessageSquare className="h-8 w-8 text-primary" />
-            Your Trade Chats
-          </CardTitle>
-          <CardDescription className="font-body">
-            Access your ongoing and recent trade negotiations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {activeChats.length === 0 ? (
-            <p className="text-center text-muted-foreground font-body py-10">You have no active trade chats.</p>
-          ) : (
-            <div className="space-y-4">
-              {activeChats.map((trade) => {
-                // Determine who the other party is
-                const otherPartyId = trade.offeringUserId === currentUserId ? trade.receivingUserId : trade.offeringUserId;
-                const otherPartyName = getUserName(otherPartyId, currentUserId);
-                
-                // Determine what is being offered and requested from the current user's perspective
-                let itemCurrentUserOffersName = 'Something';
-                let itemOtherUserOffersName = 'Something';
+    <div className="max-w-3xl mx-auto space-y-6 py-8">
+      <CardHeader className="px-0">
+        <CardTitle className="font-headline text-3xl flex items-center gap-3">
+          <MessageSquare className="h-8 w-8 text-primary" />
+          Your Trade Chats
+        </CardTitle>
+        <CardDescription className="font-body">
+          Access your ongoing and recent trade negotiations.
+        </CardDescription>
+      </CardHeader>
+      <div className="space-y-4">
+        {chats.map((chat) => {
+          const otherParticipantInfo = chat.participantInfo.find(p => p.userId !== authUser.uid);
+          const itemTitles = chat.itemIds.map(id => involvedItemsDetails[id]?.title || 'Item').join(', ');
 
-                if (trade.offeringUserId === currentUserId) {
-                  // Current user is OFFERING trade.offeredItemId
-                  // and REQUESTING trade.requestedItemId from the other user
-                  itemCurrentUserOffersName = getItemName(trade.offeredItemId);
-                  itemOtherUserOffersName = getItemName(trade.requestedItemId);
-                } else { // trade.receivingUserId === currentUserId
-                  // Current user is RECEIVING trade.offeredItemId from the other user
-                  // and the other user is REQUESTING trade.requestedItemId (which is current user's)
-                  itemCurrentUserOffersName = getItemName(trade.requestedItemId);
-                  itemOtherUserOffersName = getItemName(trade.offeredItemId);
-                }
-
-
-                return (
-                  <Card key={trade.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <div className="flex-grow">
-                        <div className="flex items-center gap-2 mb-1">
-                          <StatusIcon status={trade.status} />
-                          <h3 className="font-headline text-lg">
-                            Chat with {otherPartyName}
-                          </h3>
-                           <Badge variant={
-                                trade.status === 'accepted' ? 'default' :
-                                trade.status === 'pending' ? 'secondary' :
-                                'outline'
-                            } className="capitalize ml-auto sm:ml-2 py-1 px-2 text-xs">
-                                {trade.status}
-                            </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground font-body line-clamp-2">
-                           {`Your offer: ${itemCurrentUserOffersName} for Their: ${itemOtherUserOffersName}`}
+          return (
+            <Link key={chat.id} href={`/trades/${chat.id}`} className="block">
+              <Card className="hover:shadow-lg transition-shadow duration-200 ease-in-out cursor-pointer">
+                <CardContent className="p-4 flex items-center space-x-4">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={otherParticipantInfo?.photoURL || undefined} alt={otherParticipantInfo?.displayName} />
+                    <AvatarFallback>{(otherParticipantInfo?.displayName || 'P').charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-grow overflow-hidden">
+                    <div className="flex justify-between items-start">
+                        <h3 className="font-semibold text-md truncate">
+                        {otherParticipantInfo?.displayName || 'Trade Partner'}
+                        </h3>
+                        {chat.lastMessageTimestamp && (
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNowStrict(chat.lastMessageTimestamp, { addSuffix: true })}
                         </p>
-                        <p className="text-xs text-muted-foreground font-body">
-                          Last activity: {new Date(trade.updatedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Button asChild variant="outline" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                        <Link href={`/trades/${trade.id}`}>Open Chat</Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-headline text-3xl flex items-center gap-3">
-            <Bot className="h-8 w-8 text-accent" />
-            Direct Assistant Chat
-          </CardTitle>
-          <CardDescription className="font-body">
-            Have a question or need help? Chat directly with our AI assistant.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GeneralChatWindow />
-        </CardContent>
-      </Card>
+                        )}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5">
+                      <Package size={14} className="shrink-0"/>
+                      <span className="truncate">Item(s): {itemTitles || 'N/A'}</span>
+                    </p>
+                    <p className="text-sm text-foreground truncate mt-0.5">
+                      {chat.lastMessageText || 'No messages yet.'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

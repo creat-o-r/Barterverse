@@ -1,10 +1,16 @@
 
-import { use, Suspense } from 'react';
+'use client'; // Add 'use client' for the main data fetching and display logic
+
+import { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod, ItemTiming } from '@/types';
+import { useRouter } from 'next/navigation'; // Import useRouter
+import type { Item as ItemType, UserProfileDocument, TradeChat, TradeChatParticipantInfo } from '@/types'; // Adjusted imports
 import { Button } from '@/components/ui/button';
+// Firebase imports
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'; // Added setDoc, serverTimestamp
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock } from 'lucide-react';
@@ -14,14 +20,14 @@ import SuggestedMatches from '@/components/items/SuggestedMatches';
 import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast'; // For notifications
 
-async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
-  const item = dummyItems.find((i) => i.id === itemId);
-  if (!item) return null;
-  const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) return null;
-  return { item, owner };
-}
+// Removed DUMMY_CURRENT_USER_ID
+
+// getItemDetails will be part of the client component's useEffect
+// async function getItemDetails(itemId: string): Promise<{ item: ItemType; ownerName: string; ownerAvatar?: string } | null> {
+//   // Firestore fetching logic will be here
+// }
 
 const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
   pickup_only: "Pickup",
@@ -32,26 +38,25 @@ const deliveryMethodDisplayMap: Record<ItemDeliveryMethod, string> = {
   flexible_meetup: "Flexible Meetup",
 };
 
-function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, owner: User }) {
+// Simplified LogisticsDisplay, assuming owner details might not be fully available without a separate fetch
+// or are denormalized differently in the Item object from Firestore.
+function LogisticsDisplay({ logistics, ownerNameForLogistics }: { logistics?: ItemLogistics, ownerNameForLogistics?: string }) {
   if (!logistics) {
     return <p className="text-sm text-muted-foreground font-body">Logistics details not specified for this item.</p>;
   }
 
   let locationDisplay = "Location not specified for this item.";
-  if (logistics.locationType === 'profile_stored_location' && logistics.selectedUserStoredLocationId) {
-    const storedLoc = owner.locations?.find(l => l.id === logistics.selectedUserStoredLocationId);
-    locationDisplay = storedLoc ? `${storedLoc.name} (${storedLoc.address || 'Address not set'})` : "Stored address (details unavailable)";
-  } else if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
+  if (logistics.locationType === 'item_specific_location' && logistics.itemSpecificAddress) {
     locationDisplay = logistics.itemSpecificAddress;
-  } else if (logistics.locationType !== 'not_specified') {
-    // Fallback if type is set but no specific details (e.g. profile default implied)
-    const defaultStoredLocId = owner.logisticsPreferences?.preferredStoredLocationId;
-    const defaultLoc = owner.locations?.find(l => l.id === defaultStoredLocId) || owner.locations?.find(l => l.isDefault);
-    if (defaultLoc) {
-      locationDisplay = `Owner's default: ${defaultLoc.name} (${defaultLoc.address || 'Address not specified'})`;
+  } else if (logistics.locationType === 'profile_stored_location') {
+    // If owner's locations are not part of the Item object, this part needs adjustment
+    // For now, we'll assume it might be a placeholder or needs more data.
+    locationDisplay = `Owner's stored location (details may require profile view)`;
+    if (logistics.selectedUserStoredLocationId) {
+        locationDisplay = `Owner's stored location: ${logistics.selectedUserStoredLocationId}`; // Display ID if name not available
     }
   }
-
+  // The logic for owner's default location would require fetching User profile, which is out of scope for item fetch for now.
 
   let timingDisplay = "Timing not specified.";
   if (logistics.timing) {
@@ -113,11 +118,110 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   );
 }
 
+// Helper function to convert Firestore data to UserProfileDocument, handling Timestamps
+// Ensure this is defined before its use or imported.
+const processUserProfileData = (docSnap: any): UserProfileDocument => {
+  const data = docSnap.data();
+  return {
+    ...data,
+    uid: docSnap.id,
+    email: data.email || '', // ensure all UserProfileDocument fields are present
+    displayName: data.displayName || '',
+    photoURL: data.photoURL || undefined,
+    bio: data.bio || undefined,
+    displayLocation: data.displayLocation || undefined,
+    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+  } as UserProfileDocument;
+};
 
-async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
-  const itemDetails = await getItemDetails(itemId);
+// ItemDetailsDisplay is now a client component
+function ItemDetailsDisplay({ itemId }: { itemId: string }) {
+  const [item, setItem] = useState<ItemType | null>(null);
+  const [ownerProfile, setOwnerProfile] = useState<UserProfileDocument | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user: authUser } = useAuth(); // Get current authenticated user
+  const router = useRouter();
+  const { toast } = useToast();
+  const [chatButtonLoading, setChatButtonLoading] = useState(false);
 
-  if (!itemDetails) {
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!itemId) {
+      if (isMounted) setError("No item ID provided.");
+      if (isMounted) setIsLoading(false);
+      return;
+    }
+
+    const fetchItemDetails = async () => {
+      if (isMounted) setIsLoading(true);
+      if (isMounted) setError(null);
+      try {
+        const itemRef = doc(db, "items", itemId);
+        const itemSnap = await getDoc(itemRef);
+
+        if (itemSnap.exists()) {
+          const itemData = itemSnap.data();
+          const createdAt = itemData.createdAt instanceof Timestamp ? itemData.createdAt.toDate() : itemData.createdAt;
+          const fetchedItem = { ...itemData, id: itemSnap.id, createdAt } as ItemType;
+          if (isMounted) setItem(fetchedItem);
+
+          // After fetching item, fetch owner's profile if ownerId exists
+          if (fetchedItem.ownerId) {
+            const ownerRef = doc(db, "users", fetchedItem.ownerId);
+            const ownerSnap = await getDoc(ownerRef);
+            if (ownerSnap.exists()) {
+              if (isMounted) setOwnerProfile(processUserProfileData(ownerSnap));
+            } else {
+              console.warn(`Owner profile not found for ownerId: ${fetchedItem.ownerId}`);
+              // Create a partial owner profile from item data if full profile not found
+              if (isMounted) setOwnerProfile({
+                uid: fetchedItem.ownerId,
+                displayName: fetchedItem.ownerName,
+                email: '', // Email not available from item
+                createdAt: new Date() // Placeholder
+              } as UserProfileDocument);
+            }
+          } else {
+             if (isMounted) setOwnerProfile(null); // No ownerId on item
+          }
+        } else {
+          if (isMounted) setError("Item not found.");
+          if (isMounted) setItem(null);
+        }
+      } catch (e: any) {
+        console.error("Error fetching item or owner details:", e);
+        if (isMounted) setError(e.message || "Failed to fetch details.");
+        if (isMounted) setItem(null);
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    fetchItemDetails();
+
+    return () => { isMounted = false; }; // Cleanup function
+  }, [itemId]);
+
+  if (isLoading) {
+    return <ItemPageLoadingState />; // Use existing loading skeleton
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <Card className="border-destructive">
+          <CardHeader><CardTitle className="text-destructive text-center font-headline">Error</CardTitle></CardHeader>
+          <CardContent><p className="text-center font-body">{error}</p></CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!item) {
+    // This case should be covered by error state if item not found, but as a fallback:
     return (
       <div className="space-y-8">
         <Card>
@@ -128,9 +232,61 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
     );
   }
 
-  const { item, owner } = itemDetails;
-  const currentUserId = dummyUsers[0]?.id || 'user1_fallback';
-  const isCurrentUserOwner = item.ownerId === currentUserId;
+  const isCurrentUserOwner = authUser && item && item.ownerId === authUser.uid;
+
+  const handleInitiateChat = async () => {
+    if (!authUser || !item || !ownerProfile) {
+      toast({ title: "Error", description: "Cannot initiate chat. User or item data missing.", variant: "destructive"});
+      return;
+    }
+    if (isCurrentUserOwner) {
+      toast({ title: "Info", description: "This is your own listing.", variant: "default"});
+      return;
+    }
+
+    setChatButtonLoading(true);
+    const participantIds = [authUser.uid, item.ownerId].sort();
+    const chatId = `${participantIds[0]}_${participantIds[1]}_${item.id}`; // Deterministic chat ID
+
+    try {
+      const chatDocRef = doc(db, "tradeChats", chatId);
+      const chatDocSnap = await getDoc(chatDocRef);
+
+      if (chatDocSnap.exists()) {
+        // Chat already exists, navigate to it
+        router.push(`/trades/${chatId}`);
+      } else {
+        // Create new chat
+        const currentUserInfo: TradeChatParticipantInfo = {
+          userId: authUser.uid,
+          displayName: authUser.displayName || authUser.email || 'Current User',
+          photoURL: authUser.photoURL || undefined,
+        };
+        const ownerInfo: TradeChatParticipantInfo = {
+          userId: item.ownerId,
+          displayName: ownerProfile.displayName || item.ownerName || 'Owner',
+          photoURL: ownerProfile.photoURL || undefined,
+        };
+
+        const newChatData: Omit<TradeChat, 'id'> = { // Omit 'id' as it's the document key
+          itemIds: [item.id],
+          participantIds: participantIds,
+          participantInfo: [currentUserInfo, ownerInfo].sort((a,b) => a.userId.localeCompare(b.userId)), // Keep consistent order
+          createdAt: serverTimestamp() as Date,
+          updatedAt: serverTimestamp() as Date,
+          lastMessageText: '',
+          lastMessageTimestamp: serverTimestamp() as Date,
+        };
+        await setDoc(chatDocRef, newChatData);
+        router.push(`/trades/${chatId}`);
+      }
+    } catch (err: any) {
+      console.error("Error initiating chat:", err);
+      toast({ title: "Chat Error", description: `Could not start or find chat: ${err.message}`, variant: "destructive"});
+    } finally {
+      setChatButtonLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -139,7 +295,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
           <div className="relative aspect-square md:aspect-auto min-h-[300px] md:min-h-0 bg-muted">
             <Image
               src={item.imageUrl || 'https://placehold.co/600x400.png'}
-              alt={item.name}
+              alt={item.title}
               fill
               className="object-cover"
               data-ai-hint={item.dataAiHint || "item image"}
@@ -149,7 +305,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
           </div>
           <div className="p-6 flex flex-col">
             <CardHeader className="p-0 pb-4">
-              <CardTitle className="font-headline text-3xl mb-2">{item.name}</CardTitle>
+              <CardTitle className="font-headline text-3xl mb-2">{item.title}</CardTitle>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <div className="flex items-center gap-2">
                   <Tag className="h-5 w-5 text-primary" />
@@ -167,13 +323,17 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                     <HeartHandshake className="mr-1 h-3 w-3" /> Gift It Forward
                   </Badge>
                 )}
-                {/* Minimum Match Rating Override badge removed */}
-                 {item.openToAnyOpportunity && (
+                {item.openToAnyOpportunity && (
                   <Badge variant="outline" className="text-xs border-accent/50 text-accent">
                     Open to Any Opportunity
                   </Badge>
                 )}
               </div>
+              {item.createdAt && (
+                 <p className="text-xs text-muted-foreground font-body">
+                    Listed on: {format(new Date(item.createdAt), "PPP p")}
+                 </p>
+              )}
             </CardHeader>
 
             <CardContent className="p-0 flex-grow">
@@ -183,38 +343,46 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                 <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
-                    <AvatarImage src={owner.avatarUrl} alt={owner.name} data-ai-hint={owner.dataAiHint || "owner avatar"} />
-                    <AvatarFallback>{owner.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={ownerProfile?.photoURL || undefined} alt={ownerProfile?.displayName || item.ownerName || 'Owner'} />
+                    <AvatarFallback>{(ownerProfile?.displayName || item.ownerName || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <Link href={`/profile/${owner.id}`} className="font-semibold text-primary hover:underline">{owner.name}</Link>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Star className="h-4 w-4 mr-1 text-yellow-400 fill-yellow-400" /> {owner.rating.toFixed(1)} ({owner.tradesCompleted} trades)
-                    </div>
+                    <Link href={`/profile/${item.ownerId}`} className="font-semibold text-primary hover:underline">
+                      {ownerProfile?.displayName || item.ownerName || 'Unknown Owner'}
+                    </Link>
                   </div>
                 </div>
               </div>
               <Separator className="my-4" />
                <div className="space-y-3">
                 <h3 className="font-headline text-xl flex items-center gap-2"><Truck className="h-6 w-6 text-primary" />Logistics Information</h3>
-                <LogisticsDisplay logistics={item.logistics} owner={owner} />
+                <LogisticsDisplay logistics={item.logistics} ownerNameForLogistics={ownerProfile?.displayName || item.ownerName} />
               </div>
             </CardContent>
 
-            <CardFooter className="p-0 pt-6">
-              {!isCurrentUserOwner && item.status === 'available' && (
-                 item.listingType === 'offer' && item.isGiftItForward ? (
-                    <Button asChild className="w-full bg-pink-500 hover:bg-pink-600 text-white" size="lg">
-                      <Link href={`/profile/${owner.id}`}>
-                        <HeartHandshake className="mr-2 h-5 w-5" /> Express Interest / Contact Gifter
-                      </Link>
-                    </Button>
-                  ) : (
-                    <ItemTradeInitiationContent item={item} ownerName={owner.name} ownerId={owner.id} />
-                  )
+            <CardFooter className="p-0 pt-6 flex flex-col gap-2"> {/* Added flex-col and gap */}
+              {!isCurrentUserOwner && item.status === 'available' && authUser && (
+                <>
+                  {item.listingType === 'offer' && item.isGiftItForward ? (
+                      <Button asChild className="w-full bg-pink-500 hover:bg-pink-600 text-white" size="lg">
+                        <Link href={`/profile/${item.ownerId}`}> {/* Or contact owner directly */}
+                          <HeartHandshake className="mr-2 h-5 w-5" /> Express Interest / Contact Gifter
+                        </Link>
+                      </Button>
+                    ) : (
+                      // Replace or integrate ItemTradeInitiationContent with chat button
+                      // For now, adding a new button for chat:
+                      <Button onClick={handleInitiateChat} className="w-full" size="lg" disabled={chatButtonLoading}>
+                        {chatButtonLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                        Chat with Owner
+                      </Button>
+                      // Original ItemTradeInitiationContent can be kept if it serves a different purpose (e.g. formal offers)
+                      // <ItemTradeInitiationContent item={item} ownerName={ownerProfile?.displayName || item.ownerName || 'Owner'} ownerId={item.ownerId} />
+                    )}
+                </>
               )}
               {isCurrentUserOwner && item.status === 'available' && (
-                <Button variant="outline" className="w-full">Manage Your Listing</Button>
+                <Button variant="outline" className="w-full" asChild><Link href={`/items/edit/${item.id}`}>Manage Your Listing</Link></Button>
               )}
               {item.status === 'traded' && <Badge variant="destructive" className="w-full text-center py-2 text-sm">Item Traded</Badge>}
               {item.status === 'pending' && <Badge variant="secondary" className="w-full text-center py-2 text-sm">Trade Pending</Badge>}
@@ -233,6 +401,7 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   );
 }
 
+// ... (ItemPageLoadingState and SuggestedMatchesLoadingState remain the same)
 function ItemPageLoadingState() {
   return (
     <div className="space-y-8 animate-pulse">
@@ -320,8 +489,9 @@ function SuggestedMatchesLoadingState() {
   );
 }
 
-export default function ItemDetailPageWrapper({ params: paramsProp }: { params: { id: string } }) {
-  const params = use(paramsProp);
+
+export default function ItemDetailPageWrapper({ params }: { params: { id: string } }) {
+  // const params = use(paramsProp); // 'use' is for server components to read client context/params if needed, not used here.
 
   if (!params || !params.id) {
     return (

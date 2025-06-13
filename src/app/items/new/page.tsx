@@ -34,6 +34,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
 const NO_LOCATION_SPECIFIED_VALUE = "no_location_specified_for_item";
@@ -48,10 +49,12 @@ const deliveryMethodEnum = z.enum([
 ]);
 
 const itemFormSchemaBase = z.object({
-  name: z.string().min(3, { message: 'Item name must be at least 3 characters.' }),
+  title: z.string().min(3, { message: 'Item title must be at least 3 characters.' }), // Renamed name to title
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
   category: z.string().min(2, { message: 'Category is required and should be at least 2 characters.' }),
-  imageUrl: z.string().url({ message: 'Please enter a valid image URL.' }).optional().or(z.literal('')),
+  // imageUrl is handled by file input, so schema might not need it, or it's populated post-upload.
+  // For now, let's keep it optional as a string that will hold the download URL.
+  imageUrl: z.string().url({ message: 'Image URL will be populated after upload.' }).optional().or(z.literal('')),
   listingType: z.enum(['offer', 'want'], { required_error: "You must select a listing type." }),
   isGiftItForward: z.boolean().optional(),
   openToAnyOpportunity: z.boolean().optional(),
@@ -103,20 +106,25 @@ export default function NewItemPage() {
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // const [currentUser, setCurrentUser] = useState<User | null>(null); // Replaced by useAuth
+  const { user: currentUser, loading: authLoading } = useAuth(); // Use Firebase auth user
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // Firebase services
+  const { db, storage } = await import('../../../lib/firebase'); // Use await import for client component
+  const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+  const { ref, uploadBytesResumable, getDownloadURL } = await import('firebase/storage');
 
-  useEffect(() => {
-    const user = dummyUsers.find(u => u.id === 'user1'); 
-    setCurrentUser(user || null);
-  }, []);
+
+  // Remove useEffect that loads dummy user
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
     defaultValues: {
-      name: '',
+      title: '', // Renamed name to title
       description: '',
       category: globalSelectedCategory || '',
-      imageUrl: '',
+      imageUrl: '', // This will be set after upload
       listingType: 'offer',
       isGiftItForward: false,
       openToAnyOpportunity: false,
@@ -168,15 +176,15 @@ export default function NewItemPage() {
   const timingTypeWatch = form.watch('timingType');
 
   const handleAiSuggestions = useCallback(async () => {
-    const name = form.getValues('name');
+    const title = form.getValues('title'); // Use title
     const description = form.getValues('description');
 
-    if (name.length < 3 || description.length < 10) return;
+    if (title.length < 3 || description.length < 10) return;
 
     if (!form.formState.dirtyFields.category && !globalSelectedCategory) {
         setIsSuggestingCategory(true);
         try {
-            const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
+            const categoryResult: SuggestCategoryOutput = await suggestCategory({ name: title, description }); // Pass title as name to AI flow
             if (categoryResult.errorMessage) toast({ title: "AI Category Suggestion Failed", description: categoryResult.errorMessage, variant: "default" });
             else if (categoryResult.suggestedCategory) {
                 form.setValue('category', categoryResult.suggestedCategory, { shouldValidate: true });
@@ -190,7 +198,7 @@ export default function NewItemPage() {
     if (!form.formState.dirtyFields.listingType) {
         setIsInferringListingType(true);
         try {
-            const listingTypeResult: InferListingTypeOutput = await inferListingType({ name, description });
+            const listingTypeResult: InferListingTypeOutput = await inferListingType({ name: title, description }); // Pass title as name to AI flow
             if (listingTypeResult.errorMessage) toast({ title: "AI Listing Type Inference Failed", description: listingTypeResult.errorMessage, variant: "default" });
             else if (listingTypeResult.inferredListingType) {
                 form.setValue('listingType', listingTypeResult.inferredListingType, { shouldValidate: true });
@@ -205,11 +213,45 @@ export default function NewItemPage() {
 
   async function onSubmit(data: ItemFormValues) {
     if (!currentUser) {
-      toast({ title: "Error", description: "Current user not loaded.", variant: "destructive" });
+      toast({ title: "Authentication Error", description: "You must be logged in to list an item.", variant: "destructive" });
+      router.push('/auth/signin');
       return;
     }
+    if (!imageFile) {
+      toast({ title: "Image Required", description: "Please select an image for your item.", variant: "destructive" });
+      // Optionally, trigger form validation error display for image field if using Controller
+      form.setError("imageUrl", { type: "manual", message: "Image is required." }); // Example if imageUrl was part of form
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      // 1. Upload image to Firebase Storage
+      const imageName = `items/${currentUser.uid}/${Date.now()}-${imageFile.name}`;
+      const storageRef = ref(storage, imageName);
+      const uploadTask = uploadBytesResumable(storageRef, imageFile);
+
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            // Optional: handle progress (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log('Upload is ' + (snapshot.bytesTransferred / snapshot.totalBytes) * 100 + '% done');
+          },
+          (error) => {
+            console.error("Image Upload Error:", error);
+            toast({ title: "Image Upload Failed", description: error.message, variant: "destructive" });
+            reject(error);
+          },
+          () => {
+            resolve();
+          }
+        );
+      });
+
+      const uploadedImageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+
+      // 2. Prepare item data for Firestore
       let locationTypeForLogistics: ItemLogisticsLocationType;
       let storedLocationIdForLogistics: string | undefined = undefined;
       let specificAddressForLogistics: string | undefined = undefined;
@@ -241,63 +283,87 @@ export default function NewItemPage() {
           notes: data.logisticsNotes,
       };
 
-      const newItemData = {
-        name: data.name,
+      const ownerName = currentUser.displayName || currentUser.email || 'Anonymous User';
+
+      const itemToSave = {
+        title: data.title,
         description: data.description,
         category: data.category,
         listingType: data.listingType,
-        imageUrl: data.imageUrl || '',
-        ownerId: currentUser.id,
+        imageUrl: uploadedImageUrl,
+        ownerId: currentUser.uid,
+        ownerName: ownerName,
+        status: 'available',
+        createdAt: serverTimestamp(), // Or new Date() if serverTimestamp gives issues with type
         isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false,
         openToAnyOpportunity: data.openToAnyOpportunity,
         logistics: itemLogistics,
+        // dataAiHint is not in the form, can be added later if needed
       };
-      const addedItem = addNewItemToDummyData(newItemData);
+
+      // 3. Save item to Firestore
+      const itemsCollectionRef = collection(db, "items");
+      const docRef = await addDoc(itemsCollectionRef, itemToSave);
+      console.log("Document written with ID: ", docRef.id);
 
       toast({
         title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
-        description: `${data.name} has been successfully posted.`,
+        description: `${data.title} has been successfully posted.`,
       });
 
-      if (currentUser && form.reset) {
+      setImageFile(null); // Clear selected file
+      setImagePreview(null); // Clear preview
+
+      // Reset form
+      if (form.reset) { // Check if form.reset is available
+        // Simplified reset, original logic for logistics defaults can be re-added if User type from useAuth matches dummyUser type
         let defaultSelectedLocationId: string = NO_LOCATION_SPECIFIED_VALUE;
-        const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
-        if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
-            defaultSelectedLocationId = preferredStoredLocId;
-        }
-        const defaultDeliveryMethods = currentUser.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
+        // const preferredStoredLocId = currentUser?.logisticsPreferences?.preferredStoredLocationId; // Assuming currentUser has these details
+        // if (preferredStoredLocId && currentUser?.locations?.find(l => l.id === preferredStoredLocId)) {
+        //     defaultSelectedLocationId = preferredStoredLocId;
+        // }
+        // const defaultDeliveryMethods = currentUser?.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
 
         form.reset({
-            name: '',
+            title: '',
             description: '',
-            category: globalSelectedCategory || '', 
+            category: globalSelectedCategory || '',
             imageUrl: '',
             listingType: 'offer',
             isGiftItForward: false,
             openToAnyOpportunity: false,
-            selectedLocationIdentifier: defaultSelectedLocationId,
+            selectedLocationIdentifier: defaultSelectedLocationId, // Use a simplified default or re-fetch user logistics
             itemSpecificAddress: '',
-            deliveryMethods: defaultDeliveryMethods,
+            deliveryMethods: ['pickup_only'], // Simplified default
             logisticsNotes: '',
             timingType: 'flexible',
             timingFixedDate: undefined,
         });
-      } else {
-        form.reset();
       }
-      router.push(`/items/${addedItem.id}`);
+
+      router.push(`/items/${docRef.id}`);
+
     } catch (error: any) {
-        toast({ title: "Submission Error", description: error.message || "Could not post item.", variant: "destructive" });
+      console.error("Item Posting Error:", error);
+      toast({ title: "Posting Failed", description: error.message || "Could not post item. Please try again.", variant: "destructive" });
     } finally {
         setIsSubmitting(false);
     }
   }
 
   const isLoadingAi = isSuggestingCategory || isInferringListingType;
-  const isLoadingOverall = isLoadingAi || isSubmitting || !currentUser;
+  const isLoadingOverall = isLoadingAi || isSubmitting || authLoading || !currentUser;
 
+  if (authLoading) {
+      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Authenticating...</div>;
+  }
   if (!currentUser) {
-      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Loading user data...</div>;
+      // This case might be handled by a higher-order component or redirect in a real app
+      // For now, prompt to sign in. Could redirect.
+      return <div className="flex flex-col justify-center items-center h-64 text-center">
+          <p className="text-lg font-semibold mb-4">Please sign in to list an item.</p>
+          <Button onClick={() => router.push('/auth/signin')}>Sign In</Button>
+        </div>;
   }
 
   return (
@@ -318,11 +384,42 @@ export default function NewItemPage() {
 
               <section className="space-y-6">
                 <h3 className="font-headline text-xl border-b pb-2 mb-4">Item Details</h3>
-                <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel className="font-headline">Item Name</FormLabel><FormControl><Input placeholder="e.g., Vintage Leather Journal" {...field} disabled={isLoadingOverall} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel className="font-headline">Item Title</FormLabel><FormControl><Input placeholder="e.g., Vintage Leather Journal" {...field} disabled={isLoadingOverall} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel className="font-headline">Description</FormLabel><FormControl><Textarea placeholder="Condition, features, etc." className="resize-none" rows={5} {...field} disabled={isLoadingOverall} onBlur={() => { field.onBlur(); if (!form.formState.dirtyFields.category || !form.formState.dirtyFields.listingType) { handleAiSuggestions(); }}} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="listingType" render={({ field }) => (<FormItem className="space-y-3"><FormLabel className="font-headline flex items-center gap-2">Listing Type {isInferringListingType && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><RadioGroup onValueChange={(value) => { field.onChange(value); form.setValue('listingType', value as 'offer' | 'want', {shouldDirty: true}); }} value={field.value} className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4" disabled={isLoadingOverall}><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="offer" id="offer" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="offer" className="font-normal flex items-center gap-2"><Gift className="h-5 w-5 text-green-600" /> Offering an item</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="want" id="want" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="want" className="font-normal flex items-center gap-2"><Search className="h-5 w-5 text-blue-600" /> Looking for an item</FormLabel></FormItem></RadioGroup></FormControl><FormDescription className="font-body">AI may suggest this.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="category" render={({ field }) => (<FormItem><FormLabel className="font-headline flex items-center gap-2">Category {isSuggestingCategory && !globalSelectedCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {(!isSuggestingCategory || globalSelectedCategory) && (form.formState.dirtyFields.category || globalSelectedCategory) && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><Input placeholder={isSuggestingCategory && !globalSelectedCategory ? "AI suggesting..." : (globalSelectedCategory && !form.formState.dirtyFields.category ? globalSelectedCategory : "e.g., Books")} {...field} onChange={(e) => { field.onChange(e); form.setValue('category', e.target.value, {shouldDirty: true});}} disabled={isLoadingOverall} /></FormControl><FormDescription className="font-body">{globalSelectedCategory && !form.formState.dirtyFields.category ? `Prefilled from global filter. ` : ``}AI may suggest if not globally set. Type to override.</FormDescription><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="imageUrl" render={({ field }) => (<FormItem><FormLabel className="font-headline">Image URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="https://placehold.co/600x400.png" {...field} disabled={isLoadingOverall}/></FormControl><FormDescription className="font-body">Link to an image. Use placeholder if needed.</FormDescription><FormMessage /></FormItem>)} />
+
+                <FormItem>
+                  <FormLabel className="font-headline">Item Image</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setImageFile(file);
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setImagePreview(reader.result as string);
+                          }
+                          reader.readAsDataURL(file);
+                        } else {
+                          setImagePreview(null);
+                        }
+                      }}
+                      className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                      disabled={isLoadingOverall}
+                    />
+                  </FormControl>
+                  {imagePreview && (
+                    <div className="mt-4">
+                      <img src={imagePreview} alt="Image preview" className="w-full max-w-xs h-auto rounded-md shadow-md mx-auto" />
+                    </div>
+                  )}
+                  <FormDescription className="font-body">Upload an image for your item. Required.</FormDescription>
+                  {/* You might want to add a FormMessage here if you make the file input a required field via react-hook-form controller */}
+                </FormItem>
               </section>
 
               <Separator />
@@ -556,7 +653,7 @@ export default function NewItemPage() {
               />
 
               <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isLoadingOverall}>
-                {isLoadingOverall ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting...' : (isInferringListingType ? 'Inferring...' : 'Loading...'))}</>) : (`Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`)}
+                {isLoadingOverall ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isSubmitting ? 'Posting...' : (isSuggestingCategory ? 'Suggesting...' : (isInferringListingType ? 'Inferring...' : (authLoading ? 'Authenticating' : 'Loading...')))}</>) : (`Post ${form.getValues('listingType') === 'offer' ? 'Offer' : 'Want'} Listing`)}
               </Button>
             </form>
           </Form>

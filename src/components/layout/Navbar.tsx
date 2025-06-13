@@ -3,9 +3,9 @@
 
 import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Imported buttonVariants
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus, ListPlus } from 'lucide-react'; // Added ListPlus
+import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus, ListPlus, LogOut, LayoutDashboard, LayoutGrid } from 'lucide-react'; // Added LayoutGrid
 import {
   Select,
   SelectContent,
@@ -14,24 +14,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
+import { useAuth } from '../../contexts/AuthContext'; // Adjusted path
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
 // Define link configurations
-const primaryNavLinks = [
+const primaryNavLinksBase = [
   { href: '/', label: 'Match', icon: <Package className="h-4 w-4" /> },
-  { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
-  { href: '/quick-list', label: 'Quick List', icon: <ListPlus className="h-4 w-4" /> }, // New Quick List link
-  {
-    href: '/chats',
-    label: 'Chats',
-    icon: <MessageSquare className="h-4 w-4" />,
-    hasNotification: true
-  },
+  { href: '/items', label: 'Browse', icon: <LayoutGrid className="h-4 w-4" /> }, // Added Browse link
+  // { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> }, // Moved to conditional
+  { href: '/quick-list', label: 'Quick List', icon: <ListPlus className="h-4 w-4" /> },
 ];
-const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
 
+const getPrimaryNavLinks = (isLoggedIn: boolean, unreadCount: number) => {
+  const links = [...primaryNavLinksBase];
+  if (isLoggedIn) {
+    links.splice(2, 0, { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> }); // Add "List Item" if logged in
+    links.push({ // Add "Chats" link also only if logged in
+      href: '/chats',
+      label: 'Chats',
+      icon: <MessageSquare className="h-4 w-4" />,
+      hasNotification: unreadCount > 0, // isLoggedIn is true here
+      unreadCount: unreadCount,
+    });
+  }
+  return links;
+};
+
+const getProfileLinkConfig = (userId?: string) => ({
+   href: userId ? `/profile/${userId}` : '/profile/me', // Default or specific user
+   label: 'Profile',
+   icon: <UserCircle className="h-4 w-4" />
+  });
 
 function GlobalCategoryFilter() {
-  'use client';
+  // 'use client' is already at the top of the file
   const { selectedCategory, setSelectedCategory, availableCategories } = useGlobalFilter();
 
   return (
@@ -58,10 +74,91 @@ function GlobalCategoryFilter() {
   );
 }
 
-
 export default function Navbar() {
-  const isLoggedIn = true; // Placeholder for auth state
-  const unreadCount = 3; // Placeholder for unread chat count
+  const { user, loading, logout } = useAuth();
+  const isLoggedIn = !!user;
+  const unreadCount = 3; // Placeholder for unread chat count - this should ideally come from user data or another context
+  const profileLinkConfig = getProfileLinkConfig(user?.uid);
+  const primaryNavLinks = getPrimaryNavLinks(isLoggedIn, unreadCount);
+
+  // Mobile Auth Buttons
+  const MobileAuthButtons = () => {
+    if (loading) {
+      return <Skeleton className="h-8 w-8 rounded-full" />;
+    }
+    if (isLoggedIn && user) { // Ensure user object is available
+      return (
+        <>
+          <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild className="rounded-full">
+            <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-9 h-9">
+              <Avatar className="h-7 w-7">
+                <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+                <AvatarFallback>{(user.displayName || user.email || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={logout} aria-label="Sign Out" className="flex items-center justify-center w-9 h-9">
+            <LogOut className="h-5 w-5" />
+          </Button>
+        </>
+      );
+    }
+    return (
+      <>
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/auth/signin" aria-label="Login" className="flex items-center justify-center w-9 h-9">
+            <LogIn className="h-5 w-5" />
+          </Link>
+        </Button>
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/auth/signup" aria-label="Sign Up" className="flex items-center justify-center w-9 h-9">
+            <UserPlus className="h-5 w-5" />
+          </Link>
+        </Button>
+      </>
+    );
+  };
+
+  // Desktop Auth Buttons
+  const DesktopAuthButtons = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <Skeleton className="h-9 w-24" /> {/* For email */}
+          <Skeleton className="h-9 w-24" /> {/* For sign out */}
+        </div>
+      );
+    }
+    if (isLoggedIn && user) { // Ensure user object is available
+      return (
+        <div className="flex items-center gap-3"> {/* Increased gap slightly for avatar */}
+          <Link href={profileLinkConfig.href} className="flex items-center gap-2 text-sm font-medium hover:text-primary">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+              <AvatarFallback>{(user.displayName || user.email || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            {/* {profileLinkConfig.label} Display name can be next to email or implicit with avatar */}
+          </Link>
+          {user.displayName && <span className="text-sm text-foreground hidden md:inline">{user.displayName}</span>}
+          {!user.displayName && user.email && <span className="text-sm text-muted-foreground hidden lg:inline">{user.email}</span>}
+          <Button variant="outline" size="sm" onClick={logout}>
+            <LogOut className="mr-0 md:mr-2 h-4 w-4" /> <span className="hidden md:inline">Sign Out</span>
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-2">
+        <Button variant="default" size="sm" asChild>
+          <Link href="/auth/signin">Login</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/auth/signup">Sign Up</Link>
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
@@ -91,29 +188,8 @@ export default function Navbar() {
           </nav>
 
           {/* Right: Auth/Profile Icons */}
-          <div className="flex-none flex items-center gap-0.5 ml-auto"> 
-            {isLoggedIn ? (
-              <>
-                <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
-                  <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-9 h-9">
-                    {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
-                  </Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="ghost" size="icon" asChild>
-                  <Link href="/auth/signin" aria-label="Login" className="flex items-center justify-center w-9 h-9">
-                    <LogIn className="h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button variant="ghost" size="icon" asChild>
-                  <Link href="/auth/signup" aria-label="Sign Up" className="flex items-center justify-center w-9 h-9">
-                    <UserPlus className="h-5 w-5" />
-                  </Link>
-                </Button>
-              </>
-            )}
+          <div className="flex-none flex items-center gap-0.5 ml-auto">
+            <MobileAuthButtons />
           </div>
         </div>
         
@@ -138,23 +214,7 @@ export default function Navbar() {
         </nav>
 
         <div className="ml-auto hidden md:flex items-center">
-          {isLoggedIn ? (
-            <Button variant="ghost" asChild className="flex items-center gap-2 text-sm px-3 py-2">
-              <Link href={profileLinkConfig.href}>
-                {React.cloneElement(profileLinkConfig.icon, { className: "h-4 w-4" })}
-                {profileLinkConfig.label}
-              </Link>
-            </Button>
-          ) : (
-             <div className="flex items-center gap-2">
-              <Button variant="default" size="sm" asChild>
-                <Link href="/auth/signin">Login</Link>
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/auth/signup">Sign Up</Link>
-              </Button>
-            </div>
-          )}
+          <DesktopAuthButtons />
         </div>
       </div>
     </header>
