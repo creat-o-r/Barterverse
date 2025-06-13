@@ -24,6 +24,11 @@ const customJestConfig = {
     '/node_modules/(?!lucide-react)/',
     '^.+\\.module\\.(css|sass|scss)$',
   ],
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/.next/',
+    '<rootDir>/tests/e2e/', // Ignore Playwright E2E tests
+  ],
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
