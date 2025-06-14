@@ -33,4 +33,7 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}'
           projectId: barterverse-l9uq3
+          target: barterverse-test
           expires: 7d
+        env:
+          FIREBASE_CLI_EXPERIMENTS: webframeworks
