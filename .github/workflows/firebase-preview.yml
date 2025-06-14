@@ -24,8 +24,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Get Google AI API Key from Secret Manager
+        id: get-api-key
+        run: |
+          gcloud auth activate-service-account --key-file=<(echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}')
+          API_KEY=$(gcloud secrets versions access latest --secret="google-ai-api-key" --project="barterverse-l9uq3")
+          echo "::add-mask::$API_KEY"
+          echo "GOOGLE_API_KEY=$API_KEY" >> $GITHUB_ENV
+      
       - name: Build project  
         run: npm run build
+        env:
+          GOOGLE_API_KEY: ${{ env.GOOGLE_API_KEY }}
         
       - name: Deploy to Firebase Preview Channel
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -37,3 +47,4 @@ jobs:
           expires: 7d
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
+          GOOGLE_API_KEY: ${{ env.GOOGLE_API_KEY }}
