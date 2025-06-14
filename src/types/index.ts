@@ -132,3 +132,12 @@ export type InferUserPreferencesOutput = {
   errorMessage?: string;
 };
 
+export type Project = {
+  id: string;
+  name: string;
+  description: string;
+  ownerId: string;
+  itemIds: string[]; // An array of item IDs included in the project
+  visibility: 'private' | 'shared'; // Updated type
+  sharedWith?: string[]; // This field remains
+};
