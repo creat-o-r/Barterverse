@@ -8,7 +8,11 @@ export async function getGoogleApiKey(): Promise<string> {
   }
 
   try {
-    const client = new SecretManagerServiceClient();
+    // For Firebase Cloud Functions, we need to explicitly set the project ID
+    const client = new SecretManagerServiceClient({
+      projectId: 'barterverse-l9uq3'
+    });
+    
     const [version] = await client.accessSecretVersion({
       name: 'projects/barterverse-l9uq3/secrets/google-ai-api-key/versions/latest',
     });
