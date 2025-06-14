@@ -2,7 +2,7 @@
 // src/app/opportunities/page.tsx
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -130,8 +130,7 @@ const modelDisplayMap: Record<AIModelName, string> = {
   'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview',
 };
 
-
-export default function OpportunityMatchPage() {
+function OpportunityMatchPageContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -542,3 +541,10 @@ export default function OpportunityMatchPage() {
   );
 }
 
+export default function OpportunityMatchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OpportunityMatchPageContent />
+    </Suspense>
+  );
+}
