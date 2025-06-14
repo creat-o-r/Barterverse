@@ -7,7 +7,8 @@ export async function GET() {
       keyLength: apiKey?.length || 0,
       keyPreview: apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : 'No key',
       environment: process.env.NODE_ENV || 'unknown',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      source: 'next-env-vars'
     });
   } catch (error) {
     return Response.json({ 

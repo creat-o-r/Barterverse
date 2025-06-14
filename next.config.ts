@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  env: {
+    // Ensure server-side environment variables are available at runtime
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+  },
 };
 
 export default nextConfig;
