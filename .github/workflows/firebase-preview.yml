@@ -31,10 +31,15 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}' > /tmp/service-account.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account.json
+          
+          # Authenticate with gcloud
           gcloud auth activate-service-account --key-file=/tmp/service-account.json
+          
+          # Get API key from existing Google Secret Manager
           API_KEY=$(gcloud secrets versions access latest --secret="google-ai-api-key" --project="barterverse-l9uq3")
           echo "::add-mask::$API_KEY"
-          # Set Firebase Functions secret (the proper way)
+          
+          # Set Firebase Functions secret using Firebase CLI
           echo "$API_KEY" | firebase functions:secrets:set GOOGLE_API_KEY --project="barterverse-l9uq3"
           rm /tmp/service-account.json
       
