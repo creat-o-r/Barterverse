@@ -1,13 +1,16 @@
+import { getGoogleApiKey } from '@/lib/secret-manager';
+
 export async function GET() {
   try {
-    const apiKey = process.env.GOOGLE_API_KEY;
+    const apiKey = await getGoogleApiKey();
     
     return Response.json({
       hasKey: !!apiKey,
       keyLength: apiKey?.length || 0,
       keyPreview: apiKey ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}` : 'No key',
       environment: process.env.NODE_ENV || 'unknown',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      source: 'secret-manager-runtime'
     });
   } catch (error) {
     return Response.json({ 
