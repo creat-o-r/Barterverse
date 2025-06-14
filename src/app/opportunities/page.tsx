@@ -2,7 +2,7 @@
 // src/app/opportunities/page.tsx
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -131,7 +131,7 @@ const modelDisplayMap: Record<AIModelName, string> = {
 };
 
 
-export default function OpportunityMatchPage() {
+function OpportunityMatchPageContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -539,6 +539,14 @@ export default function OpportunityMatchPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function OpportunityMatchPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-10 font-body flex items-center justify-center gap-2"><ArrowRightLeft className="h-5 w-5 animate-spin" /> Loading opportunity details...</div>}>
+      <OpportunityMatchPageContent />
+    </Suspense>
   );
 }
 
