@@ -5,8 +5,8 @@
   "targets": {
     "barterverse-l9uq3": {
       "hosting": {
-        "barterverse-l9uq3": [
-          "barterverse-l9uq3"
+        "barterverse-auto-deploy": [
+          "barterverse-auto-deploy"
         ]
       }
     }
