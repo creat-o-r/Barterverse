@@ -26,10 +26,12 @@ jobs:
       - name: Get Google AI API Key from Secret Manager
         id: get-api-key
         run: |
-          gcloud auth activate-service-account --key-file=<(echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}')
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}' > /tmp/service-account.json
+          gcloud auth activate-service-account --key-file=/tmp/service-account.json
           API_KEY=$(gcloud secrets versions access latest --secret="google-ai-api-key" --project="barterverse-l9uq3")
           echo "::add-mask::$API_KEY"
           echo "GOOGLE_API_KEY=$API_KEY" >> $GITHUB_ENV
+          rm /tmp/service-account.json
       
       - name: Build project
         run: npm run build
