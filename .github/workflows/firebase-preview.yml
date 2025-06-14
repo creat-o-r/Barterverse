@@ -42,6 +42,16 @@ jobs:
           NEXT_PUBLIC_BUILD_BRANCH: ${{ github.head_ref }}
           NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
         
+      - name: Grant Secret Manager access to App Engine default service account
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}' > /tmp/service-account.json
+          gcloud auth activate-service-account --key-file=/tmp/service-account.json
+          # Grant Secret Manager access to the default App Engine service account
+          gcloud projects add-iam-policy-binding barterverse-l9uq3 \
+            --member="serviceAccount:barterverse-l9uq3@appspot.gserviceaccount.com" \
+            --role="roles/secretmanager.secretAccessor"
+          rm /tmp/service-account.json
+          
       - name: Deploy to Firebase Preview Channel
         uses: FirebaseExtended/action-hosting-deploy@v0
         id: firebase_deploy
