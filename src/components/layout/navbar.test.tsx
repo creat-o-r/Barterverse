@@ -39,7 +39,7 @@ describe('Navbar Component', () => {
   describe('Common Elements', () => {
     test('renders GlobalCategoryFilter and calls setSelectedCategory on change', () => {
       render(<Navbar />);
-      const selectTrigger = screen.getByRole('combobox'); // SelectTrigger has role="combobox"
+      const selectTrigger = screen.getAllByRole('combobox')[0]; // SelectTrigger has role="combobox", use first one
       expect(selectTrigger).toBeInTheDocument();
       // Simulate opening the select - Radix Selects are complex to test programmatically
       // For unit tests, we often directly test the callback if possible,
@@ -99,7 +99,7 @@ describe('Navbar Component', () => {
       expect(within(navElement).getByRole('link', { name: /list item/i })).toHaveAttribute('href', '/items/new');
       expect(within(navElement).getByRole('link', { name: /quick list/i })).toHaveAttribute('href', '/quick-list');
       expect(within(navElement).getByRole('link', { name: /chats/i })).toHaveAttribute('href', '/chats');
-      expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute('href', '/profile/me');
+      expect(screen.getAllByRole('link', { name: /profile/i })[1]).toHaveAttribute('href', '/profile/me'); // Desktop profile link
     });
   });
 
@@ -116,15 +116,13 @@ describe('Navbar Component', () => {
       // Mobile icons are typically within buttons with aria-label
       // Check for presence of profile icon button and absence of login/signup icon buttons
       // This assumes the mobile section is always rendered in the DOM, even if hidden by CSS.
-      const mobileNav = screen.getAllByRole('navigation')[0]; // Mobile nav is the first <nav>
 
-      // Query within the mobile navigation section
-      // Profile icon should exist because isLoggedIn is true
-      expect(within(mobileNav).getByRole('link', { name: /profile/i })).toBeInTheDocument();
+      // Profile icon should exist because isLoggedIn is true (both mobile and desktop)
+      expect(screen.getAllByRole('link', { name: /profile/i })).toHaveLength(2); // Mobile and desktop
 
-      // Login and Sign Up icons should NOT exist
-      expect(within(mobileNav).queryByRole('link', { name: /login/i })).not.toBeInTheDocument();
-      expect(within(mobileNav).queryByRole('link', { name: /sign up/i })).not.toBeInTheDocument();
+      // Login and Sign Up icons should NOT exist in mobile or anywhere else
+      expect(screen.queryByRole('link', { name: /login/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /sign up/i })).not.toBeInTheDocument();
     });
 
     test('renders mobile primary navigation icons', () => {
