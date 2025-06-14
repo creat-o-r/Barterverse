@@ -559,7 +559,7 @@ describe('Explain Match Rationale Flow', () => {
     });
 
     test('should handle generic errors', async () => {
-      mockPromptFn.mockRejectedValueOnce(new Error('Unexpected server error'));
+      mockPromptFn.mockRejectedValueOnce(new Error('Random server failure'));
 
       const result = await explainMatchRationale(testInput);
 
