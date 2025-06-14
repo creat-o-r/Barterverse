@@ -24,11 +24,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      
       - name: Configure Firebase Functions environment
         id: firebase-config
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}' > /tmp/service-account.json
           gcloud auth activate-service-account --key-file=/tmp/service-account.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account.json
           API_KEY=$(gcloud secrets versions access latest --secret="google-ai-api-key" --project="barterverse-l9uq3")
           echo "::add-mask::$API_KEY"
           # Set Firebase Functions configuration
