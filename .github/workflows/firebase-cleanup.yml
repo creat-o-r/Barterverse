@@ -33,6 +33,12 @@ jobs:
           # Generate channel ID from PR number (same logic as preview action)
           CHANNEL_ID="pr${{ github.event.pull_request.number }}"
           
+          # Skip deletion if this is the testing channel (keep it for 7 days)
+          if [ "$CHANNEL_ID" = "testing" ] || [ "${{ github.head_ref }}" = "testing" ]; then
+            echo "Skipping deletion of testing channel - keeping for 7 days"
+            exit 0
+          fi
+          
           # Delete the preview channel
           firebase hosting:channel:delete $CHANNEL_ID --project barterverse-l9uq3 --force || echo "Channel $CHANNEL_ID not found or already deleted"
       
