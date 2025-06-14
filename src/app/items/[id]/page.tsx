@@ -15,6 +15,7 @@ import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdmi
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import SpecificationsDisplay from '@/components/items/SpecificationsDisplay'; // Import the new client component
+import ManageItemProjectsButton from '@/components/items/ManageItemProjectsButton'; // Import the new client component
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
   const item = dummyItems.find((i) => i.id === itemId);
@@ -217,11 +218,21 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                   )
               )}
               {isCurrentUserOwner && item.status === 'available' && (
-                <Button variant="outline" className="w-full">Manage Your Listing</Button>
+                // <Button variant="outline" className="w-full">Manage Your Listing</Button> // Original button
+                // Placeholder for future listing management features, project management is separate for now
+                null
               )}
               {item.status === 'traded' && <Badge variant="destructive" className="w-full text-center py-2 text-sm">Item Traded</Badge>}
               {item.status === 'pending' && <Badge variant="secondary" className="w-full text-center py-2 text-sm">Trade Pending</Badge>}
             </CardFooter>
+             {/* Project Management Button - Placed outside CardFooter for distinct sectioning, or could be inside if preferred */}
+            {isCurrentUserOwner && item.status === 'available' && ( // Only show if owner and item is available
+                <div className="p-6 pt-0"> {/* Use similar padding as CardFooter or CardContent */}
+                    <Separator className="my-4" />
+                     <h3 className="font-headline text-lg mb-3">Project Assignment</h3>
+                    <ManageItemProjectsButton item={item} isOwner={isCurrentUserOwner} currentUserId={currentUserId} />
+                </div>
+            )}
           </div>
       </Card>
 
