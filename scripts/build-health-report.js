@@ -170,6 +170,39 @@ This PR was automatically created by the build health monitoring system to addre
     }
   }
 
+  async createBuildIssue(failureRate, insights) {
+    if (failureRate > 50) {
+      try {
+        await fetch(`https://api.github.com/repos/${this.repo}/issues`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${this.githubToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: `🚨 Critical Build Failure Rate: ${failureRate}%`,
+            body: `## Build Health Crisis Detected\n\n` +
+                  `**Current Status:**\n` +
+                  `- Failure Rate: ${failureRate}%\n` +
+                  `- Time Period: Last 24 hours\n\n` +
+                  `**Insights:**\n${insights.map(i => `- ${i.message}`).join('\\n')}\n\n` +
+                  `**Immediate Actions Required:**\n` +
+                  `- [ ] Investigate root cause\n` +
+                  `- [ ] Apply emergency fixes\n` +
+                  `- [ ] Monitor build stability\n` +
+                  `- [ ] Update dependencies if needed\n\n` +
+                  `*🤖 Automated by Build Health Monitor*`,
+            labels: ['critical', 'build-failure', 'automated', 'high']
+          })
+        });
+        
+        console.log(`✅ Created critical build issue for ${failureRate}% failure rate`);
+      } catch (error) {
+        console.error('Failed to create build issue:', error.message);
+      }
+    }
+  }
+
   async run() {
     console.log('🔍 Starting Build Health Monitoring...');
 
@@ -205,6 +238,9 @@ This PR was automatically created by the build health monitoring system to addre
       console.log('\\n🔧 Applying automatic fixes...');
       await this.createAutoFixPR(autoFixes);
     }
+
+    // Create GitHub issue for critical failures
+    await this.createBuildIssue(parseFloat(analysis.failureRate), insights);
 
     console.log('\\n✅ Build health monitoring complete');
   }
