@@ -85,3 +85,29 @@ Central types in `src/types/index.ts`:
 - AI flows use structured input/output schemas for type safety
 - Error handling includes fallbacks for AI failures and safety blocks
 - All AI interactions are logged via match-report-service for debugging
+
+## Proactive Build Monitoring & Auto-Fixing
+
+### Monitoring Strategy
+- **Continuous monitoring** every 15 minutes via GitHub Actions
+- **Pattern recognition** across all builds in 24-hour windows  
+- **Predictive analysis** to identify issues before they become blockers
+- **Automatic notification** for critical failure rates (>30%)
+
+### Auto-Fix Capabilities
+1. **Dependency Issues**: Automatic `npm audit fix` and security updates
+2. **Permission Problems**: Auto-grant missing IAM permissions via GCP CLI
+3. **Network Timeouts**: Retry mechanisms and timeout adjustments
+4. **Build Errors**: Pattern-based fixes for common TypeScript/ESLint issues
+
+### Escalation Thresholds
+- **>30% failure rate**: Auto-create critical GitHub issue
+- **>50% failure rate**: Auto-create fix PR with dependency updates
+- **Branch-specific failures**: Alert for branches with >3 consecutive failures
+- **Time-based patterns**: Identify peak failure hours for maintenance scheduling
+
+### Implementation Files
+- `.github/workflows/build-monitoring.yml` - Automated monitoring workflow
+- `scripts/build-health-report.js` - Comprehensive analysis and auto-fix logic
+- **GitHub API integration** - Real-time build status and log analysis
+- **Secret Manager integration** - Secure token management for automation

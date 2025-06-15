@@ -42,7 +42,7 @@ jobs:
           GOOGLE_API_KEY: ${{ env.GOOGLE_API_KEY }}
           NEXT_PUBLIC_BUILD_COMMIT: ${{ github.sha }}
           NEXT_PUBLIC_BUILD_BRANCH: ${{ github.head_ref }}
-          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp || github.run_started_at }}
         
       - name: Deploy to Firebase Preview Channel
         uses: FirebaseExtended/action-hosting-deploy@v0
