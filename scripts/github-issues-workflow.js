@@ -123,6 +123,10 @@ class GitHubIssuesWorkflow {
       // Create Claude chat context file for this issue
       await this.createClaudeChatContext(issue, branchName);
 
+      // Check if issue is part of a project (has milestone)
+      const projectInfo = issue.milestone ? 
+        `\n**🎯 Project:** ${issue.milestone.title}\n**📅 Due Date:** ${issue.milestone.due_on ? new Date(issue.milestone.due_on).toDateString() : 'Not set'}` : '';
+
       // Add workflow comment
       await this.makeGitHubRequest(`/repos/${this.repo}/issues/${issue.number}/comments`, {
         method: 'POST',
@@ -131,7 +135,7 @@ class GitHubIssuesWorkflow {
 
 **Feature Branch:** \`${branchName}\`
 
-**Claude Chat Context:** Created \`.claude-context.md\` with issue details
+**Claude Chat Context:** Created \`.claude-context.md\` with issue details${projectInfo}
 
 **Development Checklist:**
 - [ ] Switch to feature branch: \`git checkout ${branchName}\`
