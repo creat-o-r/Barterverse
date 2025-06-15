@@ -193,3 +193,16 @@ Automated GitHub issues management system that streamlines development workflow 
 - **Project Management**: Links issues to milestones and epics
 - **Claude Code**: Provides rich context for AI-assisted development
 - **Jules Integration**: Handles externally created branches
+
+## Development Guidelines
+
+### Analysis and Decision-Making Process
+**Always examine actual content and purpose before making decisions:**
+
+1. **Read file contents** before determining classification or purpose
+2. **Understand what the code/config actually does** rather than assuming from filename or git history  
+3. **Cross-check assumptions** against multiple sources of information
+4. **Question initial assumptions** when evidence doesn't align
+5. **Document findings** to build institutional knowledge
+
+**Core Principle**: Evidence-based decisions over assumption-based decisions.
