@@ -25,7 +25,8 @@
     "jules:auto": "node scripts/jules-branch-integration.js auto",
     "jules:integrate": "node scripts/jules-branch-integration.js integrate",
     "jules:check-orphans": "node scripts/jules-branch-integration.js check-orphans",
-    "jules:cleanup": "node scripts/jules-branch-integration.js cleanup"
+    "jules:cleanup": "node scripts/jules-branch-integration.js cleanup",
+    "build:status": "node scripts/startup-build-check.js"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",
