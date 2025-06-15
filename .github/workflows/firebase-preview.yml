@@ -32,6 +32,8 @@ jobs:
           API_KEY=$(gcloud secrets versions access latest --secret="google-ai-api-key" --project="barterverse-l9uq3")
           echo "::add-mask::$API_KEY"
           echo "GOOGLE_API_KEY=$API_KEY" >> $GITHUB_ENV
+          # Create .env.production for Firebase deployment (the working approach)
+          echo "GOOGLE_API_KEY=$API_KEY" > .env.production
           rm /tmp/service-account.json
       
       - name: Build project  
