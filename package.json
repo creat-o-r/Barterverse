@@ -20,7 +20,12 @@
     "projects:create-item-matching": "node scripts/github-projects-integration.js create-item-matching",
     "projects:create-firebase-ai": "node scripts/github-projects-integration.js create-firebase-ai",
     "projects:status": "node scripts/github-projects-integration.js status",
-    "projects:link": "node scripts/github-projects-integration.js link"
+    "projects:link": "node scripts/github-projects-integration.js link",
+    "jules:detect": "node scripts/jules-branch-integration.js detect",
+    "jules:auto": "node scripts/jules-branch-integration.js auto",
+    "jules:integrate": "node scripts/jules-branch-integration.js integrate",
+    "jules:check-orphans": "node scripts/jules-branch-integration.js check-orphans",
+    "jules:cleanup": "node scripts/jules-branch-integration.js cleanup"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",
