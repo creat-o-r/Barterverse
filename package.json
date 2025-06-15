@@ -9,7 +9,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "issues:report": "node scripts/github-issues-workflow.js report",
+    "issues:start": "node scripts/github-issues-workflow.js start",
+    "issues:progress": "node scripts/github-issues-workflow.js progress",
+    "issues:auto": "node scripts/github-issues-workflow.js auto",
+    "claude:info": "node scripts/claude-context-helper.js info",
+    "claude:title": "node scripts/claude-context-helper.js title",
+    "claude:setup": "node scripts/claude-context-helper.js setup"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.8.0",
