@@ -148,10 +148,12 @@ Automated GitHub issues management system that streamlines development workflow 
 
 ### Claude Code Workflow
 
-**MANDATORY Startup Routine** (Claude MUST run these commands at the start of EVERY chat session):
+**MANDATORY Startup Routine for CI/CD Management** (Claude MUST run these commands when working on ci-cd-infrastructure branch):
 1. `npm run build:status` - Check current build health across all branches
 2. `npm run issues:report` - Review open issues and their priorities  
 3. Analyze results to determine next actions and provide actionable summary to user
+
+**For Core App Development**: Switch to `testing` branch for application development work.
 
 **ALWAYS Follow This Decision Flow:**
 - If **critical builds failing** → Address build issues first (highest priority)
