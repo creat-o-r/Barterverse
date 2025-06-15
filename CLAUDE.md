@@ -85,3 +85,111 @@ Central types in `src/types/index.ts`:
 - AI flows use structured input/output schemas for type safety
 - Error handling includes fallbacks for AI failures and safety blocks
 - All AI interactions are logged via match-report-service for debugging
+
+## Proactive Build Monitoring & Auto-Fixing
+
+### Monitoring Strategy
+- **Continuous monitoring** every 15 minutes via GitHub Actions
+- **Pattern recognition** across all builds in 24-hour windows  
+- **Predictive analysis** to identify issues before they become blockers
+- **Automatic notification** for critical failure rates (>30%)
+
+### Auto-Fix Capabilities
+1. **Dependency Issues**: Automatic `npm audit fix` and security updates
+2. **Permission Problems**: Auto-grant missing IAM permissions via GCP CLI
+3. **Network Timeouts**: Retry mechanisms and timeout adjustments
+4. **Build Errors**: Pattern-based fixes for common TypeScript/ESLint issues
+
+### Escalation Thresholds
+- **>30% failure rate**: Auto-create critical GitHub issue
+- **>50% failure rate**: Auto-create fix PR with dependency updates
+- **Branch-specific failures**: Alert for branches with >3 consecutive failures
+- **Time-based patterns**: Identify peak failure hours for maintenance scheduling
+
+### Implementation Files
+- `.github/workflows/build-monitoring.yml` - Automated monitoring workflow
+- `scripts/build-health-report.js` - Comprehensive analysis and auto-fix logic
+- **GitHub API integration** - Real-time build status and log analysis
+- **Secret Manager integration** - Secure token management for automation
+
+## GitHub Issues Workflow System
+
+### Overview
+Automated GitHub issues management system that streamlines development workflow from issue creation to deployment. **Not every issue gets a branch automatically** - only issues marked as ready for development.
+
+### Available Commands
+
+#### Issue Management
+- `npm run issues:report` - Generate workflow status report for all open issues
+- `npm run issues:start <issue-number>` - Create feature branch and start workflow for specific issue
+- `npm run issues:progress <issue-number> <step>` - Update issue progress (development-complete, testing-complete, etc.)
+- `npm run issues:auto <max-issues>` - Auto-start workflows for issues labeled `ready-for-development`
+
+#### Claude Code Integration
+- `npm run claude:info` - Show current issue context and suggested chat title
+- `npm run claude:title` - Get AI-generated chat title based on current branch/issue
+- `npm run claude:setup` - Full Claude integration setup for current issue
+
+#### Project Management
+- `npm run projects:create-item-matching` - Create comprehensive item matching project with milestones
+- `npm run projects:create-firebase-ai` - Create Firebase AI integration project
+- `npm run projects:status <milestone>` - Get detailed project status and progress
+- `npm run projects:link <milestone> <issue-numbers>` - Link issues to project milestones
+
+#### Jules Branch Integration
+- `npm run jules:detect` - Detect Jules-created branches and prepare for integration
+- `npm run jules:auto` - Auto-integrate Jules branches with proper workflow
+- `npm run jules:integrate <branch>` - Manually integrate specific Jules branch
+- `npm run jules:check-orphans` - Find orphaned Jules branches
+- `npm run jules:cleanup` - Clean up merged or abandoned Jules branches
+
+#### Build Monitoring
+- `npm run build:status` - Show startup build status report for all tracked branches with expectations
+
+### Claude Code Workflow
+
+**MANDATORY Startup Routine** (Claude MUST run these commands at the start of EVERY chat session):
+1. `npm run build:status` - Check current build health across all branches
+2. `npm run issues:report` - Review open issues and their priorities  
+3. Analyze results to determine next actions and provide actionable summary to user
+
+**ALWAYS Follow This Decision Flow:**
+- If **critical builds failing** → Address build issues first (highest priority)
+- If **builds healthy** → Focus on highest priority ready issues
+- If **on feature branch** → Check `.claude-context.md` for current issue context
+- **Provide clear summary** of current project state and recommended next actions
+
+**Claude must proactively run this routine without being asked - it's required for every session.**
+
+### How Branch Creation Works
+
+**Selective Branch Creation:**
+- Branches are **NOT created for every issue automatically**
+- Only issues with `ready-for-development` label get branches via `npm run issues:auto`
+- Manual branch creation: `npm run issues:start <issue-number>`
+- Branch naming: `feature/issue-{number}-{sanitized-title}`
+
+**Automated Process:**
+1. **Issue Analysis**: Issues are analyzed and prioritized based on labels and content
+2. **Branch Creation**: Feature branch created from main branch
+3. **Claude Context**: `.claude-context.md` file created with issue details, acceptance criteria
+4. **Workflow Tracking**: Issue gets `in-progress` and `feature-branch-created` labels
+5. **Integration**: Claude Code automatically detects context when working on the branch
+
+**What Gets Created:**
+- Feature branch: `feature/issue-123-descriptive-name`
+- Context file: `.claude-context.md` with issue details, requirements, and development notes
+- Issue comment with development checklist and branch information
+- Updated labels for workflow tracking
+
+### Issue Prioritization
+- **Critical**: Security issues, critical bugs (2 hours estimated)
+- **High**: Urgent features, high-priority bugs (6 hours estimated)  
+- **Medium**: Standard features and improvements (4 hours estimated)
+- **Low**: Nice-to-have features (8 hours estimated)
+
+### Workflow Integration
+- **Build Monitoring**: Creates issues automatically for build failures >50%
+- **Project Management**: Links issues to milestones and epics
+- **Claude Code**: Provides rich context for AI-assisted development
+- **Jules Integration**: Handles externally created branches
