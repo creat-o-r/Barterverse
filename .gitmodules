@@ -1,0 +1,3 @@
+[submodule "cicd-infrastructure"]
+	path = cicd-infrastructure
+	url = https://github.com/creat-o-r/Firebase-GitHub.git
