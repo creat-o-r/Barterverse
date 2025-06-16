@@ -11,6 +11,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "issues:report": "node scripts/github-issues-workflow.js report",
+    "issues:create": "node scripts/github-issues-workflow.js create",
+    "issues:update": "node scripts/github-issues-workflow.js update",
     "issues:start": "node scripts/github-issues-workflow.js start",
     "issues:progress": "node scripts/github-issues-workflow.js progress",
     "issues:auto": "node scripts/github-issues-workflow.js auto",
