@@ -246,6 +246,8 @@ ${issue.labels.map(l => `- ${l.name}`).join('\n')}
 
   async updateWorkflowProgress(issueNumber, step) {
     const stepComments = {
+      'development-started': '🚀 **Development Started** - Work in progress',
+      'development-partial': '🔄 **Partial Implementation** - Core features working, enhancements needed',
       'development-complete': '✅ **Development Complete** - Ready for testing',
       'tests-added': '🧪 **Tests Added** - Code coverage updated',
       'build-passing': '🔨 **Build Passing** - All checks green',
@@ -346,6 +348,40 @@ ${issue.labels.map(l => `- ${l.name}`).join('\n')}
     return readyIssues.length;
   }
 
+  async createIssue(title, body, labels = []) {
+    try {
+      const response = await this.makeGitHubRequest(`/repos/${this.repo}/issues`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title: title,
+          body: body,
+          labels: labels
+        })
+      });
+      
+      console.log(`✅ Created issue #${response.number}: ${response.html_url}`);
+      return response;
+    } catch (error) {
+      console.error('Failed to create issue:', error.message);
+      throw error;
+    }
+  }
+
+  async updateIssue(issueNumber, updates) {
+    try {
+      const response = await this.makeGitHubRequest(`/repos/${this.repo}/issues/${issueNumber}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
+      
+      console.log(`✅ Updated issue #${issueNumber}`);
+      return response;
+    } catch (error) {
+      console.error(`Failed to update issue #${issueNumber}:`, error.message);
+      throw error;
+    }
+  }
+
   async run() {
     console.log('🔍 Starting GitHub Issues Workflow Management...');
 
@@ -354,6 +390,27 @@ ${issue.labels.map(l => `- ${l.name}`).join('\n')}
     switch (command) {
       case 'report':
         await this.generateWorkflowReport();
+        break;
+
+      case 'create':
+        const title = process.argv[3];
+        const bodyText = process.argv[4] || '';
+        const labels = process.argv[5] ? process.argv[5].split(',') : [];
+        if (!title) {
+          console.error('Usage: npm run issues:create <title> [body] [labels]');
+          process.exit(1);
+        }
+        await this.createIssue(title, bodyText, labels);
+        break;
+
+      case 'update':
+        const updateIssueNumber = process.argv[3];
+        const updateBody = process.argv[4];
+        if (!updateIssueNumber) {
+          console.error('Usage: npm run issues:update <issue-number> <body>');
+          process.exit(1);
+        }
+        await this.updateIssue(updateIssueNumber, { body: updateBody });
         break;
       
       case 'start':
@@ -372,7 +429,7 @@ ${issue.labels.map(l => `- ${l.name}`).join('\n')}
         const step = process.argv[4];
         if (!progressIssue || !step) {
           console.error('Usage: npm run issues:progress <issue-number> <step>');
-          console.error('Steps: development-complete, tests-added, build-passing, pr-to-testing, integration-tested, pr-to-main, merged');
+          console.error('Steps: development-started, development-partial, development-complete, tests-added, build-passing, pr-to-testing, integration-tested, pr-to-main, merged');
           process.exit(1);
         }
         await this.updateWorkflowProgress(progressIssue, step);
