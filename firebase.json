@@ -1,0 +1,14 @@
+{
+  "hosting": {
+    "site": "barterverse-auto-deploy",
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "frameworksBackend": {
+      "region": "asia-east1"
+    }
+  }
+}
