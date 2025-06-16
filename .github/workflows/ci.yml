@@ -3,4 +3,4 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - run: curl -X POST -H "Authorization: token ${{ secrets.CICD_TOKEN }}" https://api.github.com/repos/creat-o-r/cicd-infrastructure/dispatches -d '{}'
+      - run: curl -X POST -H "Authorization: token ${{ secrets.CICD_TOKEN }}" https://api.github.com/repos/creat-o-r/Firebase-GitHub/dispatches -d '{}'
