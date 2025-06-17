@@ -3,4 +3,10 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "✅ CI workflow completed - this will trigger Universal Pipeline via workflow_run"
+      - name: Trigger Universal Pipeline
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.CICD_TOKEN }}
+          repository: creat-o-r/Firebase-GitHub
+          event-type: pipeline
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}", "repository": "${{ github.repository }}"}'
