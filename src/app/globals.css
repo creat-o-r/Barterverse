@@ -4,33 +4,33 @@
 
 @layer base {
   :root {
-    --background: 208 43% 95%; /* Very Light Blue #F0F4F7 */
-    --foreground: 207 10% 30%; /* Dark Gray for text */
+    --background: 0 0% 98%; /* #F9F9F9 */
+    --foreground: 0 0% 20%; /* #333333 */
 
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 207 10% 30%;
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 0 0% 20%; /* Adjusted to match new foreground */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 207 10% 30%;
+    --popover-foreground: 0 0% 20%; /* Adjusted to match new foreground */
 
-    --primary: 207 36% 64%; /* Dusty Blue #7EA9CC */
-    --primary-foreground: 210 100% 98%; /* Light color for text on primary */
+    --primary: 210 100% 50%; /* #007AFF */
+    --primary-foreground: 0 0% 98%; /* White/Very Light for text on primary */
 
-    --secondary: 208 30% 88%; /* Lighter Dusty Blue / Greyish Blue */
-    --secondary-foreground: 207 20% 45%;
+    --secondary: 210 90% 70%; /* Lighter Blue */
+    --secondary-foreground: 0 0% 20%; /* Dark text for lighter secondary */
 
-    --muted: 208 30% 90%;
-    --muted-foreground: 207 15% 55%;
+    --muted: 208 30% 90%; /* Kept for now */
+    --muted-foreground: 207 15% 55%; /* Kept for now */
 
-    --accent: 19 41% 65%; /* Soft Orange #CC937E */
-    --accent-foreground: 0 0% 98%; /* Light color for text on accent */
+    --accent: 28 100% 63%; /* #FF9F40 Warm Orange */
+    --accent-foreground: 0 0% 98%; /* White/Very Light for text on accent */
 
-    --destructive: 0 72% 51%; /* Standard Red */
+    --destructive: 0 72% 51%; /* Standard Red, Kept for now */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 208 20% 85%;
-    --input: 208 20% 90%;
-    --ring: 207 36% 64%; /* Primary color for ring */
+    --border: 0 0% 85%; /* Adjusted to new palette style */
+    --input: 0 0% 90%; /* Adjusted to new palette style */
+    --ring: 210 100% 50%; /* Primary color for ring */
 
     --radius: 0.5rem;
 
@@ -52,33 +52,33 @@
   }
 
   .dark {
-    --background: 207 15% 15%; /* Dark Blue-Gray */
-    --foreground: 208 30% 90%;
+    --background: 0 0% 7%; /* #121212 */
+    --foreground: 0 0% 88%; /* #E0E0E0 */
 
-    --card: 207 15% 20%;
-    --card-foreground: 208 30% 90%;
+    --card: 0 0% 12%; /* #1E1E1E */
+    --card-foreground: 0 0% 88%; /* Adjusted to match new foreground */
 
-    --popover: 207 15% 10%;
-    --popover-foreground: 208 30% 90%;
+    --popover: 0 0% 5%; /* Darker for popovers in dark mode */
+    --popover-foreground: 0 0% 88%; /* Adjusted to match new foreground */
 
-    --primary: 207 36% 64%; /* Dusty Blue */
-    --primary-foreground: 210 10% 10%;
+    --primary: 210 100% 50%; /* #007AFF */
+    --primary-foreground: 0 0% 98%; /* Light text on primary */
 
-    --secondary: 207 15% 25%;
-    --secondary-foreground: 208 30% 90%;
+    --secondary: 210 100% 35%; /* Darker Blue */
+    --secondary-foreground: 0 0% 88%; /* Light text for darker secondary */
 
-    --muted: 207 15% 22%;
-    --muted-foreground: 208 20% 70%;
+    --muted: 0 0% 15%; /* Adjusted for dark mode */
+    --muted-foreground: 0 0% 60%; /* Adjusted for dark mode */
 
-    --accent: 19 41% 65%; /* Soft Orange */
-    --accent-foreground: 210 10% 10%;
+    --accent: 31 100% 71%; /* #FFB86C Lighter Orange */
+    --accent-foreground: 0 0% 10%; /* Dark text on lighter accent */
 
-    --destructive: 0 63% 40%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 63% 40%; /* Kept for now */
+    --destructive-foreground: 0 0% 98%; /* Kept for now */
 
-    --border: 207 15% 30%;
-    --input: 207 15% 30%;
-    --ring: 207 36% 58%;
+    --border: 0 0% 20%; /* Adjusted for dark mode */
+    --input: 0 0% 20%; /* Adjusted for dark mode */
+    --ring: 210 100% 50%; /* Primary color for ring */
 
     /* Dark Sidebar specific colors */
     --sidebar-background: 207 15% 12%;
