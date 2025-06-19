@@ -145,62 +145,71 @@ const advancedItemMatchPrompt = ai.definePrompt({
   prompt: `You are an expert AI trade facilitator for a bartering platform. Your goal is to identify highly relevant and mutually beneficial trade opportunities.
 The primary goal is to find matches where listing types are OPPOSITE and complementary (e.g., User A's 'offer' for User B's 'want').
 
-Current Item Details:
+Current Item Details (User A's item):
 ID: {{{currentItem.id}}}
 Name: "{{{currentItem.name}}}"
 Description: "{{{currentItem.description}}}"
 Category: "{{{currentItem.category}}}"
-Listed As: {{{currentItem.listingType}}} (by user {{{currentItem.ownerId}}})
+Listed As: {{{currentItem.listingType}}} (by user {{{currentItem.ownerId}}}, referred to as User A)
 Is Gift: {{#if currentItem.isGiftItForward}}Yes{{else}}No{{/if}}
-Open to Any Opportunity: {{#if currentItem.openToAnyOpportunity}}Yes (consider broader matches){{else}}No (focus on direct relevance){{/if}}
+Open to Any Opportunity: {{#if currentItem.openToAnyOpportunity}}Yes (User A is flexible, consider broader, cross-category matches or those based on general interests, especially if reciprocity is possible. Slightly increase match score or consider matches you might otherwise discard if this is true, provided other justification exists.){{else}}No (User A prefers direct relevance){{/if}}
 
-The user viewing these suggestions (ID: {{{triggeringUserId}}}), who owns/wants the 'Current Item', has the following preferences:
-{{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}{{/if}}
-{{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"{{/if}}){{/if}}
-{{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}{{/if}}
- - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}
+The user viewing these suggestions (ID: {{{triggeringUserId}}}, User A), who owns/wants the 'Current Item', has the following preferences:
+{{#if triggeringUserPreferences.motivations}} - Motivations: {{#each triggeringUserPreferences.motivations}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}. (Example: If 'help-others', prioritize matches where User A's offer helps someone, or a gift is involved. If 'maximize-trades', look for high-value exchanges or multi-item possibilities.) {{/if}}
+{{#if triggeringUserPreferences.locationPreference}} - Location Sensitive: {{triggeringUserPreferences.locationPreference.isSensitive}} {{#if triggeringUserPreferences.locationPreference.notes}}(Notes: "{{{triggeringUserPreferences.locationPreference.notes}}}"). (Example: If 'isSensitive' is true, downgrade or exclude matches requiring significant travel unless notes indicate openness, or if 'interestedInThirdPartyFulfillment' is true and applicable.) {{/if}} {{/if}}
+{{#if triggeringUserPreferences.tradeTimingPreference}} - Preferred Timing: {{{triggeringUserPreferences.tradeTimingPreference}}}. (Example: If 'simultaneous', slightly prefer direct item-for-item trades. If 'staged', be open to more complex or multi-step trades.) {{/if}}
+ - Open to 3rd Party Fulfillment: {{triggeringUserPreferences.fulfillmentPreferenceDisplay}}. (If 'Yes' or not 'No', you can be more lenient on location if fulfillment services could bridge the gap for physical items.)
  - User's Effective Minimum Match Preference: '{{{triggeringUserPreferences.minimumMatchRating}}}' (This is always set, defaulting to 'Low' if user hasn't specified otherwise).
 
-Available Items from OTHER users (Format: ID :: Name :: Category :: OwnerID :: ListingType :: IsGift :: OpenToAny :: Description):
+Available Items from OTHER users (User B items) (Format: ID :: Name :: Category :: OwnerID :: ListingType :: IsGift :: OpenToAny :: Description):
 {{#each availableItems}}
-- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} :: {{{listingType}}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{#if openToAnyOpportunity}}Yes{{else}}No{{/if}} :: {{{description}}}
+- {{{id}}} :: {{{name}}} :: {{{category}}} :: {{{ownerId}}} (User B) :: {{{listingType}}} :: {{#if isGiftItForward}}Yes{{else}}No{{/if}} :: {{#if openToAnyOpportunity}}Yes (User B is flexible, increases match viability if some justification exists. Slightly increase score or consider matches you might otherwise discard.){{else}}No{{/if}} :: {{{description}}}
 {{/each}}
+
+RECIPROCITY SEARCH:
+When evaluating a potential match (e.g., User A's 'want' for User B's 'offer'), actively look through User B's *other* items (both 'offers' and 'wants' listed in 'Available Items') to find an item that could fulfill a potential 'want' of User A (related to User A's 'currentItem' category/description or general interests if User A is 'openToAnyOpportunity').
+If such a reciprocal item from User B is found and it's a strong factor, identify its ID as 'reciprocalItemId' in the suggestion.
 
 MATCH SCORE ASSIGNMENT ("High", "Medium", "Low"):
 Also indicate if the suggested matched item 'isGiftItForward'.
-If 'Current Item' or 'Available Item' has 'openToAnyOpportunity: true', you can be more lenient in category matching for 'Medium' or 'Low' scores, suggesting items that might appeal due to broader interests rather than direct category similarity.
+The 'openToAnyOpportunity' flag on either User A's or User B's item should encourage creativity. If true on either side, slightly increase match scores or consider matches you might otherwise discard, especially if there's a potential reciprocal element or alignment with User A's preferences.
 
-- "High" Match: (Same definition as before, focusing on strong direct and reciprocal fulfillment)
-    1.  VERY STRONG & DIRECT PRIMARY OPPOSITE MATCH...
-    2.  AND VERY STRONG & DIRECT RECIPROCAL FULFILLMENT (via Item C)...
-    3.  NO SPECULATION & OVERALL CLARITY...
-    4.  If all these conditions are met, include Item C's ID as 'reciprocalItemId'.
+- "High" Match:
+    1.  VERY STRONG & DIRECT PRIMARY OPPOSITE MATCH (e.g., User A's 'want' directly fulfilled by User B's 'offer', or User A's 'offer' directly fulfills User B's 'want').
+    2.  AND (ideally) VERY STRONG & DIRECT RECIPROCAL FULFILLMENT (User B has an item that clearly fulfills a potential want of User A). If this reciprocal aspect is a key reason for the "High" score, include the reciprocal item's ID as 'reciprocalItemId'.
+    3.  NO SPECULATION & OVERALL CLARITY. The match should be obviously beneficial.
+    4.  Strongly aligns with User A's preferences (e.g., location, motivations).
 
-- "Medium" Match: (Same general definition, but consider 'openToAnyOpportunity')
-    1.  GOOD PRIMARY OPPOSITE MATCH...
-    2.  AND PARTIAL/POTENTIAL RECIPROCAL FULFILLMENT...
-    3.  If conditions 1 and 2 are met, and Item C is clearly identified, include its ID as 'reciprocalItemId'.
-    Alternatively, a strong primary opposite match without clear reciprocal fulfillment can also be 'Medium'.
-    If 'openToAnyOpportunity' is true for currentItem or suggestedItem, a 'Medium' score can also indicate a less direct but still interesting cross-category match if reciprocal value is present or implied.
+- "Medium" Match:
+    1.  GOOD PRIMARY OPPOSITE MATCH.
+    2.  AND PARTIAL/POTENTIAL RECIPROCAL FULFILLMENT (User B has an item that might fulfill a want of User A). Include 'reciprocalItemId' if this contributes significantly.
+    Alternatively, a strong primary opposite match without clear reciprocal fulfillment but good alignment with User A's preferences can also be 'Medium'.
+    If 'openToAnyOpportunity' is true for currentItem or suggestedItem, a 'Medium' score can also indicate a less direct but still interesting cross-category match if reciprocal value is present/implied or it aligns with User A's broader interests/motivations.
 
-- "Low" Match: (Same general definition, but consider 'openToAnyOpportunity')
-    1.  PLAUSIBLE PRIMARY MATCH...
-    2.  AND SPECULATIVE RECIPROCAL FULFILLMENT...
-    3.  Only include 'reciprocalItemId' if a specific item from User B strongly contributes.
-    If 'openToAnyOpportunity' is true for currentItem or suggestedItem, a 'Low' score might reflect a more speculative connection based on potential shared interests even across different categories.
+- "Low" Match:
+    1.  PLAUSIBLE PRIMARY MATCH (could be offer-for-offer if relevant, or a less direct want/offer fulfillment).
+    2.  AND SPECULATIVE RECIPROCAL FULFILLMENT. Only include 'reciprocalItemId' if a specific item from User B strongly contributes.
+    If 'openToAnyOpportunity' is true for currentItem or suggestedItem, a 'Low' score might reflect a more speculative connection based on potential shared interests even across different categories, or a niche alignment with a specific User A preference.
 
-GIFT FULFILLMENT OVERRIDE (Takes precedence for scoring a specific match as High, IF IT IS A DIRECT FULFILLMENT): (Same logic as before)
+GIFT FULFILLMENT OVERRIDE (Takes precedence for scoring a specific match as High, IF IT IS A DIRECT FULFILLMENT): (Same logic as before - e.g., User A wants X, User B offers X as a gift = High).
 
 MINIMUM MATCH SCORE RULE:
 The user's effective minimum match preference is '{{{triggeringUserPreferences.minimumMatchRating}}}'. Prioritize matches AT or ABOVE this level. You MUST NOT suggest items with a match score lower than this.
 
 Do NOT suggest:
 - The current item itself (ID: {{{currentItem.id}}}).
-- Any items owned by {{{currentItem.ownerId}}} (owner of Current Item).
+- Any items owned by {{{currentItem.ownerId}}} (User A, owner of Current Item).
 
 Return a list of up to 5 suggested matches (itemId, matchScore, isGiftItForward status, and reciprocalItemId if applicable) if available, ensuring ALL suggested items meet the applicable minimum match score rule. Aim for variety and strong reciprocal potential if multiple good options exist.
-If matches are found, provide a brief (1-2 sentences) 'reasoning' for your overall approach. If any suggested match includes a 'reciprocalItemId', your reasoning MUST specifically address how that reciprocal item enhances the trade potential for the 'triggeringUser'. Highlight direct gift fulfillments as well if significant.
-If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why.
+
+REASONING:
+If matches are found, provide a brief 'reasoning' (2-3 sentences) for your overall approach.
+Your reasoning should be informative. Briefly explain *why* a match is good.
+- If any suggested match includes a 'reciprocalItemId', your reasoning MUST specifically address how that reciprocal item enhances the trade potential for User A.
+- If User A's preferences (e.g., 'help-others' motivation, location flexibility due to 'interestedInThirdPartyFulfillment') significantly influenced a match, mention this.
+- If 'openToAnyOpportunity' (either User A's or User B's) led to a creative or cross-category match, briefly note it.
+- Highlight direct gift fulfillments as well if significant.
+If NO suitable matches are found (especially considering any minimum rating), return an empty list for 'suggestedMatches' AND YOU MUST PROVIDE a brief 'reasoning' explaining why (e.g., "No items directly matched User A's want for X, and no strong reciprocal opportunities were found despite User B's flexibility. Limited options available in relevant categories/locations based on User A's preferences.").
   `,
 });
 
