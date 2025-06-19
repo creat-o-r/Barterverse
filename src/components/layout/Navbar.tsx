@@ -42,7 +42,7 @@ function GlobalCategoryFilter() {
           setSelectedCategory(value === "any" ? null : value);
         }}
       >
-        <SelectTrigger className="w-auto max-w-[120px] sm:max-w-[140px] text-xs h-9 px-2 md:w-[180px] md:text-sm md:px-3 md:h-10 md:max-w-none bg-background">
+        <SelectTrigger className="w-auto max-w-[120px] sm:max-w-[140px] text-xs h-9 px-2 md:w-[180px] md:text-sm md:px-3 md:h-10 md:max-w-none bg-card">
           <SelectValue placeholder="Any" />
         </SelectTrigger>
         <SelectContent>
