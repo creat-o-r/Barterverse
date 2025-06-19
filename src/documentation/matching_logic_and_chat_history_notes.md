@@ -43,24 +43,28 @@ The system supports two primary matching modes, configurable via the AI Configur
     *   **Focus**: More nuanced matching, aiming for mutually beneficial trades by considering reciprocity and detailed user preferences.
     *   **Primary Goal**: Find matches where `listingType`s are opposite and complementary.
     *   **Reciprocity (`reciprocalItemId`)**:
-        *   This is a key feature of advanced mode. The AI attempts to identify if an owner of a suggested matching item (`ItemB`) also offers another item (`ItemC`) that the `triggeringUser` (owner of `ItemA`) might want (based on `ItemA`'s type if it's a 'want', or general appeal).
-        *   If such an `ItemC` is found and significantly enhances the trade's appeal, its ID is included as `reciprocalItemId` in the `suggestedMatch` object.
-    *   **`triggeringUserPreferences` (`UserPreferencesSchema`)**:
-        *   **`motivations`**: E.g., 'help-others', 'maximize-trades'.
-        *   **`locationPreference`**: Sensitivity and notes.
-        *   **`tradeTimingPreference`**: 'simultaneous', 'staged', 'flexible'.
-        *   **`interestedInThirdPartyFulfillment`**: Boolean indicating openness.
-        *   **`minimumMatchRating`**: ('Low', 'Medium', 'High') - This is the user's global minimum match rating preference. All suggested matches *must* meet or exceed this rating. This is always passed and defaults to 'Low' if not explicitly set by the user.
-    *   **`openToAnyOpportunity`**: If true for either `currentItem` or a potential `availableItem`, the AI can be more lenient in category matching, suggesting items based on broader interests, especially if reciprocal value is present.
+        *   A key feature. The AI is now guided to **more actively look for items from the suggested match's owner (User B) that the `triggeringUser` (User A) might want.** This involves checking User B's other available items (both offers and wants) for potential fits for User A.
+        *   If such a reciprocal item is found and is a strong factor in the match quality, its ID is included as `reciprocalItemId`.
+        *   The AI's `reasoning` output is expected to highlight such reciprocal finds when they are significant.
+    *   **`triggeringUserPreferences` (`UserPreferencesSchema`)**: The AI is instructed to weigh these preferences more specifically:
+        *   **`motivations`**: For example, if 'help-others' is a motivation, the AI should prioritize matches where the `triggeringUser`'s offer can help someone in need, or where a gift is involved. If 'maximize-trades', it should look for high-value exchanges or multi-item possibilities.
+        *   **`locationPreference`**: If `isSensitive` is true, the AI should downgrade or exclude matches that seem to require significant travel, unless `notes` indicate openness or `interestedInThirdPartyFulfillment` is true and applicable.
+        *   **`tradeTimingPreference`**: If 'simultaneous', the AI may slightly prefer direct item-for-item trades. If 'staged', it can be more open to complex or multi-step trades.
+        *   **`interestedInThirdPartyFulfillment`**: If true, this can make matches with logistical challenges (e.g., distance) more viable, as the AI can be more lenient on location if fulfillment services could bridge the gap.
+        *   **`minimumMatchRating`**: ('Low', 'Medium', 'High') - This remains the user's global minimum. All suggested matches *must* meet or exceed this rating. It defaults to 'Low'.
+    *   **`openToAnyOpportunity`**:
+        *   The AI has **clearer instructions to be more creative and flexible if this flag is true on either the `currentItem` (User A's item) or any `availableItems` (User B's item).**
+        *   This can lead to more cross-category or serendipitous suggestions, especially if supported by User A's preferences (e.g., broader interests) or if a potential reciprocal element is identified. The AI might slightly increase match scores or consider matches it would otherwise discard if this flag is true and there's other supporting justification.
     *   **Gift Matching**: Same logic as simple mode, often resulting in 'High' scores for direct gift fulfillments.
     *   **Filtering**: Suggestions are filtered by the `triggeringUserPreferences.minimumMatchRating`.
+    *   **Reasoning Output**: The AI's `reasoning` field in the output is expected to be **more informative**. It should briefly explain *why* a match is good, and specifically mention if reciprocity, user preferences (like motivations or `openToAnyOpportunity`), or gift status played a key role in the suggestion.
 
 ### Output of the Matching Flow (`ItemMatchOutput`)
 
 The flow returns:
 
 *   **`suggestedMatches`**: An array of items (with their `ownerId`, `matchScore`, `isGiftItForward` status, and potentially `reciprocalItemId`).
-*   **`reasoning`**: An overall textual explanation from the AI about its suggestions.
+*   **`reasoning`**: An overall textual explanation from the AI about its suggestions. This is now expected to be more detailed in advanced mode, reflecting factors like reciprocity or specific user preferences if they were influential (see "Reasoning Output" under Advanced Mode).
 *   **`usedMatchingMode`**: Indicates whether 'simple' or 'advanced' mode was used for the request.
 *   **`preferencesConsidered`**: A boolean indicating if user profile preferences (beyond the default minimum match rating) were actively used in the matching logic (primarily relevant in advanced mode when the global setting is enabled).
 
