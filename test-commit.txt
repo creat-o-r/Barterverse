@@ -1,3 +1,0 @@
-This is a test file for GitHub commit functionality.
-Created on: 2025-06-17
-Purpose: Testing commit process on ci-cd-infrastructure branch
