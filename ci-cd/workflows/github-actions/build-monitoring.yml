@@ -1,0 +1,109 @@
+name: Build Monitoring & Auto-Fix
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_run:
+    workflows: ["Deploy PR Preview"]
+    types: [completed]
+
+jobs:
+  monitor_and_fix:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Monitor builds and auto-fix issues
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}' > /tmp/service-account.json
+          gcloud auth activate-service-account --key-file=/tmp/service-account.json
+          GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="github-token" --project="barterverse-l9uq3")
+          
+          # Get all recent workflow runs (last 24 hours)
+          RECENT_RUNS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=50" | \
+            jq '[.workflow_runs[] | select(.created_at > (now - 86400 | strftime("%Y-%m-%dT%H:%M:%SZ")))]')
+          
+          # Analyze failure patterns
+          FAILURE_COUNT=$(echo "$RECENT_RUNS" | jq '[.[] | select(.conclusion == "failure")] | length')
+          TOTAL_COUNT=$(echo "$RECENT_RUNS" | jq 'length')
+          FAILURE_RATE=$(echo "scale=2; $FAILURE_COUNT * 100 / $TOTAL_COUNT" | bc -l 2>/dev/null || echo "0")
+          
+          echo "Build Health Report:"
+          echo "- Total builds (24h): $TOTAL_COUNT"
+          echo "- Failed builds: $FAILURE_COUNT"
+          echo "- Failure rate: ${FAILURE_RATE}%"
+          
+          # Check for critical failure rate
+          if (( $(echo "$FAILURE_RATE > 30" | bc -l) )); then
+            echo "🚨 CRITICAL: High failure rate detected ($FAILURE_RATE%)"
+            # Auto-create issue for high failure rate
+            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues" \
+              -d "{
+                \"title\": \"🚨 High Build Failure Rate Alert ($FAILURE_RATE%)\",
+                \"body\": \"Automated monitoring detected high failure rate:\\n\\n- **Failure Rate**: $FAILURE_RATE%\\n- **Failed Builds**: $FAILURE_COUNT/$TOTAL_COUNT\\n- **Time Period**: Last 24 hours\\n\\nThis requires immediate investigation.\",
+                \"labels\": [\"critical\", \"build-failure\", \"automated-alert\"]
+              }"
+          fi
+          
+          # Analyze common failure patterns
+          echo "$RECENT_RUNS" | jq -r '.[] | select(.conclusion == "failure") | .id' | while read run_id; do
+            # Get failure details for pattern analysis
+            curl -s -H "Authorization: token $GITHUB_TOKEN" -L \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id/logs" \
+              > /tmp/failure_logs_$run_id.zip
+              
+            if [ -f /tmp/failure_logs_$run_id.zip ]; then
+              unzip -q /tmp/failure_logs_$run_id.zip -d /tmp/logs_$run_id/ 2>/dev/null || true
+              
+              # Check for common failure patterns
+              if grep -r "Module not found" /tmp/logs_$run_id/ >/dev/null 2>&1; then
+                echo "🔧 Pattern detected: Missing dependencies in run $run_id"
+              fi
+              
+              if grep -r "permission.*denied" /tmp/logs_$run_id/ >/dev/null 2>&1; then
+                echo "🔧 Pattern detected: Permission issues in run $run_id"
+              fi
+              
+              if grep -r "ENOTFOUND\|timeout\|network" /tmp/logs_$run_id/ >/dev/null 2>&1; then
+                echo "🔧 Pattern detected: Network issues in run $run_id"
+              fi
+              
+              rm -rf /tmp/logs_$run_id/ /tmp/failure_logs_$run_id.zip
+            fi
+          done
+          
+          rm -f /tmp/service-account.json
+          
+      - name: Auto-fix common issues
+        run: |
+          # Check for common fixable issues in current repo
+          if [ -f package.json ]; then
+            # Check for dependency issues
+            npm audit --audit-level=high --json > /tmp/audit.json 2>/dev/null || true
+            
+            if [ -s /tmp/audit.json ]; then
+              VULNERABILITIES=$(jq '.metadata.vulnerabilities.total' /tmp/audit.json 2>/dev/null || echo "0")
+              if [ "$VULNERABILITIES" != "0" ] && [ "$VULNERABILITIES" != "null" ]; then
+                echo "🔧 Auto-fixing npm vulnerabilities: $VULNERABILITIES found"
+                npm audit fix --force || true
+                
+                if [ -n "$(git status --porcelain)" ]; then
+                  git config user.name "Build Monitor Bot"
+                  git config user.email "build-monitor@barterverse.com"
+                  git add package*.json
+                  git commit -m "🔧 Auto-fix: Update dependencies to resolve security vulnerabilities
+
+- Fixed $VULNERABILITIES security vulnerabilities
+- Automated fix by build monitoring system
+
+🤖 Generated by Build Monitor"
+                  git push origin main || echo "Failed to push auto-fix"
+                fi
+              fi
+            fi
+          fi

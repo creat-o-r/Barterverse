@@ -1,0 +1,54 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Get Google AI API Key from Secret Manager
+        id: get-api-key
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}' > /tmp/service-account.json
+          gcloud auth activate-service-account --key-file=/tmp/service-account.json
+          API_KEY=$(gcloud secrets versions access latest --secret="google-ai-api-key" --project="barterverse-l9uq3")
+          echo "::add-mask::$API_KEY"
+          echo "GOOGLE_API_KEY=$API_KEY" >> $GITHUB_ENV
+          rm /tmp/service-account.json
+      
+      - name: Build project
+        run: npm run build
+        env:
+          GOOGLE_API_KEY: ${{ env.GOOGLE_API_KEY }}
+          NEXT_PUBLIC_BUILD_COMMIT: ${{ github.sha }}
+          NEXT_PUBLIC_BUILD_BRANCH: ${{ github.ref_name }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+        
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}'
+          channelId: live
+          projectId: barterverse-l9uq3
+          target: barterverse-production
+        env:
+          FIREBASE_CLI_EXPERIMENTS: webframeworks
+          GOOGLE_API_KEY: ${{ env.GOOGLE_API_KEY }}
