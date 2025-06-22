@@ -32,6 +32,8 @@ jobs:
           API_KEY=$(gcloud secrets versions access latest --secret="google-ai-api-key" --project="barterverse-l9uq3")
           echo "::add-mask::$API_KEY"
           echo "GOOGLE_API_KEY=$API_KEY" >> $GITHUB_ENV
+          # Create .env.production for Firebase deployment (the working approach)
+          echo "GOOGLE_API_KEY=$API_KEY" > .env.production
           rm /tmp/service-account.json
       
       - name: Build project  
@@ -40,10 +42,11 @@ jobs:
           GOOGLE_API_KEY: ${{ env.GOOGLE_API_KEY }}
           NEXT_PUBLIC_BUILD_COMMIT: ${{ github.sha }}
           NEXT_PUBLIC_BUILD_BRANCH: ${{ github.head_ref }}
-          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+          NEXT_PUBLIC_BUILD_TIME: ${{ github.event.head_commit.timestamp || github.run_started_at }}
         
       - name: Deploy to Firebase Preview Channel
         uses: FirebaseExtended/action-hosting-deploy@v0
+        id: firebase_deploy
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}'
@@ -59,23 +62,23 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const deploymentUrl = process.env.FIREBASE_HOSTING_URL || 'https://barterverse-auto-deploy.web.app';
-            const commit = '${{ github.sha }}'.slice(0, 7);
+            const deploymentUrl = '${{ steps.firebase_deploy.outputs.details_url }}' || 'https://barterverse-auto-deploy.web.app';
+            const commit = '${{ github.event.pull_request.head.sha }}'.slice(0, 7);
             const branch = '${{ github.head_ref }}';
-            const timestamp = '${{ github.event.head_commit.timestamp }}';
+            const buildTime = new Date().toLocaleString();
             
             const comment = `## 🚀 Preview Deployment Successful!
             
             **🌐 Preview URL:** ${deploymentUrl}  
             **📝 Branch:** \`${branch}\`  
             **💾 Commit:** \`${commit}\`  
-            **⏰ Built:** ${new Date(timestamp).toLocaleString()}  
-            **🔧 APIs:** Google AI integration enabled ✅
+            **⏰ Built:** ${buildTime}  
+            **🔧 APIs:** Secret Manager integration enabled ✅
             
             **Quick Links:**
             - [📱 Open Preview Site](${deploymentUrl})
-            - [🔧 Test API Endpoint](${deploymentUrl}/api/list-models)
-            - [📊 View Commit](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+            - [🔧 Test API Endpoint](${deploymentUrl}/api/test-key)
+            - [📊 View Commit](https://github.com/${{ github.repository }}/commit/${{ github.event.pull_request.head.sha }})
             
             *Preview expires in 7 days*`;
             
