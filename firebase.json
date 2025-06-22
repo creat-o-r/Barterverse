@@ -1,6 +1,6 @@
-lay {
+{
   "hosting": {
-    "site": "barterverse-test",
+    "site": "barterverse-auto-deploy",
     "source": ".",
     "ignore": [
       "firebase.json",
