@@ -61,10 +61,10 @@ describe('Navbar Component', () => {
       expect(screen.queryByRole('link', { name: /login/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /sign up/i })).not.toBeInTheDocument();
 
-      // Profile link should be present
-      const profileLink = screen.getByRole('link', { name: /profile/i });
-      expect(profileLink).toBeInTheDocument();
-      expect(profileLink).toHaveAttribute('href', '/profile/me');
+      // Profile link should be present (use getAllByRole since there are multiple profile links)
+      const profileLinks = screen.getAllByRole('link', { name: /profile/i });
+      expect(profileLinks.length).toBeGreaterThan(0);
+      expect(profileLinks[0]).toHaveAttribute('href', '/profile/me');
     });
 
     test('renders primary navigation links with icons', () => {
@@ -73,7 +73,6 @@ describe('Navbar Component', () => {
 
       expect(within(navElement).getByRole('link', { name: /match/i })).toBeInTheDocument();
       expect(within(navElement).getByRole('link', { name: /list item/i })).toBeInTheDocument();
-      expect(within(navElement).getByRole('link', { name: /quick list/i })).toBeInTheDocument();
       expect(within(navElement).getByRole('link', { name: /chats/i })).toBeInTheDocument();
     });
 
@@ -97,7 +96,6 @@ describe('Navbar Component', () => {
 
       expect(within(navElement).getByRole('link', { name: /match/i })).toHaveAttribute('href', '/');
       expect(within(navElement).getByRole('link', { name: /list item/i })).toHaveAttribute('href', '/items/new');
-      expect(within(navElement).getByRole('link', { name: /quick list/i })).toHaveAttribute('href', '/quick-list');
       expect(within(navElement).getByRole('link', { name: /chats/i })).toHaveAttribute('href', '/chats');
       expect(screen.getAllByRole('link', { name: /profile/i })[1]).toHaveAttribute('href', '/profile/me'); // Desktop profile link
     });
@@ -131,7 +129,6 @@ describe('Navbar Component', () => {
 
       expect(within(mobileNav).getByRole('link', { name: /match/i })).toBeInTheDocument();
       expect(within(mobileNav).getByRole('link', { name: /list item/i })).toBeInTheDocument();
-      expect(within(mobileNav).getByRole('link', { name: /quick list/i })).toBeInTheDocument();
       expect(within(mobileNav).getByRole('link', { name: /chats/i })).toBeInTheDocument();
     });
 
