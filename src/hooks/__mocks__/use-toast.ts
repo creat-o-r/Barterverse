@@ -1,8 +1,8 @@
 // src/hooks/__mocks__/use-toast.ts
-// No need to import React here anymore for the useToast mock itself.
-// import * as React from 'react';
+/// <reference types="jest" />
+import type { State, Action, ToasterToast } from '../use-toast';
 
-const originalModule = jest.requireActual('../use-toast');
+const originalModule = jest.requireActual('../use-toast') as typeof import('../use-toast');
 
 // --- Mock Functions ---
 export const mockAddToRemoveQueue = jest.fn();
@@ -10,11 +10,11 @@ export const mockDispatch = jest.fn();
 export const mockGenId = jest.fn();
 
 // --- Mock State & Listeners (Listeners are no longer directly used by useToast mock) ---
-export let mockMemoryState: originalModule.State = { toasts: [] }; // Export for potential direct manipulation in tests if needed
-const mockListeners: Array<(state: originalModule.State) => void> = []; // Kept for internalMockDispatch consistency
+export let mockMemoryState: State = { toasts: [] }; // Export for potential direct manipulation in tests if needed
+const mockListeners: Array<(state: State) => void> = []; // Kept for internalMockDispatch consistency
 
 // Helper to update mockMemoryState and notify listeners
-const internalMockDispatch = (action: originalModule.Action) => {
+const internalMockDispatch = (action: Action) => {
   mockMemoryState = reducer(mockMemoryState, action);
   mockDispatch(action);
   // Listeners would be called here in a more complete React simulation,
@@ -25,7 +25,6 @@ const internalMockDispatch = (action: originalModule.Action) => {
 // --- Export original constants and types ---
 export const actionTypes = originalModule.actionTypes;
 export const TOAST_LIMIT = originalModule.TOAST_LIMIT;
-export type { State, Action } from '../use-toast';
 
 // --- Mocked Reducer ---
 export const reducer = (state: State, action: Action): State => {
@@ -74,7 +73,7 @@ export const reducer = (state: State, action: Action): State => {
 };
 
 // --- Mocked toast function ---
-export const toast = (props: Omit<originalModule.ToasterToast, "id">) => {
+export const toast = (props: Omit<ToasterToast, "id">) => {
   const id = mockGenId();
   internalMockDispatch({
     type: actionTypes.ADD_TOAST,
