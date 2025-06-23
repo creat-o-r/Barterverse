@@ -1,0 +1,208 @@
+name: GitHub Issues Workflow Management
+
+on:
+  issues:
+    types: [opened, edited, labeled, assigned]
+  pull_request:
+    types: [opened, closed, merged]
+  schedule:
+    - cron: '0 9 * * MON'  # Weekly report every Monday at 9 AM UTC
+
+jobs:
+  issue_automation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          service_account_key: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}
+          project_id: barterverse-l9uq3
+      
+      - name: Auto-label new issues
+        if: github.event.action == 'opened'
+        run: |
+          GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="github-token" --project="barterverse-l9uq3")
+          
+          # Get issue details
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          
+          # Auto-detect issue type and priority
+          LABELS=()
+          
+          # Check for bug indicators
+          if echo "$ISSUE_BODY $ISSUE_TITLE" | grep -i -E "(bug|error|broken|fail|crash|issue)" >/dev/null; then
+            LABELS+=("bug")
+          fi
+          
+          # Check for feature indicators
+          if echo "$ISSUE_BODY $ISSUE_TITLE" | grep -i -E "(feature|enhancement|add|implement)" >/dev/null; then
+            LABELS+=("enhancement")
+          fi
+          
+          # Check for priority indicators
+          if echo "$ISSUE_BODY $ISSUE_TITLE" | grep -i -E "(urgent|critical|important|asap)" >/dev/null; then
+            LABELS+=("high")
+          elif echo "$ISSUE_BODY $ISSUE_TITLE" | grep -i -E "(nice to have|low|minor)" >/dev/null; then
+            LABELS+=("low")
+          else
+            LABELS+=("medium")
+          fi
+          
+          # Check for complexity indicators
+          if echo "$ISSUE_BODY" | wc -c | awk '$1 > 500' >/dev/null; then
+            LABELS+=("complex")
+          elif echo "$ISSUE_BODY" | wc -c | awk '$1 < 100' >/dev/null; then
+            LABELS+=("simple")
+          fi
+          
+          # Add good-first-issue for simple items
+          if [[ " ${LABELS[@]} " =~ " simple " ]]; then
+            LABELS+=("good first issue")
+          fi
+          
+          # Apply labels if any were determined
+          if [ ${#LABELS[@]} -gt 0 ]; then
+            LABELS_JSON=$(printf '"%s",' "${LABELS[@]}" | sed 's/,$//')
+            curl -s -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/labels" \
+              -d "[${LABELS_JSON}]"
+            
+            echo "Auto-labeled issue #$ISSUE_NUMBER with: ${LABELS[*]}"
+          fi
+      
+      - name: Auto-start workflow for ready issues
+        if: github.event.action == 'labeled' && contains(github.event.label.name, 'ready-for-development')
+        run: |
+          npm install
+          npm run issues:start ${{ github.event.issue.number }}
+
+  pr_integration:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          service_account_key: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}
+          project_id: barterverse-l9uq3
+      
+      - name: Update related issues on PR events
+        run: |
+          GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="github-token" --project="barterverse-l9uq3")
+          PR_BODY="${{ github.event.pull_request.body }}"
+          PR_BRANCH="${{ github.event.pull_request.head.ref }}"
+          
+          # Extract issue number from branch name (feature/issue-123-description)
+          if [[ "$PR_BRANCH" =~ feature/issue-([0-9]+) ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+            
+            case "${{ github.event.action }}" in
+              "opened")
+                if [[ "${{ github.event.pull_request.base.ref }}" == "testing" ]]; then
+                  # PR to testing branch
+                  curl -s -X POST \
+                    -H "Authorization: token $GITHUB_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
+                    -d '{"body":"🔀 **PR to Testing Created**\n\nPR #${{ github.event.pull_request.number }} opened for integration testing.\n\n*Automated by Issues Workflow*"}'
+                elif [[ "${{ github.event.pull_request.base.ref }}" == "main" ]]; then
+                  # PR to main branch
+                  curl -s -X POST \
+                    -H "Authorization: token $GITHUB_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
+                    -d '{"body":"🚀 **PR to Main Created**\n\nPR #${{ github.event.pull_request.number }} ready for final review.\n\n*Automated by Issues Workflow*"}'
+                fi
+                ;;
+              "closed")
+                if [[ "${{ github.event.pull_request.merged }}" == "true" ]]; then
+                  # PR was merged
+                  curl -s -X POST \
+                    -H "Authorization: token $GITHUB_TOKEN" \
+                    -H "Content-Type: application/json" \
+                    "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
+                    -d '{"body":"🎉 **Merged Successfully**\n\nPR #${{ github.event.pull_request.number }} has been merged to ${{ github.event.pull_request.base.ref }}.\n\n*Automated by Issues Workflow*"}'
+                  
+                  # Close issue if merged to main
+                  if [[ "${{ github.event.pull_request.base.ref }}" == "main" ]]; then
+                    curl -s -X PATCH \
+                      -H "Authorization: token $GITHUB_TOKEN" \
+                      -H "Content-Type: application/json" \
+                      "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER" \
+                      -d '{"state":"closed","labels":["merged","completed"]}'
+                  fi
+                fi
+                ;;
+            esac
+            
+            echo "Updated issue #$ISSUE_NUMBER for PR event: ${{ github.event.action }}"
+          fi
+
+  weekly_report:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          service_account_key: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}
+          project_id: barterverse-l9uq3
+      
+      - name: Generate weekly issues report
+        run: |
+          npm install
+          npm run issues:report
+          
+          GITHUB_TOKEN=$(gcloud secrets versions access latest --secret="github-token" --project="barterverse-l9uq3")
+          
+          # Read the generated report
+          if [ -f /tmp/issues-workflow-report.json ]; then
+            REPORT_DATA=$(cat /tmp/issues-workflow-report.json)
+            TOTAL_ISSUES=$(echo "$REPORT_DATA" | jq -r '.totalIssues')
+            CRITICAL_ISSUES=$(echo "$REPORT_DATA" | jq -r '.byPriority.critical')
+            HIGH_ISSUES=$(echo "$REPORT_DATA" | jq -r '.byPriority.high')
+            NEEDS_ATTENTION=$(echo "$REPORT_DATA" | jq -r '.needsAttention')
+            WORKLOAD=$(echo "$REPORT_DATA" | jq -r '.estimatedWorkload')
+            
+            # Create weekly report issue
+            curl -s -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues" \
+              -d "{
+                \"title\": \"📊 Weekly Issues Report - $(date +'%Y-%m-%d')\",
+                \"body\": \"## Weekly Issues Workflow Report\\n\\n**Summary:**\\n- Total Open Issues: $TOTAL_ISSUES\\n- Critical Issues: $CRITICAL_ISSUES\\n- High Priority Issues: $HIGH_ISSUES\\n- Issues Needing Attention: $NEEDS_ATTENTION\\n- Estimated Total Workload: $WORKLOAD hours\\n\\n**Actions Needed:**\\n- Review issues marked as needing attention\\n- Assign developers to high priority items\\n- Consider breaking down complex issues\\n\\n*Automated by Issues Workflow*\",
+                \"labels\": [\"report\", \"weekly\", \"automated\"]
+              }"
+          fi
+      
+      - name: Auto-start workflow for ready issues
+        run: |
+          npm run issues:auto 2
