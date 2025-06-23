@@ -322,7 +322,7 @@ function SuggestedMatchesLoadingState() {
   );
 }
 
-export default function ItemDetailPageWrapper({ params: paramsProp }: { params: { id: string } }) {
+export default function ItemDetailPageWrapper({ params: paramsProp }: { params: Promise<{ id: string }> }) {
   const params = use(paramsProp);
 
   if (!params || !params.id) {
