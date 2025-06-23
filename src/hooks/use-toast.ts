@@ -27,6 +27,7 @@ const actionTypes = {
 
 // Export for testing and potential external use
 export { actionTypes }
+export type { State, Action, ToasterToast }
 
 let count = 0
 
