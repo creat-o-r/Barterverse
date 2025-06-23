@@ -119,7 +119,7 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
 );
 
 
-export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
+export default function UserProfilePage({ params: paramsProp }: { params: Promise<{ userId: string }> }) {
   const resolvedParams = use(paramsProp); 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
