@@ -1005,4 +1005,203 @@ describe('ManageItemProjectsButton', () => {
       expect(screen.getByText('My Private Projects')).toBeInTheDocument();
     });
   });
+
+  it('covers specific uncovered line 103 - generic remove error', async () => {
+    const projectNotFound = { ...mockSharedProject, ownerId: 'user-1' };
+    (projectService.getPublicProjects as jest.Mock).mockResolvedValue([projectNotFound]);
+    (projectService.removeItemFromProject as jest.Mock).mockResolvedValue(undefined);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      const removeButton = screen.getByText('Remove');
+      fireEvent.click(removeButton);
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Permission Denied',
+        description: 'You can only remove items from projects you own.',
+        variant: 'destructive',
+      });
+    });
+  });
+
+  it('covers uncovered line 75 - generic add error', async () => {
+    const projectNotFound = { ...mockPrivateProject, ownerId: 'user-1' };
+    (projectService.getProjectsByOwner as jest.Mock).mockResolvedValue([projectNotFound]);
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(undefined);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      const addButton = screen.getByText('Add');
+      fireEvent.click(addButton);
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Error',
+        description: 'Could not add item to project.',
+        variant: 'destructive',
+      });
+    });
+  });
+
+  it('covers line 65 - shared project update in addItem', async () => {
+    const updatedSharedProject = { ...mockSharedProject, itemIds: ['item-1', 'new-item'] };
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(updatedSharedProject);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      const addButton = screen.getByText('Add');
+      fireEvent.click(addButton);
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Success',
+        description: "Item added to project 'Shared Project'.",
+      });
+    });
+  });
+
+  it('covers line 92 - shared project update in removeItem', async () => {
+    const updatedSharedProject = { ...mockSharedProject, itemIds: [] };
+    (projectService.removeItemFromProject as jest.Mock).mockResolvedValue(updatedSharedProject);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      const removeButton = screen.getByText('Remove');
+      fireEvent.click(removeButton);
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Success',
+        description: "Item removed from project 'Shared Project'.",
+      });
+    });
+  });
+
+  it('covers line 133 - shared project creation in state', async () => {
+    const newSharedProject = { 
+      id: 'proj-new', 
+      name: 'New Shared', 
+      ownerId: 'user-1', 
+      itemIds: [], 
+      visibility: 'shared' as const, 
+      description: 'Project created for item: Test Item',
+      sharedWith: []
+    };
+    const projectWithItem = { ...newSharedProject, itemIds: ['item-1'] };
+    
+    (projectService.createProject as jest.Mock).mockResolvedValue(newSharedProject);
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(projectWithItem);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'New Shared' } });
+      
+      fireEvent.click(screen.getByText('Private (Only you can add items; only you can see)'));
+      fireEvent.click(screen.getByText('Shared (Anyone can add items; everyone can see)'));
+      
+      fireEvent.click(screen.getByText('Create & Add Item'));
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Project Created & Item Added',
+        description: "'Test Item' added to new project 'New Shared'.",
+      });
+    });
+  });
+
+  it('covers line 142 - shared project update after creation', async () => {
+    const newSharedProject = { 
+      id: 'proj-new', 
+      name: 'Shared Creation', 
+      ownerId: 'user-1', 
+      itemIds: [], 
+      visibility: 'shared' as const, 
+      description: 'Project created for item: Test Item',
+      sharedWith: []
+    };
+    const projectWithItem = { ...newSharedProject, itemIds: ['item-1'] };
+    
+    (projectService.createProject as jest.Mock).mockResolvedValue(newSharedProject);
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(projectWithItem);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'Shared Creation' } });
+      
+      fireEvent.click(screen.getByText('Private (Only you can add items; only you can see)'));
+      fireEvent.click(screen.getByText('Shared (Anyone can add items; everyone can see)'));
+      
+      fireEvent.click(screen.getByText('Create & Add Item'));
+    });
+    
+    await waitFor(() => {
+      expect(projectService.createProject).toHaveBeenCalledWith(expect.objectContaining({
+        visibility: 'shared'
+      }));
+    });
+  });
 });
