@@ -23,10 +23,13 @@ import { suggestCategory, type SuggestCategoryOutput } from '@/ai/flows/suggest-
 import { inferListingType, type InferListingTypeOutput } from '@/ai/flows/infer-listing-type-flow';
 import { useState, useCallback, useEffect } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select'; // Added SelectGroup, SelectLabel, SelectSeparator
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Added Dialog
+import { Label } from '@/components/ui/label'; // Added Label for modal
 import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data';
-import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming } from '@/types';
+import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming, Project } from '@/types'; // Added Project type
+import { getProjectsByOwner, createProject, addItemToProject, getPublicProjects } from '@/services/project-service'; // Added getPublicProjects
 import { useRouter } from 'next/navigation';
 import Link from 'next/link'; // Added Link
 import { Separator } from '@/components/ui/separator';
@@ -110,10 +113,45 @@ export default function NewItemPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  // Project related states
+  const [myPrivateProjects, setMyPrivateProjects] = useState<Project[]>([]);
+  const [allSharedProjects, setAllSharedProjects] = useState<Project[]>([]);
+  const [loadingProjectsState, setLoadingProjectsState] = useState(true); // Combined loading state for projects
+  const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
+  const [showCreateProjectModalForItem, setShowCreateProjectModalForItem] = useState(false);
+  const [newProjectNameForItem, setNewProjectNameForItem] = useState('');
+  const [newProjectVisibilityForItem, setNewProjectVisibilityForItem] = useState<'private' | 'shared'>('private'); // Updated type
+
+
   useEffect(() => {
-    const user = dummyUsers.find(u => u.id === 'user1');
+    const user = dummyUsers.find(u => u.id === 'user1'); // Assuming current logged-in user is user1
     setCurrentUser(user || null);
-  }, []);
+    if (user) {
+      setLoadingProjectsState(true);
+      Promise.all([
+        getProjectsByOwner(user.id),
+        getPublicProjects()
+      ]).then(([ownedProjects, publicSharedProjects]) => {
+        setMyPrivateProjects(ownedProjects.filter(p => p.visibility === 'private'));
+        // Filter public/shared to exclude current user's private projects, though getPublicProjects shouldn't return them.
+        // Also, ensure shared projects owned by current user are distinct if they appear in both lists.
+        // For now, getPublicProjects returns 'shared' and 'public' (old type), so we assume 'shared' is the target here.
+        // And we filter out projects the user owns from this list if they would also appear in "My Private Projects"
+        // However, the goal is "All Shared Projects", which means any project with visibility 'shared'.
+        // A user's own 'shared' project would appear here.
+        setAllSharedProjects(publicSharedProjects.filter(p => p.visibility === 'shared'));
+      }).catch(err => {
+        console.error("Failed to fetch projects for new item form:", err);
+        toast({ title: "Error", description: "Could not load projects for assignment.", variant: "default" });
+      }).finally(() => {
+        setLoadingProjectsState(false);
+      });
+    } else {
+      setLoadingProjectsState(false);
+      setMyPrivateProjects([]);
+      setAllSharedProjects([]);
+    }
+  }, [toast]);
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
@@ -295,12 +333,66 @@ export default function NewItemPage() {
         form.reset();
       }
       router.push(`/items/${addedItem.id}`);
+
+      // Assign to project if selected
+      if (selectedProjectId && currentUser) {
+        try {
+          await addItemToProject(selectedProjectId, addedItem.id, currentUser.id);
+          toast({
+            title: "Item Added to Project",
+            description: `${addedItem.name} was successfully added to your selected project.`,
+          });
+        } catch (projectError) {
+          console.error("Error adding item to project:", projectError);
+          toast({
+            title: "Project Assignment Failed",
+            description: `Could not add '${addedItem.name}' to the project. Please try managing projects directly.`,
+            variant: "destructive",
+          });
+        }
+      }
+      setSelectedProjectId(undefined); // Reset after submission
+
     } catch (error: any) {
         toast({ title: "Submission Error", description: error.message || "Could not post item.", variant: "destructive" });
     } finally {
         setIsSubmitting(false);
     }
   }
+
+  const handleCreateNewProjectForItem = async () => {
+    if (!newProjectNameForItem.trim() || !currentUser) {
+      toast({ title: "Validation Error", description: "Project name is required.", variant: "destructive" });
+      return;
+    }
+    try {
+      const projectData: Omit<Project, 'id'> = {
+        name: newProjectNameForItem,
+        description: '', // Keep description minimal for this quick add
+        ownerId: currentUser.id,
+        itemIds: [],
+        visibility: newProjectVisibilityForItem,
+      };
+      if (newProjectVisibilityForItem === 'shared') {
+        projectData.sharedWith = [];
+      }
+      const newProject = await createProject(projectData);
+      // Add to the correct list based on visibility
+      if (newProject.visibility === 'private') {
+        setMyPrivateProjects(prev => [newProject, ...prev]);
+      } else { // shared
+        setAllSharedProjects(prev => [newProject, ...prev]);
+      }
+      setSelectedProjectId(newProject.id); // Auto-select the new project
+      toast({ title: "Project Created", description: `'${newProject.name}' created and selected.` });
+      setShowCreateProjectModalForItem(false);
+      setNewProjectNameForItem('');
+      setNewProjectVisibilityForItem('private');
+    } catch (error) {
+      console.error("Error creating project from item form:", error);
+      toast({ title: "Project Creation Failed", description: "Could not create the new project.", variant: "destructive" });
+    }
+  };
 
   const isLoadingAi = isSuggestingCategory || isInferringListingType;
   const isLoadingOverall = isLoadingAi || isSubmitting || !currentUser;
@@ -343,6 +435,58 @@ export default function NewItemPage() {
                 <FormField control={form.control} name="listingType" render={({ field }) => (<FormItem className="space-y-3"><FormLabel className="font-headline flex items-center gap-2">Listing Type {isInferringListingType && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {!isInferringListingType && form.formState.dirtyFields.listingType && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><RadioGroup onValueChange={(value) => { field.onChange(value); form.setValue('listingType', value as 'offer' | 'want', {shouldDirty: true}); }} value={field.value} className="flex flex-col space-y-1 md:flex-row md:space-y-0 md:space-x-4" disabled={isLoadingOverall}><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="offer" id="offer" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="offer" className="font-normal flex items-center gap-2"><Gift className="h-5 w-5 text-green-600" /> Offering an item</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0"><FormControl><RadioGroupItem value="want" id="want" disabled={isLoadingOverall} /></FormControl><FormLabel htmlFor="want" className="font-normal flex items-center gap-2"><Search className="h-5 w-5 text-blue-600" /> Looking for an item</FormLabel></FormItem></RadioGroup></FormControl><FormDescription className="font-body">AI may suggest this.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="category" render={({ field }) => (<FormItem><FormLabel className="font-headline flex items-center gap-2">Category {isSuggestingCategory && !globalSelectedCategory && <Loader2 className="h-4 w-4 animate-spin text-primary" />} {(!isSuggestingCategory || globalSelectedCategory) && (form.formState.dirtyFields.category || globalSelectedCategory) && <Sparkles className="h-4 w-4 text-accent" />}</FormLabel><FormControl><Input placeholder={isSuggestingCategory && !globalSelectedCategory ? "AI suggesting..." : (globalSelectedCategory && !form.formState.dirtyFields.category ? globalSelectedCategory : "e.g., Books")} {...field} onChange={(e) => { field.onChange(e); form.setValue('category', e.target.value, {shouldDirty: true});}} disabled={isLoadingOverall} /></FormControl><FormDescription className="font-body">{globalSelectedCategory && !form.formState.dirtyFields.category ? `Prefilled from global filter. ` : ``}AI may suggest if not globally set. Type to override.</FormDescription><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="imageUrl" render={({ field }) => (<FormItem><FormLabel className="font-headline">Image URL (Optional)</FormLabel><FormControl><Input type="url" placeholder="https://placehold.co/600x400.png" {...field} disabled={isLoadingOverall}/></FormControl><FormDescription className="font-body">Link to an image. Use placeholder if needed.</FormDescription><FormMessage /></FormItem>)} />
+              </section>
+
+              <Separator />
+
+              <section className="space-y-6">
+                <h3 className="font-headline text-xl border-b pb-2 mb-4">Organization (Optional)</h3>
+                 <FormItem>
+                  <FormLabel className="font-headline">Assign to Project</FormLabel>
+                  <Select
+                    value={selectedProjectId || ""}
+                    onValueChange={(value) => {
+                      if (value === "_CREATE_NEW_PROJECT_") {
+                        setShowCreateProjectModalForItem(true);
+                      } else {
+                        setSelectedProjectId(value === "" ? undefined : value);
+                      }
+                    }}
+                    disabled={isLoadingOverall || loadingProjectsState}
+                  >
+                    <FormControl><SelectTrigger><SelectValue placeholder="None" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+
+                      {myPrivateProjects.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>My Private Projects</SelectLabel>
+                          {myPrivateProjects.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+
+                      {allSharedProjects.length > 0 && (
+                        <SelectGroup>
+                          {myPrivateProjects.length > 0 && <SelectSeparator />}
+                          <SelectLabel>All Shared Projects</SelectLabel>
+                          {allSharedProjects.map(p => (
+                            <SelectItem key={p.id} value={p.id}>{p.name} (Shared)</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+
+                      {(myPrivateProjects.length > 0 || allSharedProjects.length > 0) && <SelectSeparator />}
+                      <SelectItem value="_CREATE_NEW_PROJECT_">
+                        <div className="flex items-center">
+                          <PlusCircle className="mr-2 h-4 w-4 inline-block" /> Create New Project...
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription className="font-body">Organize this item into one of your projects or create a new one. Shared projects are visible to everyone.</FormDescription>
+                </FormItem>
               </section>
 
               <Separator />
@@ -582,6 +726,73 @@ export default function NewItemPage() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Mini Modal for Creating New Project for Item */}
+      {showCreateProjectModalForItem && (
+        <Dialog open={showCreateProjectModalForItem} onOpenChange={(isOpen) => {
+          setShowCreateProjectModalForItem(isOpen);
+          if (!isOpen) {
+            // If modal is closed without saving, and current selection is for a project that was just attempted to be created
+            // (but now cancelled), we might want to reset selectedProjectId.
+            // For simplicity, if the user cancels, we don't change selectedProjectId here.
+            // They can manually select "None" or another project from the main dropdown if needed.
+            // The `onValueChange` of the main Select already handles setting selectedProjectId to undefined if "None" is chosen.
+            // If `_CREATE_NEW_PROJECT_` was selected, selectedProjectId isn't changed until a project is actually created.
+            const projectExists = myPrivateProjects.some(p => p.id === selectedProjectId) || allSharedProjects.some(p => p.id === selectedProjectId);
+            if (selectedProjectId && !projectExists && selectedProjectId !== "_CREATE_NEW_PROJECT_") {
+                 // This implies a new project was started, assigned to selectedProjectId, but then cancelled.
+                 // Or, if selectedProjectId was set to the new project's ID upon successful creation,
+                 // then this block is not needed on modal close.
+                 // The current logic in handleCreateNewProjectForItem sets selectedProjectId.
+                 // If user cancels before that, selectedProjectId might still be the one from before.
+                 // The goal is if they picked "Create New" then hit cancel on modal, the main select should not be stuck.
+                 // The main select's onValueChange doesn't set selectedProjectId if "_CREATE_NEW_PROJECT_" is chosen.
+                 // So, this specific reset might not be strictly needed if main select handles it.
+            }
+          }
+        }}>
+          <DialogContent className="sm:max-w-[425px] bg-card">
+            <DialogHeader>
+              <DialogTitle className="font-headline">Create New Project</DialogTitle>
+              <DialogDescription className="font-body">
+                Create a simple project to assign this item to. You can add more details later.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="newProjectNameForItem" className="text-right font-body">Name</Label>
+                <Input
+                  id="newProjectNameForItem"
+                  value={newProjectNameForItem}
+                  onChange={(e) => setNewProjectNameForItem(e.target.value)}
+                  className="col-span-3 font-body"
+                  placeholder="Project Name"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="newProjectVisibilityForItem" className="text-right font-body">Visibility</Label>
+                <Select value={newProjectVisibilityForItem} onValueChange={(value: 'private' | 'shared') => setNewProjectVisibilityForItem(value)}>
+                  <SelectTrigger className="col-span-3 font-body">
+                    <SelectValue placeholder="Select visibility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private" className="font-body">Private (Only you can add items; only you can see)</SelectItem>
+                    <SelectItem value="shared" className="font-body">Shared (Anyone can add items; everyone can see)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowCreateProjectModalForItem(false);
+                // If main select value was "_CREATE_NEW_PROJECT_", user might want to reset it to "" (None)
+                // For now, let main select handle its state.
+              }} className="font-body">Cancel</Button>
+              <Button onClick={handleCreateNewProjectForItem} disabled={!newProjectNameForItem.trim()} className="font-body">Create & Select</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

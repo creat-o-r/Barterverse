@@ -4,13 +4,21 @@
 import { use, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
-import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, ItemDeliveryMethod } from '@/types';
+import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, ItemDeliveryMethod, Project } from '@/types'; // Added Project
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
+import { getProjectsByOwner, createProject, updateProject, deleteProject } from '@/services/project-service'; // Removed getSharedProjectsForUser
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase } from 'lucide-react';
+import ProjectCard from '@/components/projects/ProjectCard'; // Added ProjectCard
+import ProjectDetails from '@/components/projects/ProjectDetails'; // Added ProjectDetails
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Added Dialog components
+import { Input } from '@/components/ui/input'; // Added Input
+import { Textarea } from '@/components/ui/textarea'; // Added Textarea
+import { Label } from '@/components/ui/label'; // Added Label
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select components
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase, PlusCircle, Trash2 } from 'lucide-react'; // Added PlusCircle, Trash2
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -119,7 +127,7 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
 );
 
 
-export default function UserProfilePage({ params: paramsProp }: { params: Promise<{ userId: string }> }) {
+export default function UserProfilePage({ params: paramsProp }: { params: { userId: string } }) {
   const resolvedParams = use(paramsProp); 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,8 +137,31 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
   const [activityInputForAI, setActivityInputForAI] = useState<InferUserPreferencesInput | null>(null);
   const { toast } = useToast();
 
+  // Project states
+  const [userProjects, setUserProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+
+  // Create Project Modal states
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [newProjectVisibility, setNewProjectVisibility] = useState<'private' | 'shared'>('private'); // Updated type
+
+  // Edit Project Modal states
+  const [isEditingSelectedProject, setIsEditingSelectedProject] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    description: '',
+    visibility: 'private' as 'private' | 'shared', // Updated type
+  });
+
   const currentViewingUserId = dummyUsers[0].id; 
   const isOwnProfile = resolvedParams.userId === 'me' || resolvedParams.userId === currentViewingUserId;
+
+  const handleEditFormChange = (field: keyof typeof editFormData, value: string | 'private' | 'shared') => { // Updated type
+    setEditFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   useEffect(() => {
     async function loadUserProfileAndSettings() {
@@ -150,7 +181,112 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
         loadUserProfileAndSettings();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedParams.userId, isOwnProfile]); 
+  }, [resolvedParams.userId, isOwnProfile]);
+
+  useEffect(() => {
+    if (user) {
+      setLoadingProjects(true);
+      getProjectsByOwner(user.id)
+        .then(projects => {
+          setUserProjects(projects);
+        })
+        .catch(error => {
+          console.error("Error fetching user projects:", error);
+          toast({ title: "Error Fetching Projects", description: "Could not load this user's projects.", variant: "destructive" });
+        })
+        .finally(() => {
+          setLoadingProjects(false);
+        });
+    }
+  }, [user, toast]);
+
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim() || !user) {
+      toast({ title: "Validation Error", description: "Project name is required and user must be loaded.", variant: "destructive" });
+      return;
+    }
+    try {
+      const projectData: Omit<Project, 'id'> = { // Ensure correct type for projectService.createProject
+        name: newProjectName,
+        description: newProjectDescription,
+        ownerId: user.id,
+        itemIds: [],
+        visibility: newProjectVisibility,
+        // sharedWith is intentionally omitted if not 'shared'
+      };
+      if (newProjectVisibility === 'shared') {
+        projectData.sharedWith = []; // Initialize as empty, can be updated later
+      }
+
+      const createdProject = await createProject(projectData);
+
+      setUserProjects(prevProjects => [createdProject, ...prevProjects]);
+      toast({ title: "Project Created", description: `'${createdProject.name}' was successfully created.` });
+      setShowCreateProjectModal(false);
+      setNewProjectName('');
+      setNewProjectDescription('');
+      setNewProjectVisibility('private');
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast({ title: "Creation Failed", description: "Could not create the project. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateProject = async () => {
+    if (!selectedProject || !editFormData.name?.trim() || !user) {
+      toast({ title: "Validation Error", description: "Project details are missing or invalid.", variant: "destructive" });
+      return;
+    }
+    try {
+      const projectUpdates: Partial<Omit<Project, 'id' | 'ownerId'>> = {
+        name: editFormData.name,
+        description: editFormData.description,
+        visibility: editFormData.visibility,
+        // itemIds and sharedWith are not part of this form, so they won't be sent for update
+        // unless explicitly added. The service's updateProject should only update provided fields.
+      };
+
+      const updatedProject = await updateProject(selectedProject.id, projectUpdates);
+      if (!updatedProject) {
+        throw new Error("Project not found after update.");
+      }
+
+      setUserProjects(prevProjects => prevProjects.map(p => p.id === updatedProject.id ? updatedProject : p));
+      setSelectedProject(updatedProject); // Update the view in the modal
+      setIsEditingSelectedProject(false);
+      toast({ title: "Project Updated", description: `'${updatedProject.name}' was successfully updated.` });
+    } catch (error) {
+      console.error("Error updating project:", error);
+      toast({ title: "Update Failed", description: "Could not update the project. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteProjectWarning = (projectId: string) => {
+    if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      handleDeleteProject(projectId);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!user) {
+      toast({ title: "Error", description: "User not loaded.", variant: "destructive" });
+      return;
+    }
+    try {
+      const success = await deleteProject(projectId, user.id);
+      if (success) {
+        setUserProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+        toast({ title: "Project Deleted", description: "The project was successfully deleted." });
+        setSelectedProject(null); // Close modal
+        setIsEditingSelectedProject(false); // Reset edit state
+      } else {
+        throw new Error("Deletion was not successful or user is not owner.");
+      }
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast({ title: "Deletion Failed", description: String(error) || "Could not delete the project. Please try again.", variant: "destructive" });
+    }
+  };
 
   const handleLearnPreferences = async () => {
     if (!user) return;
@@ -365,9 +501,178 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
       <section><h2 className="text-2xl font-headline mb-4 flex items-center gap-2"><Search className="h-6 w-6 text-blue-600" />Items Wanted ({wantedItems.length})</h2>{wantedItems.length > 0 ? <ItemList items={wantedItems} /> : <p className="text-muted-foreground font-body">This user is not currently looking for any specific items.</p>}</section>
       <Separator />
       <section><h2 className="text-2xl font-headline mb-4">Trade &amp; Fulfillment History ({tradedOrFulfilledItems.length})</h2>{tradedOrFulfilledItems.length > 0 ? <ItemList items={tradedOrFulfilledItems} /> : <p className="text-muted-foreground font-body">No completed trades or fulfilled wants yet.</p>}</section>
+
+      {/* Projects Section - Combined My Projects and Shared With Me */}
+      <Separator />
+      <section className="space-y-6">
+        {/* My Projects Sub-section */}
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-headline flex items-center gap-2">
+              <Briefcase className="h-6 w-6 text-purple-600" />
+              My Projects ({userProjects.length})
+            </h2>
+            {isOwnProfile && (
+              <Button onClick={() => setShowCreateProjectModal(true)} variant="outline" size="sm">
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Project
+              </Button>
+            )}
+          </div>
+          {loadingProjects ? (
+            <div className="flex items-center gap-2 text-muted-foreground font-body"><Loader2 className="h-5 w-5 animate-spin" />Loading my projects...</div>
+          ) : userProjects.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {userProjects.map(project => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onClick={() => setSelectedProject(project)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground font-body">{isOwnProfile ? "You haven't created any projects yet." : "This user currently has no projects with public or shared visibility."}</p>
+            // Updated empty state message slightly for non-profile owners.
+          )}
+        </div>
+        {/* "Shared With Me" section has been removed */}
+      </section>
+
       <Separator />
       <section><h2 className="text-2xl font-headline mb-4">User Reviews &amp; Ratings</h2><Card><CardContent className="p-6"><p className="text-muted-foreground font-body">User reviews and ratings will be displayed here.</p></CardContent></Card></section>
+
+      {/* Modal for Viewing Project Details / Editing Project */}
+      {selectedProject && (
+        <Dialog open={!!selectedProject} onOpenChange={(isOpen) => {
+          if(!isOpen) {
+            setSelectedProject(null);
+            setIsEditingSelectedProject(false); // Reset edit mode on close
+          }
+        }}>
+            <DialogContent className="sm:max-w-[600px] bg-card">
+                <DialogHeader>
+                    <DialogTitle className="font-headline text-xl">
+                      {isEditingSelectedProject ? `Edit Project: ${editFormData.name}` : selectedProject.name}
+                    </DialogTitle>
+                    {!isEditingSelectedProject && selectedProject.description && <DialogDescription className="font-body">{selectedProject.description}</DialogDescription>}
+                    {isEditingSelectedProject && <DialogDescription className="font-body">Update the details for your project.</DialogDescription>}
+                </DialogHeader>
+
+                {isEditingSelectedProject ? (
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="editProjectName" className="text-right font-body">Name</Label>
+                      <Input id="editProjectName" value={editFormData.name} onChange={(e) => handleEditFormChange('name', e.target.value)} className="col-span-3 font-body" placeholder="Project Name" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="editProjectDescription" className="text-right font-body">Description</Label>
+                      <Textarea id="editProjectDescription" value={editFormData.description} onChange={(e) => handleEditFormChange('description', e.target.value)} className="col-span-3 font-body" placeholder="Brief description" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="editProjectVisibility" className="text-right font-body">Visibility</Label>
+                      <Select value={editFormData.visibility} onValueChange={(value: 'private' | 'shared') => handleEditFormChange('visibility', value)}>
+                        <SelectTrigger className="col-span-3 font-body">
+                          <SelectValue placeholder="Select visibility" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="private" className="font-body">Private (Only you can add items; only you can see)</SelectItem>
+                          <SelectItem value="shared" className="font-body">Shared (Anyone can add items; everyone can see)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-4 max-h-[60vh] overflow-y-auto">
+                      <ProjectDetails project={selectedProject} />
+                  </div>
+                )}
+
+                <DialogFooter>
+                  {!isEditingSelectedProject && (
+                    <>
+                      <Button onClick={() => {setSelectedProject(null); setIsEditingSelectedProject(false);}} variant="outline">Close</Button>
+                      {/* Edit/Delete only if profile owner AND selected project is owned by them */}
+                      {isOwnProfile && selectedProject && selectedProject.ownerId === user.id && (
+                        <>
+                          <Button variant="outline" onClick={() => {
+                            setEditFormData({
+                              name: selectedProject.name,
+                              description: selectedProject.description,
+                              visibility: selectedProject.visibility,
+                            });
+                            setIsEditingSelectedProject(true);
+                          }}>
+                            <Edit3 className="mr-2 h-4 w-4" /> Edit
+                          </Button>
+                          <Button variant="destructive" onClick={() => handleDeleteProjectWarning(selectedProject.id)}>
+                             <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {isEditingSelectedProject && isOwnProfile && (
+                    <>
+                      <Button variant="outline" onClick={() => {
+                        setIsEditingSelectedProject(false);
+                        // Reset editFormData to selectedProject's current state if user cancels edit
+                        setEditFormData({
+                           name: selectedProject.name,
+                           description: selectedProject.description,
+                           visibility: selectedProject.visibility,
+                        });
+                      }}>Cancel</Button>
+                      <Button onClick={handleUpdateProject} disabled={!editFormData.name?.trim()}>Save Changes</Button>
+                    </>
+                  )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Modal for Creating New Project */}
+      {isOwnProfile && showCreateProjectModal && (
+        <Dialog open={showCreateProjectModal} onOpenChange={setShowCreateProjectModal}>
+          <DialogContent className="sm:max-w-[480px] bg-card">
+            <DialogHeader>
+              <DialogTitle className="font-headline">Create New Project</DialogTitle>
+              <DialogDescription className="font-body">Enter the details for your new project. Click save when you're done.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="projectName" className="text-right font-body">Name</Label>
+                <Input id="projectName" value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="col-span-3 font-body" placeholder="Project Name" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="projectDescription" className="text-right font-body">Description</Label>
+                <Textarea id="projectDescription" value={newProjectDescription} onChange={(e) => setNewProjectDescription(e.target.value)} className="col-span-3 font-body" placeholder="Brief description of your project" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="projectVisibility" className="text-right font-body">Visibility</Label>
+                <Select value={newProjectVisibility} onValueChange={(value: 'private' | 'shared') => setNewProjectVisibility(value)}>
+                  <SelectTrigger className="col-span-3 font-body">
+                    <SelectValue placeholder="Select visibility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="private" className="font-body">Private (Only you can add items; only you can see)</SelectItem>
+                    <SelectItem value="shared" className="font-body">Shared (Anyone can add items; everyone can see)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateProjectModal(false)} className="font-body">Cancel</Button>
+              <Button onClick={handleCreateProject} disabled={!newProjectName.trim()} className="font-body">Save Project</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
-    
+// Added Edit3 and Trash2 to lucide imports if they are not already there.
+// Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase, PlusCircle
+// Need to ensure Edit3 and Trash2 are added to the main lucide-react import line.
+// The current import has: Edit3, Briefcase, PlusCircle. So Trash2 might be needed.
+// Re-checked: Edit3 is already in the import line. Trash2 is not.
+// Will add Trash2 to the imports.
