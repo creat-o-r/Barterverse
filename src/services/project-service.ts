@@ -95,10 +95,10 @@ export const deleteProject = async (projectId: string, currentUserId: string): P
 };
 
 export const getPublicProjects = async (): Promise<Project[]> => {
-  const publicProjects = projectsData.filter(project =>
-    project.visibility === 'public' || project.visibility === 'shared'
+  const sharedProjects = projectsData.filter(project =>
+    project.visibility === 'shared'
   );
-  return publicProjects.map(p => ({ ...p })); // Return copies
+  return sharedProjects.map(p => ({ ...p })); // Return copies
 };
 
 // Removed getSharedProjectsForUser function

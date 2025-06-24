@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select'; // Added SelectGroup, SelectLabel, SelectSeparator
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Removed SelectGroup, SelectLabel as they are for Select context
+import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle, CheckCircle, XCircle, Loader2, FolderPlus, ListPlus, Briefcase, PackageIcon } from 'lucide-react'; // Added Briefcase, PackageIcon (alias for Package)
@@ -187,59 +188,61 @@ export default function ManageItemProjectsButton({ item, isOwner, currentUserId 
                 )}
 
                 {myPrivateProjects.length > 0 && (
-                  <SelectGroup>
-                    <SelectLabel className="text-xs text-muted-foreground px-2 py-1.5 flex items-center">
+                  <div>
+                    <h5 className="text-sm font-semibold text-muted-foreground px-1 py-1.5 flex items-center">
                       <Briefcase className="mr-2 h-4 w-4" /> My Private Projects
-                    </SelectLabel>
-                    {myPrivateProjects.map(project => {
-                      const itemIsInProject = project.itemIds?.includes(item.id);
-                      return (
-                        <div key={project.id} className="flex items-center justify-between p-2 border rounded-md ml-2 mr-1">
-                          <span className="text-sm font-medium truncate pr-2" title={project.name}>{project.name}</span>
-                          {itemIsInProject ? (
-                            <Button variant="outline" size="xs" onClick={() => handleRemoveItem(project.id)} title="Remove from this project">
-                              <XCircle className="mr-1.5 h-3.5 w-3.5 text-red-600" /> Remove
-                            </Button>
-                          ) : (
-                            <Button variant="outline" size="xs" onClick={() => handleAddItem(project.id)} title="Add to this project">
-                              <CheckCircle className="mr-1.5 h-3.5 w-3.5 text-green-600" /> Add
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </SelectGroup>
-                )}
-
-                {allSharedProjects.length > 0 && (
-                  <SelectGroup>
-                     {myPrivateProjects.length > 0 && <Separator className="my-2" />}
-                    <SelectLabel className="text-xs text-muted-foreground px-2 py-1.5 flex items-center">
-                       <PackageIcon className="mr-2 h-4 w-4" /> All Shared Projects
-                    </SelectLabel>
-                    {allSharedProjects.map(project => {
-                      const itemIsInProject = project.itemIds?.includes(item.id);
-                      // For shared projects not owned by current user, remove button should be disabled/hidden
-                      // as current removeItemFromProject service requires project ownership.
-                      const canRemove = project.ownerId === currentUserId;
-                      return (
-                        <div key={project.id} className="flex items-center justify-between p-2 border rounded-md ml-2 mr-1">
-                          <span className="text-sm font-medium truncate pr-2" title={project.name}>{project.name}</span>
-                          <div className="flex gap-1">
+                    </h5>
+                    <div className="space-y-1 pl-2 pr-1">
+                      {myPrivateProjects.map(project => {
+                        const itemIsInProject = project.itemIds?.includes(item.id);
+                        return (
+                          <div key={project.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-muted/20">
+                            <span className="text-sm font-medium truncate pr-2" title={project.name}>{project.name}</span>
                             {itemIsInProject ? (
-                              <Button variant="outline" size="xs" onClick={() => handleRemoveItem(project.id)} title={canRemove ? "Remove from this project" : "Only project owner can remove"} disabled={!canRemove}>
-                                <XCircle className="mr-1.5 h-3.5 w-3.5 text-red-600" /> Remove
+                              <Button variant="outline" size="xs" onClick={() => handleRemoveItem(project.id)} title="Remove from this project">
+                                <XCircle className="mr-1.5 h-3.5 w-3.5 text-red-500" /> Remove
                               </Button>
                             ) : (
                               <Button variant="outline" size="xs" onClick={() => handleAddItem(project.id)} title="Add to this project">
-                                <CheckCircle className="mr-1.5 h-3.5 w-3.5 text-green-600" /> Add
+                                <CheckCircle className="mr-1.5 h-3.5 w-3.5 text-green-500" /> Add
                               </Button>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
-                  </SelectGroup>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {allSharedProjects.length > 0 && (
+                  <div>
+                     {myPrivateProjects.length > 0 && <Separator className="my-3" />}
+                    <h5 className="text-sm font-semibold text-muted-foreground px-1 py-1.5 flex items-center">
+                       <PackageIcon className="mr-2 h-4 w-4" /> All Shared Projects
+                    </h5>
+                    <div className="space-y-1 pl-2 pr-1">
+                      {allSharedProjects.map(project => {
+                        const itemIsInProject = project.itemIds?.includes(item.id);
+                        const canRemoveThisItem = project.ownerId === currentUserId;
+                        return (
+                          <div key={project.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-muted/20">
+                            <span className="text-sm font-medium truncate pr-2" title={project.name}>{project.name}</span>
+                            <div className="flex gap-1">
+                              {itemIsInProject ? (
+                                <Button variant="outline" size="xs" onClick={() => handleRemoveItem(project.id)} title={canRemoveThisItem ? "Remove from this project" : "Only project owner can remove items"} disabled={!canRemoveThisItem}>
+                                  <XCircle className="mr-1.5 h-3.5 w-3.5 text-red-500" /> Remove
+                                </Button>
+                              ) : (
+                                <Button variant="outline" size="xs" onClick={() => handleAddItem(project.id)} title="Add to this project">
+                                  <CheckCircle className="mr-1.5 h-3.5 w-3.5 text-green-500" /> Add
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </ScrollArea>
