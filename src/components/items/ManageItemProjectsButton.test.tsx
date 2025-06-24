@@ -688,4 +688,321 @@ describe('ManageItemProjectsButton', () => {
     expect(projectService.getProjectsByOwner).not.toHaveBeenCalled();
     expect(projectService.getPublicProjects).not.toHaveBeenCalled();
   });
+
+  it('handles unknown project visibility in state updates', async () => {
+    const unknownVisibilityProject = { ...mockPrivateProject, visibility: 'unknown' as any };
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(unknownVisibilityProject);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      const addButton = screen.getByText('Add');
+      fireEvent.click(addButton);
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Success',
+        description: "Item added to project 'Private Project'.",
+      });
+    });
+  });
+
+  it('handles generic add item error without permission context', async () => {
+    const mockError = new Error('Network error');
+    (projectService.addItemToProject as jest.Mock).mockRejectedValue(mockError);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      const addButton = screen.getByText('Add');
+      fireEvent.click(addButton);
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Error',
+        description: 'Could not add item to project.',
+        variant: 'destructive',
+      });
+    });
+  });
+
+  it('handles generic remove item error', async () => {
+    const mockError = new Error('Network error');
+    (projectService.removeItemFromProject as jest.Mock).mockRejectedValue(mockError);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      const removeButton = screen.getByText('Remove');
+      fireEvent.click(removeButton);
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Error',
+        description: 'Could not remove item from project.',
+        variant: 'destructive',
+      });
+    });
+  });
+
+  it('renders button with correct accessibility attributes', () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    const button = screen.getByText('Manage Project Memberships');
+    expect(button).toHaveClass('mt-4', 'w-full', 'md:w-auto');
+  });
+
+  it('resets form when modal closes', async () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'Test Name' } });
+    });
+    
+    fireEvent.click(screen.getByText('Cancel'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      expect(nameInput).toHaveValue('');
+    });
+  });
+
+  it('disables create button when project name is empty', async () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const createButton = screen.getByText('Create & Add Item');
+      expect(createButton).toBeDisabled();
+    });
+  });
+
+  it('shows loading indicator when creating project', async () => {
+    const newProject = { id: 'proj-new', name: 'New Project', ownerId: 'user-1', itemIds: [], visibility: 'private' as const, description: 'Project created for item: Test Item' };
+    (projectService.createProject as jest.Mock).mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(newProject), 100)));
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'New Project' } });
+      fireEvent.click(screen.getByText('Create & Add Item'));
+    });
+    
+    expect(document.querySelector('.animate-spin')).toBeInTheDocument();
+  });
+
+  it('sorts projects alphabetically when adding to lists', async () => {
+    const newProject = { id: 'proj-new', name: 'A New Project', ownerId: 'user-1', itemIds: [], visibility: 'private' as const, description: 'Project created for item: Test Item' };
+    const projectWithItem = { ...newProject, itemIds: ['item-1'] };
+    
+    (projectService.createProject as jest.Mock).mockResolvedValue(newProject);
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(projectWithItem);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'A New Project' } });
+      fireEvent.click(screen.getByText('Create & Add Item'));
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Project Created & Item Added',
+        description: "'Test Item' added to new project 'A New Project'.",
+      });
+    });
+  });
+
+  it('handles shared with undefined correctly', async () => {
+    const sharedProjectNoSharedWith = { ...mockSharedProject, sharedWith: undefined };
+    (projectService.getPublicProjects as jest.Mock).mockResolvedValue([sharedProjectNoSharedWith]);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      expect(screen.getByText('All Shared Projects')).toBeInTheDocument();
+    });
+  });
+
+  it('handles projects with no items correctly', async () => {
+    const emptyPrivateProject = { ...mockPrivateProject, itemIds: [] };
+    (projectService.getProjectsByOwner as jest.Mock).mockResolvedValue([emptyPrivateProject]);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      expect(screen.getByText('My Private Projects')).toBeInTheDocument();
+      expect(screen.getByText('Add')).toBeInTheDocument();
+    });
+  });
+
+  it('updates project name field correctly', async () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'My New Project' } });
+      expect(nameInput).toHaveValue('My New Project');
+    });
+  });
+
+  it('handles project creation with sharedWith array for shared projects', async () => {
+    const newSharedProject = { 
+      id: 'proj-new', 
+      name: 'New Shared Project', 
+      ownerId: 'user-1', 
+      itemIds: [], 
+      visibility: 'shared' as const, 
+      description: 'Project created for item: Test Item',
+      sharedWith: []
+    };
+    const projectWithItem = { ...newSharedProject, itemIds: ['item-1'] };
+    
+    (projectService.createProject as jest.Mock).mockResolvedValue(newSharedProject);
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(projectWithItem);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'New Shared Project' } });
+      
+      fireEvent.click(screen.getByText('Private (Only you can add items; only you can see)'));
+      fireEvent.click(screen.getByText('Shared (Anyone can add items; everyone can see)'));
+      
+      fireEvent.click(screen.getByText('Create & Add Item'));
+    });
+    
+    await waitFor(() => {
+      expect(projectService.createProject).toHaveBeenCalledWith(expect.objectContaining({
+        visibility: 'shared',
+        sharedWith: []
+      }));
+    });
+  });
+
+  it('displays loading state correctly', async () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    // Initial loading should show
+    expect(document.querySelector('.animate-spin')).toBeInTheDocument();
+    
+    await waitFor(() => {
+      expect(screen.getByText('My Private Projects')).toBeInTheDocument();
+    });
+  });
 });
