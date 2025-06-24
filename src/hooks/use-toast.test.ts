@@ -16,7 +16,6 @@ import {
   __resetMockState,
   mockMemoryState, // Import mockMemoryState to directly manipulate for some tests if needed
 } from './use-toast';
-// React import is no longer needed for useToast tests here as we removed useEffect spy
 
 const initialState: State = {
   toasts: [],
