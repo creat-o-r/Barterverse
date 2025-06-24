@@ -549,4 +549,143 @@ describe('ManageItemProjectsButton', () => {
       expect(removeButton).toBeDisabled();
     });
   });
+
+  it('handles permission denied when adding to private project not owned by user', async () => {
+    const privateProjectNotOwned = { ...mockPrivateProject, ownerId: 'other-user' };
+    (projectService.getProjectsByOwner as jest.Mock).mockResolvedValue([privateProjectNotOwned]);
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(undefined);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      expect(screen.getByText('My Private Projects')).toBeInTheDocument();
+    });
+    
+    const addButton = screen.getByText('Add');
+    fireEvent.click(addButton);
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Permission Denied',
+        description: 'You can only add items to your own private projects.',
+        variant: 'destructive',
+      });
+    });
+  });
+
+  it('closes create modal when cancel is clicked', async () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    });
+    
+    await waitFor(() => {
+      expect(screen.getByText('Create New Project')).toBeInTheDocument();
+    });
+    
+    fireEvent.click(screen.getByText('Cancel'));
+    
+    await waitFor(() => {
+      expect(screen.queryByText('Create New Project')).not.toBeInTheDocument();
+    });
+  });
+
+  it('closes manage modal when close is clicked', async () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      expect(screen.getByText('Add or remove "Test Item" from your projects.')).toBeInTheDocument();
+    });
+    
+    fireEvent.click(screen.getByText('Close'));
+    
+    await waitFor(() => {
+      expect(screen.queryByText('Add or remove "Test Item" from your projects.')).not.toBeInTheDocument();
+    });
+  });
+
+  it('handles project creation success but item addition failure', async () => {
+    const newProject = { id: 'proj-new', name: 'New Project', ownerId: 'user-1', itemIds: [], visibility: 'private' as const, description: 'Project created for item: Test Item' };
+    
+    (projectService.createProject as jest.Mock).mockResolvedValue(newProject);
+    (projectService.addItemToProject as jest.Mock).mockResolvedValue(undefined); // Item addition fails
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText('e.g., Summer Collection');
+      fireEvent.change(nameInput, { target: { value: 'New Project' } });
+      fireEvent.click(screen.getByText('Create & Add Item'));
+    });
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Project Created',
+        description: "Project 'New Project' created, but failed to add item automatically.",
+        variant: 'default',
+      });
+    });
+  });
+
+  it('does not load projects when modal is closed', () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    // Modal not opened, so useEffect should not trigger project loading
+    expect(projectService.getProjectsByOwner).not.toHaveBeenCalled();
+    expect(projectService.getPublicProjects).not.toHaveBeenCalled();
+  });
+
+  it('does not load projects when user is not owner', () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={false} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    // Should not render anything, and should not load projects
+    expect(projectService.getProjectsByOwner).not.toHaveBeenCalled();
+    expect(projectService.getPublicProjects).not.toHaveBeenCalled();
+  });
 });
