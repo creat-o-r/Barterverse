@@ -210,6 +210,55 @@ describe('Project Service', () => {
       expect(updatedProject).toBeDefined();
       expect(updatedProject?.itemIds.filter(id => id === 'existing-item').length).toBe(1);
     });
+
+    it('should return undefined for non-existent project', async () => {
+      const result = await addItemToProject('non-existent-id', 'item-id', testUserId);
+      expect(result).toBeUndefined();
+    });
+
+    it('should not allow non-owner to add to private project', async () => {
+      const project = await createProject({
+        name: 'Private Project Test',
+        description: 'Test private project permissions',
+        ownerId: testUserId,
+        itemIds: [],
+        visibility: 'private' as const
+      });
+      testProjectIds.push(project.id);
+
+      const result = await addItemToProject(project.id, 'item-id', otherUserId);
+      expect(result).toBeUndefined();
+    });
+
+    it('should allow any user to add to shared project', async () => {
+      const project = await createProject({
+        name: 'Shared Project Test',
+        description: 'Test shared project permissions',
+        ownerId: testUserId,
+        itemIds: [],
+        visibility: 'shared' as const
+      });
+      testProjectIds.push(project.id);
+
+      const result = await addItemToProject(project.id, 'item-id', otherUserId);
+      expect(result).toBeDefined();
+      expect(result?.itemIds).toContain('item-id');
+    });
+
+    it('should handle project with undefined itemIds', async () => {
+      const project = await createProject({
+        name: 'Undefined ItemIds Test',
+        description: 'Test undefined itemIds handling',
+        ownerId: testUserId,
+        itemIds: [],
+        visibility: 'private' as const
+      });
+      testProjectIds.push(project.id);
+      
+      const result = await addItemToProject(project.id, 'item-id', testUserId);
+      expect(result).toBeDefined();
+      expect(result?.itemIds).toContain('item-id');
+    });
   });
 
   describe('removeItemFromProject', () => {
@@ -244,6 +293,40 @@ describe('Project Service', () => {
 
       expect(updatedProject).toBeDefined();
       expect(updatedProject?.itemIds).toEqual(['existing-item']);
+    });
+
+    it('should return undefined for non-existent project', async () => {
+      const result = await removeItemFromProject('non-existent-id', 'item-id', testUserId);
+      expect(result).toBeUndefined();
+    });
+
+    it('should not allow non-owner to remove items', async () => {
+      const project = await createProject({
+        name: 'Permission Test',
+        description: 'Test removal permissions',
+        ownerId: testUserId,
+        itemIds: ['item-to-remove'],
+        visibility: 'private' as const
+      });
+      testProjectIds.push(project.id);
+
+      const result = await removeItemFromProject(project.id, 'item-to-remove', otherUserId);
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle project with undefined itemIds', async () => {
+      const project = await createProject({
+        name: 'Undefined ItemIds Remove Test',
+        description: 'Test undefined itemIds handling for removal',
+        ownerId: testUserId,
+        itemIds: [],
+        visibility: 'private' as const
+      });
+      testProjectIds.push(project.id);
+
+      const result = await removeItemFromProject(project.id, 'item-id', testUserId);
+      expect(result).toBeDefined();
+      expect(result?.itemIds).toEqual([]);
     });
   });
 
@@ -284,6 +367,71 @@ describe('Project Service', () => {
     it('should return false for non-existent project', async () => {
       const result = await deleteProject('non-existent-id', testUserId);
       expect(result).toBe(false);
+    });
+
+    it('should delete shared project with no items', async () => {
+      const project = await createProject({
+        name: 'Shared Empty Test',
+        description: 'Test shared project deletion',
+        ownerId: testUserId,
+        itemIds: [],
+        visibility: 'shared' as const
+      });
+
+      const deleteResult = await deleteProject(project.id, testUserId);
+      expect(deleteResult).toBe(true);
+
+      const deletedProject = await getProjectById(project.id);
+      expect(deletedProject).toBeUndefined();
+    });
+
+    it('should delete shared project with items from single owner', async () => {
+      const project = await createProject({
+        name: 'Shared Single Owner Test',
+        description: 'Test shared project with one owner items',
+        ownerId: testUserId,
+        itemIds: ['single-owner-item'],
+        visibility: 'shared' as const
+      });
+
+      const deleteResult = await deleteProject(project.id, testUserId);
+      expect(deleteResult).toBe(true);
+
+      const deletedProject = await getProjectById(project.id);
+      expect(deletedProject).toBeUndefined();
+    });
+
+    it('should not delete shared project with items from multiple owners', async () => {
+      const project = await createProject({
+        name: 'Shared Multi Owner Test',
+        description: 'Test shared project with multiple owner items',
+        ownerId: testUserId,
+        itemIds: ['item1', 'item2'], // These would need to exist in dummyItems with different owners
+        visibility: 'shared' as const
+      });
+      testProjectIds.push(project.id);
+
+      const deleteResult = await deleteProject(project.id, testUserId);
+      expect(deleteResult).toBe(false);
+
+      const stillExists = await getProjectById(project.id);
+      expect(stillExists).toBeDefined();
+    });
+
+    it('should handle shared project with non-existent item IDs', async () => {
+      const project = await createProject({
+        name: 'Shared Orphaned Items Test',
+        description: 'Test shared project with orphaned item IDs',
+        ownerId: testUserId,
+        itemIds: ['non-existent-item-1', 'non-existent-item-2'],
+        visibility: 'shared' as const
+      });
+
+      const deleteResult = await deleteProject(project.id, testUserId);
+      expect(deleteResult).toBe(true);
+
+      const deletedProject = await getProjectById(project.id);
+      expect(deletedProject).toBeUndefined();
     });
   });
 });
