@@ -1359,4 +1359,86 @@ describe('ManageItemProjectsButton', () => {
       }));
     });
   });
+
+  it('handles remove item permission denied for non-owner', async () => {
+    const otherUserProject = { ...mockPrivateProject, ownerId: 'other-user', itemIds: ['item-1'] };
+    
+    (projectService.getProjectsByOwner as jest.Mock).mockResolvedValue([otherUserProject]);
+    (projectService.getPublicProjects as jest.Mock).mockResolvedValue([]);
+    (projectService.removeItemFromProject as jest.Mock).mockResolvedValue(undefined);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      expect(screen.getByText('Remove')).toBeInTheDocument();
+    });
+    
+    fireEvent.click(screen.getByText('Remove'));
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Permission Denied',
+        description: 'You can only remove items from projects you own.',
+        variant: 'destructive',
+      });
+    });
+  });
+
+  it('covers validation check in create project flow', async () => {
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    fireEvent.click(screen.getByText('Create New Project & Add Item'));
+    
+    await waitFor(() => {
+      const createButton = screen.getByText('Create & Add Item');
+      expect(createButton).toBeInTheDocument();
+    });
+  });
+
+  it('handles remove item from private project state update', async () => {
+    const privateProjectWithItem = { ...mockPrivateProject, itemIds: ['item-1'] };
+    const privateProjectWithoutItem = { ...mockPrivateProject, itemIds: [] };
+    
+    (projectService.getProjectsByOwner as jest.Mock).mockResolvedValue([privateProjectWithItem]);
+    (projectService.getPublicProjects as jest.Mock).mockResolvedValue([]);
+    (projectService.removeItemFromProject as jest.Mock).mockResolvedValue(privateProjectWithoutItem);
+    
+    render(
+      <ManageItemProjectsButton 
+        item={mockItem} 
+        isOwner={true} 
+        currentUserId="user-1" 
+      />
+    );
+    
+    fireEvent.click(screen.getByText('Manage Project Memberships'));
+    
+    await waitFor(() => {
+      expect(screen.getByText('Remove')).toBeInTheDocument();
+    });
+    
+    fireEvent.click(screen.getByText('Remove'));
+    
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Success',
+        description: `Item removed from project '${privateProjectWithoutItem.name}'.`,
+      });
+    });
+  });
 });

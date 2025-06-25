@@ -433,5 +433,87 @@ describe('Project Service', () => {
       const deletedProject = await getProjectById(project.id);
       expect(deletedProject).toBeUndefined();
     });
+
+    it('should handle unknown visibility in deleteProject', async () => {
+      const unknownProject = await createProject({
+        name: 'Unknown Visibility Project',
+        description: 'Test project',
+        visibility: 'unknown' as any,
+        ownerId: testUserId,
+        itemIds: [],
+        sharedWith: []
+      });
+
+      const deleteResult = await deleteProject(unknownProject.id, testUserId);
+      expect(deleteResult).toBe(false);
+    });
+
+    it('should handle unknown visibility in addItemToProject', async () => {
+      const unknownProject = await createProject({
+        name: 'Unknown Visibility Project',
+        description: 'Test project', 
+        visibility: 'unknown' as any,
+        ownerId: testUserId,
+        itemIds: [],
+        sharedWith: []
+      });
+
+      const result = await addItemToProject(unknownProject.id, 'test-item', testUserId);
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle project with undefined itemIds in addItemToProject', async () => {
+      const project = await createProject({
+        name: 'Test Project',
+        description: 'Test project',
+        visibility: 'private',
+        ownerId: testUserId,
+        itemIds: undefined as any,
+        sharedWith: []
+      });
+
+      const result = await addItemToProject(project.id, 'test-item', testUserId);
+      expect(result).toBeDefined();
+      expect(result?.itemIds).toContain('test-item');
+    });
+
+    it('should return project copy when item not found in removeItemFromProject', async () => {
+      const project = await createProject({
+        name: 'Test Project',
+        description: 'Test project',
+        visibility: 'private',
+        ownerId: testUserId,
+        itemIds: ['existing-item'],
+        sharedWith: []
+      });
+
+      const result = await removeItemFromProject(project.id, 'non-existent-item', testUserId);
+      expect(result).toBeDefined();
+      expect(result?.itemIds).toEqual(['existing-item']);
+    });
+
+    it('should handle edge case in removeItemFromProject with false includes check', async () => {
+      const project = await createProject({
+        name: 'Test Project',
+        description: 'Test project',
+        visibility: 'private',
+        ownerId: testUserId,
+        itemIds: ['item-1', 'item-2'],
+        sharedWith: []
+      });
+
+      // Mock the includes check to return true but then remove fails internally
+      const originalIncludes = Array.prototype.includes;
+      Array.prototype.includes = jest.fn().mockReturnValue(true);
+      
+      // Remove an item that's not actually there
+      const result = await removeItemFromProject(project.id, 'item-3', testUserId);
+      
+      // Restore original includes
+      Array.prototype.includes = originalIncludes;
+      
+      expect(result).toBeDefined();
+      expect(result?.itemIds).toEqual(['item-1', 'item-2']);
+    });
   });
 });
