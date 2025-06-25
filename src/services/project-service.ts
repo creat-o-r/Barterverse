@@ -1,4 +1,4 @@
-import { Project, Item } from '../types'; // Added Item type
+import { Project } from '../types';
 import { dummyItems } from '../lib/dummy-data'; // Added dummyItems for checking item ownership
 
 let projectsData: Project[] = []; // In-memory store

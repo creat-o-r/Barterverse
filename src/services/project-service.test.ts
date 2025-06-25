@@ -1,5 +1,4 @@
 import { createProject, getProjectById, getProjectsByOwner, updateProject, deleteProject, getPublicProjects, addItemToProject, removeItemFromProject } from './project-service';
-import { Project } from '../types';
 
 describe('Project Service', () => {
   let testProjectIds: string[] = [];
