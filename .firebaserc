@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "barterverse-l9uq3"
+  },
+  "targets": {
+    "barterverse-l9uq3": {
+      "hosting": {
+        "barterverse-auto-deploy": [
+          "barterverse-auto-deploy"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

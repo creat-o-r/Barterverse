@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  webpack: (config, { isServer }) => {
+    // Exclude AI dev tools from client builds
+    if (!isServer) {
+      config.resolve.alias['@/ai/dev'] = false;
+    }
+    return config;
+  },
   images: {
     remotePatterns: [
       {

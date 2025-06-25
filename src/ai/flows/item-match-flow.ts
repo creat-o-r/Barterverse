@@ -215,7 +215,7 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     let preferencesConsideredBeyondDefaultMinRating = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
-    let finalInputForPrompt: any = { ...input };
+    const finalInputForPrompt: any = { ...input };
     let usedMatchingMode: 'simple' | 'advanced' = 'simple';
 
     const itemsToConsider = input.availableItems.filter(item =>
@@ -333,7 +333,7 @@ const itemMatchFlow = ai.defineFlow(
           return errorOutput;
       }
 
-      const augmentedMatches: SuggestedItemWithScoreSchema[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
+      const augmentedMatches: z.infer<typeof SuggestedItemWithScoreSchema>[] = (promptOutput.suggestedMatches || []).map(aiSuggestion => {
         const originalItem = itemsToConsider.find(item => item.id === aiSuggestion.itemId);
         return {
           itemId: aiSuggestion.itemId,

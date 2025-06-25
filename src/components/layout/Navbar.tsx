@@ -5,7 +5,7 @@ import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react'; // Removed ListPlus
+import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -19,7 +19,6 @@ import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
 const primaryNavLinks = [
   { href: '/', label: 'Match', icon: <Package className="h-4 w-4" /> },
   { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
-  // { href: '/quick-list', label: 'Quick List', icon: <ListPlus className="h-4 w-4" /> }, // Removed Quick List link
   {
     href: '/chats',
     label: 'Chats',
@@ -42,7 +41,7 @@ function GlobalCategoryFilter() {
           setSelectedCategory(value === "any" ? null : value);
         }}
       >
-        <SelectTrigger className="w-auto max-w-[120px] sm:max-w-[140px] text-xs h-9 px-2 md:w-[180px] md:text-sm md:px-3 md:h-10 md:max-w-none bg-background">
+        <SelectTrigger className="w-auto max-w-[120px] sm:max-w-[140px] text-xs h-9 px-2 md:w-[180px] md:text-sm md:px-3 md:h-10 md:max-w-none bg-card">
           <SelectValue placeholder="Any" />
         </SelectTrigger>
         <SelectContent>
