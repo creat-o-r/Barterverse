@@ -444,19 +444,19 @@ export default function NewItemPage() {
                  <FormItem>
                   <FormLabel className="font-headline">Assign to Project</FormLabel>
                   <Select
-                    value={selectedProjectId || ""}
+                    value={selectedProjectId || "none"}
                     onValueChange={(value) => {
                       if (value === "_CREATE_NEW_PROJECT_") {
                         setShowCreateProjectModalForItem(true);
                       } else {
-                        setSelectedProjectId(value === "" ? undefined : value);
+                        setSelectedProjectId(value === "none" ? undefined : value);
                       }
                     }}
                     disabled={isLoadingOverall || loadingProjectsState}
                   >
                     <FormControl><SelectTrigger><SelectValue placeholder="None" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
 
                       {myPrivateProjects.length > 0 && (
                         <SelectGroup>
