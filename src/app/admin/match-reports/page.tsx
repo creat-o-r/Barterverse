@@ -248,7 +248,7 @@ export default function MatchReportsPage() {
                 {isUpdatingMode && <RefreshCw className="h-5 w-5 animate-spin text-primary" />}
             </div>
             <div className="text-sm text-muted-foreground p-4 border-l-4 border-primary/50 bg-primary/5 rounded-md space-y-1">
-                <div className="flex items-start gap-2"><BrainCircuit className="h-5 w-5 text-primary mt-0.5 shrink-0" /><div><strong className="text-foreground">Advanced Mode:</strong> Considers 'offer' vs. 'want' types, aims for direct fulfillment and complementary trades. More nuanced.</div></div>
+                <div className="flex items-start gap-2"><BrainCircuit className="h-5 w-5 text-primary mt-0.5 shrink-0" /><div><strong className="text-foreground">Advanced Mode:</strong> {"Considers 'offer' vs. 'want' types, aims for direct fulfillment and complementary trades. More nuanced."}</div></div>
                  <div className="flex items-start gap-2"><Zap className="h-5 w-5 text-secondary-foreground mt-0.5 shrink-0" /><div><strong className="text-foreground">Simple Mode:</strong> Focuses on general relevance and keyword matches. Less nuanced.</div></div>
             </div>
             <Separator />

@@ -55,3 +55,12 @@ dist
 
 # TypeScript build cache
 tsconfig.tsbuildinfo
+
+# Firebase
+.firebase/
+
+# IDE specific files
+.idx/
+
+# Test coverage
+coverage/

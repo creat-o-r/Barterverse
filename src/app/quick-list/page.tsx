@@ -7,11 +7,19 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, User, Bot, Loader2, ListChecks, Package, Tag, ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"; // Added Dialog
+// Input is already imported from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'; // Added Textarea
+import { Label } from '@/components/ui/label'; // Added Label
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added Select
+import { Send, User, Bot, Loader2, ListChecks, Package, Tag, ImageIcon, PlusSquare, Briefcase } from 'lucide-react'; // Added PlusSquare, Briefcase
 import Image from 'next/image';
-import type { Item, ChatMessage } from '@/types';
+import type { Item, ChatMessage, Project } from '@/types'; // Added Project type
+import { createProject, getProjectsByOwner } from '@/services/project-service'; // Added getProjectsByOwner
 import { generalChat } from '@/ai/flows/general-chat-flow';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'; // Added Collapsible
+import { useMemo } from 'react'; // Added useMemo
 import { useToast } from "@/hooks/use-toast";
 import { dummyUsers, dummyItems } from '@/lib/dummy-data';
 import Link from 'next/link';
@@ -28,11 +36,37 @@ export default function QuickListPage() {
   const { toast } = useToast();
   const currentUserId = dummyUsers[0].id; // Simulate current user
 
+  // State for user's projects for grouping
+  const [userProjectsState, setUserProjectsState] = useState<Project[]>([]);
+  const [isLoadingProjectsForGrouping, setIsLoadingProjectsForGrouping] = useState(true);
+
+  // States for Save Chat as Project Modal
+  const [showSaveAsProjectModal, setShowSaveAsProjectModal] = useState(false);
+  const [projectChatName, setProjectChatName] = useState('');
+  const [projectChatDescription, setProjectChatDescription] = useState('');
+  const [projectChatVisibility, setProjectChatVisibility] = useState<'public' | 'private' | 'shared'>('private');
+
   useEffect(() => {
     setIsLoadingListings(true);
     const listings = dummyItems.filter(item => item.ownerId === currentUserId && (item.status === 'available' || item.status === 'pending'));
     setUserListings(listings);
     setIsLoadingListings(false);
+
+    if (currentUserId) {
+      setIsLoadingProjectsForGrouping(true);
+      getProjectsByOwner(currentUserId)
+        .then(projects => {
+          setUserProjectsState(projects);
+        })
+        .catch(err => {
+          console.error("Failed to fetch projects for grouping:", err);
+          toast({ title: "Error", description: "Could not load projects for grouping listings.", variant: "default" });
+        })
+        .finally(() => setIsLoadingProjectsForGrouping(false));
+    } else {
+      setIsLoadingProjectsForGrouping(false);
+      setUserProjectsState([]);
+    }
 
     setMessages([
       {
@@ -106,18 +140,94 @@ export default function QuickListPage() {
     }
   };
 
+  const groupedUserListings = useMemo(() => {
+    if (isLoadingProjectsForGrouping || isLoadingListings) return [];
+
+    const groups: Array<{ project: Project | null; name: string; items: Item[]; id: string; }> = [];
+    const itemIdsInProjects = new Set<string>();
+
+    userProjectsState.forEach(proj => {
+      const itemsInProject = userListings.filter(item => proj.itemIds && proj.itemIds.includes(item.id));
+      // Only add project group if it has items from current listings OR if we want to show all projects
+      // For this view, let's only show projects that have some of the userListings in them
+      // Or always show project, and then list items if any.
+      // Let's go with always show project, and list items if any.
+      groups.push({ project: proj, name: proj.name, items: itemsInProject, id: proj.id });
+      itemsInProject.forEach(item => itemIdsInProjects.add(item.id));
+    });
+
+    const unassignedItems = userListings.filter(item => !itemIdsInProjects.has(item.id));
+    if (unassignedItems.length > 0) {
+      groups.push({ project: null, name: "Unassigned Items", items: unassignedItems, id: "unassigned-group" });
+    }
+
+    // Ensure all projects are listed, even if empty of current items, and sort them
+    userProjectsState.forEach(proj => {
+        if (!groups.find(g => g.project?.id === proj.id)) {
+            groups.push({ project: proj, name: proj.name, items: [], id: proj.id });
+        }
+    });
+
+    // Remove duplicates that might arise if a project was added via items, then again as an empty project
+    const uniqueGroups = Array.from(new Map(groups.map(group => [group.id, group])).values());
+
+
+    return uniqueGroups.sort((a,b) => {
+        if (a.project && !b.project) return -1; // Projects first
+        if (!a.project && b.project) return 1; // Unassigned last
+        if (a.project && b.project) return a.name.localeCompare(b.name); // Sort projects by name
+        return 0; // Should not happen if IDs are unique
+    });
+
+  }, [userListings, userProjectsState, isLoadingProjectsForGrouping, isLoadingListings]);
+
+  const handleSaveChatAsProject = async () => {
+    if (!projectChatName.trim() || !currentUserId) {
+      toast({ title: "Validation Error", description: "Project name is required.", variant: "destructive" });
+      return;
+    }
+    try {
+      const projectData: Omit<Project, 'id'> = {
+        name: projectChatName,
+        description: projectChatDescription,
+        ownerId: currentUserId,
+        itemIds: [], // Initially empty
+        visibility: projectChatVisibility,
+      };
+      if (projectChatVisibility === 'shared') {
+        projectData.sharedWith = [];
+      }
+
+      const newProject = await createProject(projectData);
+      toast({ title: "Project Created", description: `'${newProject.name}' was successfully created from your chat session.` });
+      setShowSaveAsProjectModal(false);
+      setProjectChatName('');
+      setProjectChatDescription('');
+      setProjectChatVisibility('private');
+    } catch (error) {
+      console.error("Error creating project from chat:", error);
+      toast({ title: "Creation Failed", description: "Could not create the project. Please try again.", variant: "destructive" });
+    }
+  };
+
   return (
+    <> {/* Added React Fragment */}
     <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh_-_8rem)]"> {/* Adjust height based on actual nav/footer */}
       {/* Chat Area */}
       <Card className="flex-grow md:flex-grow-[2] flex flex-col h-full">
-        <CardHeader className="pb-3">
-          <CardTitle className="font-headline text-2xl flex items-center gap-2">
-            <ListChecks className="h-7 w-7 text-primary" />
-            Quick List Chat
-          </CardTitle>
-          <CardDescription className="font-body">
-            Chat with the AI to list your items quickly. Describe what you have, and the AI will help (soon!).
-          </CardDescription>
+        <CardHeader className="pb-3 flex flex-row items-start justify-between">
+          <div> {/* Wrapper for title and description */}
+            <CardTitle className="font-headline text-2xl flex items-center gap-2">
+              <ListChecks className="h-7 w-7 text-primary" />
+              Quick List Chat
+            </CardTitle>
+            <CardDescription className="font-body mt-1">
+              Chat with the AI to list your items quickly. Describe what you have, and the AI will help (soon!).
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowSaveAsProjectModal(true)} className="flex-shrink-0 ml-4">
+            <PlusSquare className="mr-2 h-4 w-4" /> Save Chat as Project
+          </Button>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col p-0 overflow-hidden">
           <ScrollArea className="flex-grow p-4 space-y-4" ref={scrollAreaRef}>
@@ -199,39 +309,68 @@ export default function QuickListPage() {
         </CardHeader>
         <CardContent className="flex-grow p-0 overflow-hidden">
           <ScrollArea className="h-full p-4">
-            {isLoadingListings ? (
+            {isLoadingListings || isLoadingProjectsForGrouping ? (
               <div className="flex justify-center items-center h-full">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : userListings.length === 0 ? (
               <p className="text-center text-muted-foreground font-body py-10">You have no active listings.</p>
-            ) : (
+            ) : groupedUserListings.length === 0 && userListings.length > 0 ? (
+               // This case means all items are unassigned and the unassigned group is the only one.
+               // Or if logic changes, this could be a fallback. For now, let's assume unassigned group always appears if items exist.
               <div className="space-y-3">
+                <h4 className="text-md font-semibold flex items-center gap-2">
+                    <Package className="h-5 w-5 text-muted-foreground" /> Unassigned Items ({userListings.length})
+                </h4>
                 {userListings.map(item => (
-                  <div key={item.id} className="p-3 border rounded-md bg-muted/30 hover:shadow-sm transition-shadow">
-                    <div className="flex items-start gap-3">
-                        <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
-                            {item.imageUrl ? (
-                                <Image src={item.imageUrl} alt={item.name} fill className="object-cover" data-ai-hint={item.dataAiHint || "item image"} />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                    <ImageIcon className="w-6 h-6" />
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-grow min-w-0">
-                             <Link href={`/items/${item.id}`} className="hover:text-primary">
-                                <h4 className="text-sm font-semibold truncate font-headline" title={item.name}>{item.name}</h4>
-                            </Link>
-                            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                                <Tag className="h-3 w-3 shrink-0" /> {item.category}
-                            </p>
-                            <Badge variant={item.listingType === 'offer' ? 'default' : 'secondary'} className="text-[10px] mt-1 capitalize px-1.5 py-0.5">
-                                {item.listingType}
-                            </Badge>
-                        </div>
+                  <div key={item.id} className="p-2 border rounded-md bg-background hover:shadow-sm transition-shadow">
+                    <div className="flex items-start gap-2">
+                      <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                        {item.imageUrl ? ( <Image src={item.imageUrl} alt={item.name} fill className="object-cover" data-ai-hint={item.dataAiHint || "item image"} /> ) : ( <div className="w-full h-full flex items-center justify-center text-muted-foreground"><ImageIcon className="w-5 h-5" /></div> )}
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <Link href={`/items/${item.id}`} className="hover:text-primary"><h5 className="text-xs font-semibold truncate font-headline" title={item.name}>{item.name}</h5></Link>
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1"><Tag className="h-3 w-3 shrink-0" /> {item.category}</p>
+                        <Badge variant={item.listingType === 'offer' ? 'default' : 'secondary'} className="text-[10px] mt-1 capitalize px-1.5 py-0.5">{item.listingType}</Badge>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {groupedUserListings.map((group) => (
+                  <Collapsible key={group.id} defaultOpen={true} className="rounded-md border overflow-hidden">
+                    <CollapsibleTrigger className="w-full bg-muted/50 hover:bg-muted/80 transition-colors p-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold flex items-center gap-2">
+                          {group.project ? <Briefcase className="h-4 w-4 text-primary" /> : <Package className="h-4 w-4 text-muted-foreground" />}
+                          {group.name} ({group.items.length})
+                        </h4>
+                        {/* Add Chevron from lucide if desired for open/close state indication */}
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2 pb-1 px-2 space-y-2 bg-background">
+                      {group.items.length === 0 ? (
+                        <p className="text-xs text-muted-foreground pl-1 py-1">No items from your current listings in this project.</p>
+                      ) : (
+                        group.items.map(item => (
+                          <div key={item.id} className="p-1.5 border rounded-md bg-muted/20 hover:shadow-sm transition-shadow">
+                            <div className="flex items-start gap-2">
+                              <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded bg-muted flex-shrink-0 overflow-hidden">
+                                {item.imageUrl ? ( <Image src={item.imageUrl} alt={item.name} fill className="object-cover" data-ai-hint={item.dataAiHint || "item image"} /> ) : ( <div className="w-full h-full flex items-center justify-center text-muted-foreground"><ImageIcon className="w-4 h-4" /></div> )}
+                              </div>
+                              <div className="flex-grow min-w-0">
+                                <Link href={`/items/${item.id}`} className="hover:text-primary"><h5 className="text-xs font-semibold truncate font-headline" title={item.name}>{item.name}</h5></Link>
+                                <p className="text-xs text-muted-foreground truncate flex items-center gap-1"><Tag className="h-3 w-3 shrink-0" /> {item.category}</p>
+                                <Badge variant={item.listingType === 'offer' ? 'default' : 'secondary'} className="text-[9px] mt-0.5 capitalize px-1 py-0"> {item.listingType} </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
                 ))}
               </div>
             )}
@@ -239,5 +378,47 @@ export default function QuickListPage() {
         </CardContent>
       </Card>
     </div>
+
+    {/* Modal for Saving Chat as Project */}
+    {showSaveAsProjectModal && (
+      <Dialog open={showSaveAsProjectModal} onOpenChange={setShowSaveAsProjectModal}>
+        <DialogContent className="sm:max-w-[480px] bg-card">
+          <DialogHeader>
+            <DialogTitle className="font-headline">Save Chat Session as Project</DialogTitle>
+            <DialogDescription className="font-body">
+              Create a new project based on this chat. You can add specific items later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="projectChatName" className="text-right font-body">Name</Label>
+              <Input id="projectChatName" value={projectChatName} onChange={(e) => setProjectChatName(e.target.value)} className="col-span-3 font-body" placeholder="Project Name" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="projectChatDescription" className="text-right font-body">Description</Label>
+              <Textarea id="projectChatDescription" value={projectChatDescription} onChange={(e) => setProjectChatDescription(e.target.value)} className="col-span-3 font-body" placeholder="Brief description (e.g., context of chat)" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="projectChatVisibility" className="text-right font-body">Visibility</Label>
+              <Select value={projectChatVisibility} onValueChange={(value: 'public' | 'private' | 'shared') => setProjectChatVisibility(value)}>
+                <SelectTrigger className="col-span-3 font-body">
+                  <SelectValue placeholder="Select visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private" className="font-body">Private</SelectItem>
+                  <SelectItem value="public" className="font-body">Public</SelectItem>
+                  <SelectItem value="shared" className="font-body">Shared</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveAsProjectModal(false)} className="font-body">Cancel</Button>
+            <Button onClick={handleSaveChatAsProject} disabled={!projectChatName.trim()} className="font-body">Save Project</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 }

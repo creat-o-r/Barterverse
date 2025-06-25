@@ -5,7 +5,7 @@ import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react'; // Removed ListPlus
+import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -19,7 +19,6 @@ import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
 const primaryNavLinks = [
   { href: '/', label: 'Match', icon: <Package className="h-4 w-4" /> },
   { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
-  // { href: '/quick-list', label: 'Quick List', icon: <ListPlus className="h-4 w-4" /> }, // Removed Quick List link
   {
     href: '/chats',
     label: 'Chats',
