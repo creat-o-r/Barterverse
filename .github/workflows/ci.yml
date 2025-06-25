@@ -2,7 +2,7 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ main, ci-cd-infrastructure, feature/comprehensive-testing-integration ]
+    branches: [ main, ci-cd-infrastructure, feature/comprehensive-testing-integration, feature/ui-rebase-onto-testing ]
   pull_request:
     branches: [ main, ci-cd-infrastructure ]
 

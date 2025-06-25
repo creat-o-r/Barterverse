@@ -181,15 +181,15 @@ const inferUserPreferencesFlow = ai.defineFlow(
       })),
       // Ensure currentPreferences includes a minimumMatchRating, defaulting to 'Low' if not present in input
       currentPreferences: input.currentPreferences 
-        ? { ...input.currentPreferences, minimumMatchRating: input.currentPreferences.minimumMatchRating || 'Low' } 
-        : { minimumMatchRating: 'Low' } 
+        ? { ...input.currentPreferences, minimumMatchRating: (input.currentPreferences.minimumMatchRating || 'Low') as 'Low' | 'Medium' | 'High' } 
+        : { minimumMatchRating: 'Low' as const } 
     };
 
     try {
       console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
       const {output} = await prompt(processedInput);
 
-      let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
+      const finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
       let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values may have been applied.";
       let errorMessage: string | undefined = undefined;
