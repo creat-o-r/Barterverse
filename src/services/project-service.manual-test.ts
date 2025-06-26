@@ -3,9 +3,9 @@ import { Project, Item } from '../types'; // Import Item
 import { dummyItems } from '../lib/dummy-data'; // Import dummyItems
 
 // To keep track of created project IDs for cleanup or chained tests
-let createdProjectIds: string[] = [];
-let testUser1 = 'user1-test';
-let testUser2 = 'user2-test';
+const createdProjectIds: string[] = [];
+const testUser1 = 'user1-test';
+const testUser2 = 'user2-test';
 
 const assert = (condition: boolean, message: string) => {
   if (!condition) {
@@ -26,7 +26,7 @@ const runTests = async () => {
       description: 'A test project for creation',
       ownerId: testUser1,
       itemIds: ['item1'],
-      visibility: 'private' as 'private',
+      visibility: 'private' as const,
     };
     const createdProject1 = await projectService.createProject(projectDetails1);
     assert(!!createdProject1, 'FAIL: createProject - project1 should be created');
@@ -39,7 +39,7 @@ const runTests = async () => {
       description: 'A shared project, formerly public',
       ownerId: testUser2,
       itemIds: ['item2', 'item3'],
-      visibility: 'shared' as 'shared', // Changed from 'public' to 'shared'
+      visibility: 'shared' as const, // Changed from 'public' to 'shared'
     };
     const createdProject2 = await projectService.createProject(projectDetails2);
     assert(!!createdProject2, 'FAIL: createProject - project2 should be created');
@@ -51,7 +51,7 @@ const runTests = async () => {
       description: 'A shared project',
       ownerId: testUser1,
       itemIds: ['item4'],
-      visibility: 'shared' as 'shared',
+      visibility: 'shared' as const,
       sharedWith: [testUser2],
     };
     const createdProject3 = await projectService.createProject(projectDetails3);
@@ -111,7 +111,7 @@ const runTests = async () => {
       name: 'Updated Project Name',
       description: 'Updated description.',
       itemIds: ['item1', 'item_new'],
-      visibility: 'private' as 'private', // ensure visibility is one of the allowed literals
+      visibility: 'private' as const, // ensure visibility is one of the allowed literals
     };
     // Cast updates to the correct type, excluding id and ownerId
     const typedUpdates: Partial<Omit<Project, 'id' | 'ownerId'>> = updates;

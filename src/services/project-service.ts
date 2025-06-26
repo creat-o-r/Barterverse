@@ -1,7 +1,7 @@
 import { Project } from '../types';
 import { dummyItems } from '../lib/dummy-data'; // Added dummyItems for checking item ownership
 
-let projectsData: Project[] = []; // In-memory store
+const projectsData: Project[] = []; // In-memory store
 let nextId = 1; // Simple ID generator
 
 export const createProject = async (projectDetails: Omit<Project, 'id'>): Promise<Project> => {
