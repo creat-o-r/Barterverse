@@ -85,3 +85,68 @@ Central types in `src/types/index.ts`:
 - AI flows use structured input/output schemas for type safety
 - Error handling includes fallbacks for AI failures and safety blocks
 - All AI interactions are logged via match-report-service for debugging
+
+## Project Management Features
+
+### Project System Architecture
+**Status**: Functionally complete, needs UI integration (see issue #48)
+
+- **Service Layer**: `src/services/project-service.ts` - Complete CRUD operations
+- **Data Model**: `Project` type with visibility controls (`private`/`shared`)
+- **UI Components**: 
+  - `ManageItemProjectsButton` - Full functionality (needs integration)
+  - `ProjectCard` and `ProjectDetails` - Basic views implemented
+- **Integration Points**: Item creation flow ✅, Profile pages ✅, Item management UI ❌
+
+### Missing Integration
+- Add `ManageItemProjectsButton` to `ItemCard.tsx` and item detail pages
+- Complete project listing (`/projects`) and detail (`/projects/[id]`) pages
+- Enhance profile project management section
+
+## GitHub Integration & Authentication
+
+### Repository Information
+- **Owner**: `creat-o-r`
+- **Repository**: `Barterverse`
+- **URL**: https://github.com/creat-o-r/Barterverse
+
+### Issue Management
+**IMPORTANT**: MCP GitHub tools have read-only access. For creating issues:
+
+**✅ CORRECT METHOD:**
+```bash
+npm run issues:create "Title" "Body content" "label1,label2,label3"
+```
+
+**❌ NEVER USE:**
+- `mcp__github__create_issue` (authentication fails)
+- Manual curl commands (credentials not available)
+- Any other GitHub creation methods
+
+### Available GitHub Commands
+```bash
+# Issue Management
+npm run issues:create <title> <body> <labels>
+npm run issues:update <issue-number> <field> <value>
+npm run issues:start <issue-number>
+npm run issues:progress <issue-number>
+npm run issues:auto
+
+# Build Health
+npm run build:status
+
+# Project Management  
+npm run projects:status
+npm run projects:link <issue> <project>
+
+# Development Context
+npm run claude:info
+npm run claude:title
+npm run claude:setup
+```
+
+### Branch and Repository Status
+- **Current Repository**: creat-o-r/Barterverse.git
+- **Main Branch**: `master`
+- **Development Workflow**: feature branches → testing → master
+- **CI/CD**: Comprehensive GitHub Actions with Firebase deployment
