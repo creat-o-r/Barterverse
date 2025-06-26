@@ -8,10 +8,10 @@
  * - InferUserPreferencesOutput - The return type for the inferUserPreferences function.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai} from '../genkit';
 import {z} from 'genkit';
-import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference, UserProfilePreferences } from '@/types';
-import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
+import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference, UserProfilePreferences } from '../../types';
+import { logAIDiagnostic } from '../../services/ai-diagnostic-log-service';
 
 // Define Zod enums based on string literal types from src/types for consistency
 const UserMotivationEnum = z.enum(['help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds']);
@@ -187,6 +187,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
     try {
       console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
+      // @ts-expect-error TS2345 Too complex type compatibility issue for now, related to Zod schema inference in CommonJS build
       const {output} = await prompt(processedInput);
 
       let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };

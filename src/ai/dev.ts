@@ -1,45 +1,21 @@
-'use server';
+'use server'; // Keep this, as flows might rely on server context.
 
 console.log('[AI Dev Init] dev.ts: Module execution START.');
 
-// Import AI flows at module level (proper way)
-import '@/ai/flows/smart-suggestion-tool';
-import '@/ai/flows/trade-negotiation-chat';
-import '@/ai/flows/item-match-flow';
-import '@/ai/flows/suggest-category-flow';
-import '@/ai/flows/general-chat-flow';
-import '@/ai/flows/infer-listing-type-flow';
-import '@/ai/flows/infer-user-preferences-flow';
-import '@/ai/flows/explain-match-rationale-flow';
+// Import AI flows at module level to register them
+import './flows/smart-suggestion-tool';
+import './flows/trade-negotiation-chat';
+import './flows/item-match-flow';
+import './flows/suggest-category-flow';
+import './flows/general-chat-flow';
+import './flows/infer-listing-type-flow';
+import './flows/infer-user-preferences-flow';
+import './flows/explain-match-rationale-flow';
 
-import { startFlowsServer } from 'genkit/flow';
-import './genkit';
+import './genkit'; // Ensure Genkit itself is initialized
 
-const port = process.env.PORT || 3001;
+// The explicit call to startFlowsServer and related code is removed.
+// genkit start command is expected to handle server startup.
 
-async function startAIDev() {
-  try {
-    console.log('[AI Dev Init] Starting AI development server...');
-    console.log('[AI Dev Init] All AI flows imported successfully');
-    
-    console.log(`[AI Dev Init] Starting Genkit flows server on port ${port}...`);
-    await startFlowsServer({
-      port: Number(port),
-    });
-    
-    console.log(`[AI Dev Init] ✅ Genkit dev server is running on http://localhost:${port}`);
-    console.log('[AI Dev Init] You can now access the Genkit Developer UI to test flows.');
-  } catch (error: any) {
-    console.error('[AI Dev Init] ❌ Failed to start AI development server:', error.message);
-    console.error('[AI Dev Init] Stack trace:', error.stack);
-    process.exit(1);
-  }
-}
-
-// Start the development server
-startAIDev().catch((error) => {
-  console.error('[AI Dev Init] ❌ Unhandled error:', error);
-  process.exit(1);
-});
-
+console.log('[AI Dev Init] dev.ts: All flow modules imported. Genkit CLI should now handle server startup.');
 console.log('[AI Dev Init] dev.ts: Module execution END.');

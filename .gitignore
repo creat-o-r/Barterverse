@@ -31,7 +31,7 @@ yarn-error.log*
 
 # Production Build Artifacts (Next.js)
 .next
-build
+/build # Compiled AI flows and other build artifacts
 dist
 
 # Environment variables

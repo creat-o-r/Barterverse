@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "commonjs", // Genkit/Node.js typically uses CommonJS
+    "moduleResolution": "node", // Override for CommonJS compatibility
+    "outDir": "./build",   // Output directory for compiled JS
+    "rootDir": "./src",    // Specify root directory to maintain folder structure
+    "skipLibCheck": true // Often useful to speed up compilation
+  },
+  "include": [
+    "src/ai/**/*.ts"   // Only include AI related files
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "src/ai/**/*.test.ts" // Exclude tests from AI build
+  ]
+}
