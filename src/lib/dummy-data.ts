@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import type { Item, User, UserMotivation, TradeTimingPreference, UserProfilePreferences, UserStoredLocation, UserLogisticsPreferences, ItemLogistics, ItemDeliveryMethod, ItemTiming, ItemLogisticsLocationType } from '@/types';
 import type { InferredUserPreferences } from '@/types';
 
@@ -522,7 +521,6 @@ export function addNewItemToDummyData(
     finalLogistics = {
         locationType: itemData.logistics.locationType,
         selectedUserStoredLocationId: itemData.logistics.locationType === 'profile_stored_location' ? itemData.logistics.selectedUserStoredLocationId : undefined,
-        // @ts-expect-error TS2367 Pre-existing type mismatch or subtle inference issue
         itemSpecificAddress: itemData.logistics.locationType === 'item_specific_location' ? itemData.logistics.itemSpecificAddress : undefined,
         deliveryMethods: itemData.logistics.deliveryMethods,
         timing: itemData.logistics.timing,
@@ -542,7 +540,7 @@ export function addNewItemToDummyData(
     finalLogistics = {
         locationType: defaultLocType,
         selectedUserStoredLocationId: defaultStoredId,
-        itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
+        itemSpecificAddress: undefined,
         deliveryMethods: owner.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'],
         timing: { type: 'flexible' },
         notes: '',
