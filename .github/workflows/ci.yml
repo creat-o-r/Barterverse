@@ -24,11 +24,9 @@ jobs:
 
       - name: Run unit tests (REQUIRED)
         run: npm run test:unit -- --coverage --coverageThreshold='{"global":{"lines":90,"branches":77,"statements":89,"functions":79}}'
-        continue-on-error: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
 
       - name: Build application (REQUIRED)
         run: npm run build
-        continue-on-error: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
         env:
           GOOGLE_API_KEY: placeholder_for_build
 
