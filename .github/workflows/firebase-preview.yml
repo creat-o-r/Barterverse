@@ -21,12 +21,18 @@ jobs:
           node-version: '22'
           cache: 'npm'
       
-      - name: Check CI status (non-blocking)
-        id: ci-status
-        continue-on-error: true
-        run: |
-          echo "CI_STATUS=checking" >> $GITHUB_OUTPUT
-          # We'll build regardless of CI status - prioritize previews!
+      - name: Wait for CI (testing/production branches only)
+        if: github.base_ref == 'testing' || github.base_ref == 'master' || github.base_ref == 'main'
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: 'test'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 30
+          
+      - name: Skip CI for dev branches
+        if: github.base_ref != 'testing' && github.base_ref != 'master' && github.base_ref != 'main'
+        run: echo "🚀 Dev branch detected - skipping CI wait for instant preview"
           
       - name: Install dependencies
         run: npm ci
