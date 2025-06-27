@@ -7,11 +7,15 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Send, User, Bot, Loader2 } from 'lucide-react';
-import type { Item, ChatMessage } from '@/types';
+import type { Item, ChatMessage, User } from '@/types'; // Added User
 import { tradeNegotiationChat } from '@/ai/flows/trade-negotiation-chat';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
-import { dummyUsers } from '@/lib/dummy-data'; // For currentUserId simulation
+// import { dummyUsers } from '@/lib/dummy-data'; // Replaced
+import { getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+
+// Simulated current user ID
+const SIMULATED_CURRENT_USER_ID = 'user1';
 
 interface ChatWindowProps {
   currentItem: Item; // Item that forms the primary context from *other user's* side (e.g., what they offer, or what they want of yours)

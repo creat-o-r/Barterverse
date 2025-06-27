@@ -1,16 +1,17 @@
 
 "use client";
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, Suspense } from 'react'; // Added Suspense
 import Image from 'next/image';
-import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
+// import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getUser, getItemsByOwner, updateUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
 import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, ItemDeliveryMethod } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase } from 'lucide-react';
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -18,22 +19,28 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
+// Simulated current user ID - replace with actual auth logic when available
+const SIMULATED_CURRENT_USER_ID = 'user1';
 
-async function getUserProfile(userId: string): Promise<User | null> {
-  const actualUserId = userId === 'me' ? dummyUsers[0].id : userId;
-  let user = dummyUsers.find((u) => u.id === actualUserId);
-  if (!user) return null;
+async function fetchUserProfileData(userIdToFetch: string): Promise<User | null> {
+  const user = await getUser(userIdToFetch);
+  if (!user) {
+    console.warn(`User with ID ${userIdToFetch} not found.`);
+    return null;
+  }
   
+  // Ensure some defaults if they are critical for display and might be missing
+  // This kind of logic might better live in a data transformation layer or type validation
   if (user.minimumMatchRating === undefined) {
-    user.minimumMatchRating = 'Low';
+    user.minimumMatchRating = 'Low'; // Default if not set
   }
   if (user.logisticsPreferences && !user.logisticsPreferences.defaultDeliveryMethods) {
-    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only'];
+    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only']; // Default if not set
   }
 
-
-  const userItemsFromGlobal = dummyItems.filter(item => item.ownerId === user.id);
-  return JSON.parse(JSON.stringify({...user, items: userItemsFromGlobal}));
+  const userItems = await getItemsByOwner(userIdToFetch);
+  // No need for JSON.parse(JSON.stringify(...)) if types are handled correctly
+  return { ...user, items: userItems };
 }
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };

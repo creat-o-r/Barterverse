@@ -14,8 +14,9 @@ import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
 import { logMatchSuggestion } from '@/services/match-report-service';
 import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '@/services/ai-config-service';
-import { dummyUsers } from '@/lib/dummy-data'; // For fetching user preferences
-import type { UserProfilePreferences } from '@/types';
+// import { dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import type { UserProfilePreferences, User } from '@/types'; // Added User
 import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 
 const ItemBriefSchema = z.object({
