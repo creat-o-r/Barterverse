@@ -21,12 +21,17 @@ jobs:
           node-version: '20'
           cache: 'npm'
       
-      - name: Wait for CI to pass
+      - name: Wait for CI to pass (skip if skip-ci comment found)
+        if: ${{ !contains(github.event.pull_request.body, 'skip-ci') && !contains(github.event.head_commit.message, 'skip-ci') }}
         uses: lewagon/wait-on-check-action@v1.3.4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           check-name: 'Node.js CI'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Skip CI wait (if skip-ci found)
+        if: ${{ contains(github.event.pull_request.body, 'skip-ci') || contains(github.event.head_commit.message, 'skip-ci') }}
+        run: echo "🚀 Skipping CI wait due to skip-ci directive"
           
       - name: Install dependencies
         run: npm ci

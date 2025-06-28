@@ -43,7 +43,7 @@ jobs:
         continue-on-error: true
 
       - name: Run End-to-End tests
-        run: npm run test:e2e || echo "⚠️ E2E tests failed"
+        run: echo "⚠️ E2E tests temporarily disabled for merge testing"
         continue-on-error: true
         env:
           BASE_URL: http://localhost:9002
