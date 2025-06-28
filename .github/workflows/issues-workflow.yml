@@ -92,7 +92,7 @@ jobs:
 
   pr_integration:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.head.ref, 'issue-')
     
     steps:
       - name: Checkout code
