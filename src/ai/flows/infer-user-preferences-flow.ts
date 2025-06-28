@@ -187,8 +187,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
     try {
       console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
-      // @ts-expect-error TS2345 Too complex type compatibility issue for now, related to Zod schema inference in CommonJS build
-      const {output} = await prompt(processedInput);
+      const {output} = await prompt(processedInput as any); // Complex Zod schema inference issue in CommonJS build
 
       let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
