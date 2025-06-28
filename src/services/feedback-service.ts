@@ -59,13 +59,13 @@ export async function logFeedbackEntry(
     timestamp: new Date().toISOString(),
   };
 
-  let currentLogs = await readFeedbackLogs();
+  const currentLogs = await readFeedbackLogs();
   currentLogs.unshift(newReport); // Add new report to the beginning
 
-  // Optional: Limit log size if it grows too large (e.g., keep last 1000 entries)
-  // if (currentLogs.length > 1000) {
-  //   currentLogs = currentLogs.slice(0, 1000);
-  // }
+  // Limit log size if it grows too large (keep last 1000 entries)
+  if (currentLogs.length > 1000) {
+    currentLogs.splice(1000); // Remove excess items in-place
+  }
 
   const writeSuccess = await writeFeedbackLogs(currentLogs);
   if (writeSuccess) {
