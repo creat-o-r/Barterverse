@@ -15,9 +15,9 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Added Button for Quick List link
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
-// Simulated current user ID - replace with actual auth logic when available
-const SIMULATED_CURRENT_USER_ID = 'user1';
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
 
 interface UserItemSuggestion {
   userItem: Item;

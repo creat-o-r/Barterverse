@@ -37,9 +37,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
-// Simulated current user ID - replace with actual auth logic when available
-const SIMULATED_CURRENT_USER_ID = 'user1';
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
 const NO_LOCATION_SPECIFIED_VALUE = "no_location_specified_for_item";

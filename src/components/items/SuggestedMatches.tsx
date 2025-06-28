@@ -6,12 +6,14 @@ import type { Item, User } from '@/types'; // Added User
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
 // import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced
-import { getAllItems, getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import { getAllItems } from '@/lib/firebase/firestoreUtils'; // getUser no longer needed if just using ID
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { AIMatchingMode } from '@/services/ai-config-service';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import Link from 'next/link'; // Import Link for sign-in prompt
 
 
 interface SuggestedMatchesProps {

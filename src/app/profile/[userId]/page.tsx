@@ -1,12 +1,13 @@
 
 "use client";
 
-import { use, useState, useEffect, Suspense } from 'react'; // Added Suspense
+import { use, useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
-// import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data'; // Replaced with Firestore
-import { getUser, getItemsByOwner, updateUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import { getUser, getItemsByOwner, updateUser } from '@/lib/firebase/firestoreUtils';
 import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, ItemDeliveryMethod } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -68,10 +69,13 @@ const getChainDeliveryBadgeText = (openToChain?: boolean): string | null => {
 
 
 const preparePreferenceInferenceInput = (user: User | null): InferUserPreferencesInput | null => {
-  if (!user) return null;
+  if (!user || !user.items) { // Ensure user and user.items exist
+    // console.warn("[preparePreferenceInferenceInput] User or user.items is null/undefined.", user);
+    return null;
+  }
 
-  const userListedItems = dummyItems
-    .filter(i => i.ownerId === user.id && (i.status === 'available' || i.status === 'pending'))
+  const userListedItems = user.items // Use items already attached to the user object
+    .filter(i => (i.status === 'available' || i.status === 'pending'))
     .slice(0, 5) 
     .map(item => ({
       name: item.name,
