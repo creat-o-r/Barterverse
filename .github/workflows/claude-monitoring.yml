@@ -1,0 +1,58 @@
+name: Claude Code Action Official
+
+on:
+  workflow_run:
+    workflows: ["Node.js CI", "Deploy to Firebase Hosting", "Deploy PR Preview"]
+    types: [completed]
+  issues:
+    types: [opened, reopened]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude_monitor:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' || contains(github.event.comment.body, '@claude') || contains(github.event.issue.body, '@claude') || contains(github.event.pull_request.body, '@claude') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+    
+    steps:
+      - name: Claude Code Action
+        uses: anthropics/claude-code-action@beta
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_env: |
+            NODE_ENV: test
+            CI: true
+            GITHUB_REPOSITORY: ${{ github.repository }}
+            WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+            FAILURE_URL: ${{ github.event.workflow_run.html_url }}
+          prompt: |
+            URGENT: Systemic pipeline failure detection needed.
+            
+            Context: ${{ github.event.workflow_run.name || 'GitHub event' }} 
+            Status: ${{ github.event.workflow_run.conclusion || 'triggered' }}
+            URL: ${{ github.event.workflow_run.html_url || github.event.issue.html_url || github.event.pull_request.html_url }}
+            
+            Tasks:
+            1. Download and analyze ALL recent workflow logs (not just this failure)
+            2. Detect PATTERNS across multiple commits/branches/workflows
+            3. Identify if this is a systemic infrastructure issue vs code issue
+            4. Check for error suppression patterns (|| echo commands hiding failures)
+            5. Surface root cause: Is the entire CI/CD system broken?
+            6. Create actionable issue with pattern analysis and fix strategy
+            
+            CRITICAL: Look for patterns like:
+            - Multiple workflows failing with same error across branches
+            - Configuration drift between workflow files  
+            - Silent failures being masked by || echo commands
+            - Infrastructure issues affecting multiple repositories
+            - Dependency/environment inconsistencies
+            
+            If >30% of recent workflows are failing, flag as SYSTEMIC INFRASTRUCTURE FAILURE.

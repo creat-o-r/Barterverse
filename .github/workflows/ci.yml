@@ -2,9 +2,9 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ main, ci-cd-infrastructure, feature/comprehensive-testing-integration, feat/precompile-ai-flows, fix/actual-linting-errors ]
+    branches: [ master, testing, ci-cd-infrastructure, feature/*, feat/*, fix/* ]
   pull_request:
-    branches: [ main, ci-cd-infrastructure ]
+    branches: [ master, testing, ci-cd-infrastructure, feature/*, feat/*, fix/* ]
 
 jobs:
   test:
