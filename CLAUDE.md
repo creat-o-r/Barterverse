@@ -150,3 +150,33 @@ npm run claude:setup
 - **Main Branch**: `master`
 - **Development Workflow**: feature branches → testing → master
 - **CI/CD**: Comprehensive GitHub Actions with Firebase deployment
+
+## Core App Development Workflow
+
+### Claude Code Startup Routine
+**For core app development (testing/master branches):**
+1. Check current git branch and status
+2. Verify app starts: `npm run dev` 
+3. Run type checking: `npm run typecheck`
+4. Check for obvious issues in codebase
+5. Provide summary of current development state
+
+**For CI/CD tasks:** Switch to `ci-cd-infrastructure` branch for full workflow automation.
+
+### Branch Context
+- **testing/master**: Core application development
+- **ci-cd-infrastructure**: Build monitoring, issues workflow, deployment automation
+- **feature/**: Specific feature development with optional `.claude-context.md` files
+
+## Development Guidelines
+
+### Analysis and Decision-Making Process
+**Always examine actual content and purpose before making decisions:**
+
+1. **Read file contents** before determining classification or purpose
+2. **Understand what the code/config actually does** rather than assuming from filename or git history  
+3. **Cross-check assumptions** against multiple sources of information
+4. **Question initial assumptions** when evidence doesn't align
+5. **Document findings** to build institutional knowledge
+
+**Core Principle**: Evidence-based decisions over assumption-based decisions.
