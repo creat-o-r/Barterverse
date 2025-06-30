@@ -27,6 +27,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           check-name: 'test'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+          allowed-conclusions: success,skipped
           
       - name: Install dependencies
         run: npm ci
