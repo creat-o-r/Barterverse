@@ -29,32 +29,9 @@ console.log(`[Genkit Init] Using fallback model for build compatibility: ${genki
 
 export const ai = genkit({
   plugins: [
-    googleAI({
-      safetySettings: [
-        {
-          category: 'HARM_CATEGORY_HATE_SPEECH',
-          threshold: 'BLOCK_ONLY_HIGH',
-        },
-        {
-          category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-          threshold: 'BLOCK_NONE',
-        },
-        {
-          category: 'HARM_CATEGORY_HARASSMENT',
-          threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-        },
-        {
-          category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-          threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-        },
-        {
-          category: 'HARM_CATEGORY_CIVIC_INTEGRITY',
-          threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-        }
-      ],
-    })
-  ], // Restored plugin with safety settings
-  model: genkitModelId, // Restored model selection
+    googleAI({}) // Removed safetySettings from here
+  ],
+  model: genkitModelId,
 });
 
 // Export the async initializer for future use
