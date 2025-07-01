@@ -21,7 +21,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 async function getUserProfile(userId: string): Promise<User | null> {
   const actualUserId = userId === 'me' ? dummyUsers[0].id : userId;
-  let user = dummyUsers.find((u) => u.id === actualUserId);
+  const user = dummyUsers.find((u) => u.id === actualUserId);
   if (!user) return null;
   
   if (user.minimumMatchRating === undefined) {

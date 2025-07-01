@@ -108,7 +108,7 @@ export const dummyUsers: User[] = [
   },
 ];
 
-export let dummyItems: Item[] = [
+export const dummyItems: Item[] = [
   {
     id: 'item1',
     name: 'Vintage Leather Journal',

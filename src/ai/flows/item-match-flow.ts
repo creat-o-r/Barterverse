@@ -215,7 +215,7 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     let preferencesConsideredBeyondDefaultMinRating = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
-    let finalInputForPrompt: any = { ...input };
+    const finalInputForPrompt: any = { ...input };
     let usedMatchingMode: 'simple' | 'advanced' = 'simple';
 
     const itemsToConsider = input.availableItems.filter(item =>
