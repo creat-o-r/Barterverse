@@ -5,14 +5,29 @@
 **Priority:** High - Production Readiness  
 **Timeline:** 2-3 Sprints (4-6 weeks)
 
-## 🎯 Critical Issues Overview
+## 🎯 Critical Issues Overview - REVISED PRIORITY
 
-| Issue | Priority | Effort | Impact | Risk |
-|-------|----------|--------|--------|------|
-| Main Page Component Refactor | **P0** | 8-12h | High | Medium |
-| Firebase Migration Completion | **P0** | 12-16h | High | High |
-| Build Configuration Fix | **P1** | 6-8h | Medium | Low |
-| Authentication Integration | **P0** | 4-6h | High | Medium |
+| Issue | Priority | Effort | Impact | Risk | Why This Order |
+|-------|----------|--------|--------|------|----------------|
+| **Build Configuration Fix** | **P0** | 6-8h | High | Low | **MUST BE FIRST - Need to see all errors** |
+| Main Page Component Refactor | **P1** | 8-12h | High | Medium | Can't refactor properly with errors hidden |
+| Firebase Migration Completion | **P1** | 12-16h | High | High | Need clean build to identify real issues |
+| Authentication Integration | **P2** | 4-6h | High | Medium | Depends on refactored components |
+
+**Why Build Fix Should Be First:**
+
+1. **Visibility Problem**: With `ignoreBuildErrors: true` and `ignoreDuringBuilds: true`, we can't see:
+   - What TypeScript errors exist in the current code
+   - What ESLint issues are being masked
+   - Real vs. imaginary problems in other refactoring tasks
+
+2. **Foundation Issue**: Other refactoring work should be done with proper error checking enabled
+3. **Validation**: Need clean build pipeline to validate that other fixes actually work
+
+**Revised Timeline:**
+- **Week 1**: Build Configuration Fix + Error Assessment
+- **Week 2-3**: Component Refactor + Firebase Migration  
+- **Week 4**: Authentication Integration + Polish
 
 **Total Estimated Effort:** 30-42 hours (1.5-2 sprints)
 
@@ -201,15 +216,60 @@ export default function HomePage() {
 
 ---
 
-## 🔴 Priority 0: Firebase Migration Completion
+## 🔴 Priority 1: Firebase Migration Completion - CLARIFIED
 
-### Current State Analysis
+### What Migration? Current State Analysis
+
+The codebase has **partially migrated** from dummy data to Firebase, but **many files still use dummy data**:
+
 ```typescript
-// Issues found:
-// 1. src/ai/flows/item-match-flow.ts:197 - still uses dummyUsers
-// 2. src/app/page.tsx:70 - imports dummy data (commented out)
-// 3. Multiple flows may have dummy data dependencies
+// FOUND: Extensive dummy data usage still exists:
+
+// 1. AI FLOWS - CRITICAL ISSUE
+// src/ai/flows/item-match-flow.ts:263
+const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+// This breaks AI matching for real users!
+
+// 2. PAGES - MULTIPLE FILES STILL USE DUMMY DATA
+// src/app/opportunities/page.tsx:168
+const currentUser = dummyUsers[0];
+
+// src/app/trades/[tradeId]/page.tsx:32
+const currentUser = dummyUsers.find(u => u.id === currentUserId);
+
+// src/app/quick-list/page.tsx:32
+const currentUserId = dummyUsers[0].id; // Simulate current user
+
+// 3. COMPONENTS - STILL REFERENCING DUMMY DATA
+// src/components/items/SuggestedMatches.tsx:51
+const viewingUser = dummyUsers[0];
+
+// 4. COMMENTED OUT BUT NOT REMOVED
+// Multiple files have:
+// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
+// But still use dummyUsers/dummyItems below!
 ```
+
+### Why This Is Critical
+
+1. **AI Flows Broken**: The core AI matching only works with dummy users, not real Firebase users
+2. **User Experience**: Pages show hardcoded dummy user data instead of real user data  
+3. **Data Inconsistency**: Some components use Firebase, others use dummy data
+4. **Production Blocker**: Can't deploy with hardcoded dummy data
+
+### What Needs To Be Fixed
+
+**Files with Active Dummy Data Usage (HIGH PRIORITY):**
+- `src/ai/flows/item-match-flow.ts` - AI matching broken
+- `src/app/opportunities/page.tsx` - Wrong user shown
+- `src/app/trades/[tradeId]/page.tsx` - Trade pages broken
+- `src/app/quick-list/page.tsx` - Wrong user data
+- `src/app/profile/[userId]/page.tsx` - Profile pages broken
+- `src/components/items/SuggestedMatches.tsx` - Wrong suggestions
+- `src/components/items/ItemTradeInitiationContent.tsx` - Wrong user
+- `src/components/items/TemporaryAdminMatchTestPanelClient.tsx` - Test data in prod
+
+**Total Files Needing Migration:** ~15-20 files
 
 ### Migration Strategy (12-16 hours)
 
@@ -472,17 +532,22 @@ const nextConfig: NextConfig = {
 
 ## 📋 Implementation Timeline
 
-### Sprint 1 (Week 1-2)
-- **Days 1-2:** Main Page Component Refactor Phase 1 (Custom Hooks)
-- **Days 3-4:** Firebase Migration Phase 1-2 (Audit + AI Flows)
-- **Days 5:** Authentication Integration Phase 1
+### Sprint 1 (Week 1)
+- **Days 1-2:** Build Configuration Fix + Error Assessment
+- **Days 3-4:** Main Page Component Refactor Phase 1 (Custom Hooks)
+- **Days 5:** Firebase Migration Phase 1-2 (Audit + AI Flows)
 
-### Sprint 2 (Week 3-4)
+### Sprint 2 (Week 2-3)
 - **Days 1-2:** Main Page Component Refactor Phase 2 (Components)
 - **Days 3-4:** Firebase Migration Phase 3 (Components)
-- **Days 5:** Build Configuration Fix
+- **Days 5:** Authentication Integration Phase 1
 
-### Sprint 3 (Week 5-6) - Polish & Testing
+### Sprint 3 (Week 4)
+- **Days 1-2:** Authentication Integration Phase 2
+- **Days 3-4:** Authentication Integration Phase 3
+- **Days 5:** Polish & Testing
+
+### Sprint 4 (Week 5-6) - Final Verification and Deployment
 - **Days 1-2:** Integration testing and bug fixes
 - **Days 3-4:** Performance optimization
 - **Days 5:** Final verification and deployment
