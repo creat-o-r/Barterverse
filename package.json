@@ -37,9 +37,10 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix",
-      "git add",
-      "tsc --noEmit --skipLibCheck"
+      "eslint --fix"
+    ],
+    "*": [
+      "bash -c 'tsc --noEmit --skipLibCheck'"
     ]
   },
   "dependencies": {
