@@ -190,7 +190,7 @@ export default function ChatWindow({
           </div>
         ))}
         {isLoading && (
-           <div className="flex items-end gap-2 mb-4 justify-start">
+           <div className="flex items-end gap-2 mb-4 justify-start typing-indicator">
              <Avatar className="h-8 w-8">
                 <AvatarFallback><Bot size={18}/></AvatarFallback>
               </Avatar>
