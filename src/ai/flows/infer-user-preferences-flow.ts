@@ -190,7 +190,7 @@ const inferUserPreferencesFlow = ai.defineFlow(
       // @ts-expect-error TS2345 Too complex type compatibility issue for now, related to Zod schema inference in CommonJS build
       const {output} = await prompt(processedInput);
 
-      let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
+      const finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
       let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values may have been applied.";
       let errorMessage: string | undefined = undefined;

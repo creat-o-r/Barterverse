@@ -59,7 +59,7 @@ export async function logFeedbackEntry(
     timestamp: new Date().toISOString(),
   };
 
-  let currentLogs = await readFeedbackLogs();
+  const currentLogs = await readFeedbackLogs();
   currentLogs.unshift(newReport); // Add new report to the beginning
 
   // Optional: Limit log size if it grows too large (e.g., keep last 1000 entries)
