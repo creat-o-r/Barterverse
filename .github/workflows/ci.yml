@@ -44,6 +44,7 @@ jobs:
         env:
           BASE_URL: http://localhost:9002
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+           GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }} # Also try setting GEMINI_API_KEY
 
       - name: Upload Playwright HTML report
         if: always()
