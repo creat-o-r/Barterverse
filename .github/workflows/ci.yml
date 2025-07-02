@@ -43,7 +43,7 @@ jobs:
         run: npm run test:e2e
         env:
           BASE_URL: http://localhost:9002
-           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 
       - name: Upload Playwright HTML report
         if: always()
