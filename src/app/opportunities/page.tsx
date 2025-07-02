@@ -6,7 +6,8 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
+// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getItem, getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
 import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -20,14 +21,24 @@ import { getPreferredAIModel, type AIModelName, type AIMatchingMode } from '@/se
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
 
+// Simulated current user ID
+const SIMULATED_CURRENT_USER_ID = 'user1';
 
 // Helper to get item and owner details
 async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; owner: User } | null> {
   if (!itemId) return null;
-  const item = dummyItems.find((i) => i.id === itemId);
-  if (!item) return null;
-  const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) return null;
+  // const item = dummyItems.find((i) => i.id === itemId); // Old way
+  const item = await getItem(itemId);
+  if (!item) {
+    console.warn(`[OpportunitiesPage] Item with ID ${itemId} not found.`);
+    return null;
+  }
+  // const owner = dummyUsers.find((u) => u.id === item.ownerId); // Old way
+  const owner = await getUser(item.ownerId);
+  if (!owner) {
+    console.warn(`[OpportunitiesPage] Owner with ID ${item.ownerId} for item ${itemId} not found.`);
+    return null; // Or return item with a placeholder owner if design allows
+  }
   return { item: { ...item, isGiftItForward: !!item.isGiftItForward }, owner };
 }
 

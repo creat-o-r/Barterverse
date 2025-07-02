@@ -9,14 +9,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send, User, Bot, Loader2, ListChecks, Package, Tag, ImageIcon } from 'lucide-react';
 import Image from 'next/image';
-import type { Item, ChatMessage } from '@/types';
+import type { Item, ChatMessage, User } from '@/types'; // Added User
 import { generalChat } from '@/ai/flows/general-chat-flow';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
-import { dummyUsers, dummyItems } from '@/lib/dummy-data';
+// import { dummyUsers, dummyItems } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getUser, getItemsByOwner } from '@/lib/firebase/firestoreUtils'; // Firestore access
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+
+// Simulated current user ID
+const SIMULATED_CURRENT_USER_ID = 'user1';
 
 export default function QuickListPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);

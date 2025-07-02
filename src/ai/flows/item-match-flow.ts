@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Suggests matching items for a given item based on LLM analysis.
@@ -12,11 +11,12 @@
 
 import {ai} from '../genkit';
 import {z}from 'genkit';
-import { logMatchSuggestion } from '../../services/match-report-service';
-import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '../../services/ai-config-service';
-import { dummyUsers } from '../../lib/dummy-data'; // For fetching user preferences
-import type { UserProfilePreferences } from '../../types';
-import { logAIDiagnostic } from '../../services/ai-diagnostic-log-service';
+import { logMatchSuggestion } from '@/services/match-report-service';
+import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '@/services/ai-config-service';
+import { getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import { dummyUsers } from '@/lib/dummy-data'; // Fallback for testing
+import type { UserProfilePreferences, User } from '@/types'; // Added User
+import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 
 const ItemBriefSchema = z.object({
   id: z.string(),
@@ -260,7 +260,11 @@ const itemMatchFlow = ai.defineFlow(
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
-      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      // Try Firestore first, fallback to dummyUsers
+      let userProfile: User | undefined | null = await getUser(input.triggeringUserId);
+      if (!userProfile) {
+        userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      }
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
       let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
