@@ -9,15 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 // import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced
-import { getTradesForUser, getItem, getUser, getAllItems, getAllUsers } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import { getTradesForUser, getAllItems, getAllUsers } from '@/lib/firebase/firestoreUtils'; // Removed getItem, getUser as they are not directly used here after caching
 import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
-// Simulated current user ID
-const SIMULATED_CURRENT_USER_ID = 'user1';
-
-// No longer using dummyTrades
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
 
 const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
   switch (status) {

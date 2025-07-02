@@ -6,7 +6,7 @@ import type { Item, User } from '@/types'; // Added User
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
 // import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced
-import { getAllItems } from '@/lib/firebase/firestoreUtils'; // getUser no longer needed if just using ID
+import { getAllItems } from '@/lib/firebase/firestoreUtils'; // getUser not needed if only ID is used
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
