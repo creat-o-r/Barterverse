@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { MessageSquare } from 'lucide-react';
 import type { Item } from '@/types';
 import Link from 'next/link';
-import { dummyUsers } from '@/lib/dummy-data'; // To get current user ID for tradeId
+// import { dummyUsers } from '@/lib/dummy-data'; // Replaced
+
+// Simulated current user ID - replace with actual auth logic when available
+const SIMULATED_CURRENT_USER_ID = 'user1';
 
 interface ItemTradeInitiationContentProps {
   item: Item;

@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
-import { GlobalFilterProvider } from '@/contexts/GlobalFilterContext'; // Added
+import { GlobalFilterProvider } from '@/contexts/GlobalFilterContext';
+import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -13,9 +14,11 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   }, []);
 
   return (
-    <GlobalFilterProvider> {/* Added Provider */}
-      {children}
-      {mounted && <Toaster />}
-    </GlobalFilterProvider>
+    <AuthProvider> {/* Wrap with AuthProvider */}
+      <GlobalFilterProvider>
+        {children}
+        {mounted && <Toaster />}
+      </GlobalFilterProvider>
+    </AuthProvider>
   );
 }

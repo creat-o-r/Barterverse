@@ -3,14 +3,15 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Item as FullItemType, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType } from '@/types';
-import { dummyUsers, dummyItems } from '@/lib/dummy-data';
+// import { dummyUsers, dummyItems } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getAllUsers, getItemsByOwner } from '@/lib/firebase/firestoreUtils'; // Firestore access
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Brain, ChevronDown, ChevronUp, UserCircle as UserIconLucide, Loader2, AlertCircle, Filter } from 'lucide-react';
+import { FileText, Brain, ChevronDown, ChevronUp, UserCircle as UserIconLucide, Loader2, AlertCircle, Filter, Users } from 'lucide-react'; // Added Users icon
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { useToast } from "@/hooks/use-toast";
@@ -29,11 +30,12 @@ const tradeTimingTextMap: Record<TradeTimingPreference, string> = {
   'flexible': 'Flexible Timing',
 };
 
-const preparePreferenceInferenceInputForAdmin = (user?: User): InferUserPreferencesInput | null => {
+// Updated to accept fetched items
+const preparePreferenceInferenceInputForAdmin = (user?: User, userOwnedItems?: FullItemType[]): InferUserPreferencesInput | null => {
   if (!user) return null;
 
-  const userListedItems = dummyItems
-    .filter(i => i.ownerId === user.id && (i.status === 'available' || i.status === 'pending'))
+  const userListedItems = (userOwnedItems || [])
+    .filter(i => (i.status === 'available' || i.status === 'pending'))
     .slice(0, 5) // Take up to 5 items for brevity in admin demo
     .map(item => ({
       name: item.name,
@@ -76,26 +78,86 @@ const preparePreferenceInferenceInputForAdmin = (user?: User): InferUserPreferen
 
 
 export default function AdminAIPreferenceInsights() {
-  const [selectedUserId, setSelectedUserId] = useState<string>(dummyUsers[0]?.id || '');
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userOwnedItems, setUserOwnedItems] = useState<FullItemType[]>([]);
+
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [showActivityData, setShowActivityData] = useState(false);
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   const [currentInsights, setCurrentInsights] = useState<InferUserPreferencesOutput | null>(null);
   const [insightsError, setInsightsError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const selectedUser = dummyUsers.find(u => u.id === selectedUserId);
   const [activityInputForAI, setActivityInputForAI] = useState<InferUserPreferencesInput | null>(null);
 
+  // Fetch all users on component mount
   useEffect(() => {
-    if (selectedUser) {
-        setActivityInputForAI(preparePreferenceInferenceInputForAdmin(selectedUser));
-    }
-  }, [selectedUser]);
+    const fetchUsers = async () => {
+      setIsLoadingUsers(true);
+      try {
+        const usersFromDB = await getAllUsers();
+        setAllUsers(usersFromDB);
+        if (usersFromDB.length > 0 && !selectedUserId) {
+          setSelectedUserId(usersFromDB[0].id); // Auto-select first user
+        }
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast({ title: "Error Fetching Users", description: "Could not load users from Firestore.", variant: "destructive" });
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array ensures this runs once on mount
 
+  // When selectedUserId changes, find the user and fetch their items
   useEffect(() => {
-    if (!selectedUserId || !selectedUser) {
+    if (!selectedUserId || allUsers.length === 0) {
+      setSelectedUser(null);
+      setUserOwnedItems([]);
+      return;
+    }
+    const user = allUsers.find(u => u.id === selectedUserId) || null;
+    setSelectedUser(user);
+
+    if (user) {
+      const fetchUserItems = async () => {
+        try {
+          const items = await getItemsByOwner(user.id);
+          setUserOwnedItems(items);
+        } catch (error) {
+          console.error(`Error fetching items for user ${user.id}:`, error);
+          toast({ title: "Error Fetching Items", description: `Could not load items for ${user.name}.`, variant: "destructive" });
+          setUserOwnedItems([]);
+        }
+      };
+      fetchUserItems();
+    } else {
+      setUserOwnedItems([]);
+    }
+  }, [selectedUserId, allUsers, toast]);
+
+  // When selectedUser or their items change, prepare input for AI
+   useEffect(() => {
+    if (selectedUser) {
+      setActivityInputForAI(preparePreferenceInferenceInputForAdmin(selectedUser, userOwnedItems));
+    } else {
+      setActivityInputForAI(null);
+    }
+  }, [selectedUser, userOwnedItems]);
+
+
+  // When activityInputForAI is ready (and valid), fetch AI insights
+  useEffect(() => {
+    if (!selectedUserId || !selectedUser || !activityInputForAI) {
       setCurrentInsights(null);
       setInsightsError(null);
+      if (selectedUser && !activityInputForAI) { // If user is selected but input couldn't be prepared
+        // This case might be handled by activityInputForAI effect setting it to null
+      }
       return;
     }
 
@@ -104,17 +166,18 @@ export default function AdminAIPreferenceInsights() {
       setCurrentInsights(null);
       setInsightsError(null);
       
-      const currentActivityInput = preparePreferenceInferenceInputForAdmin(selectedUser); 
-      setActivityInputForAI(currentActivityInput);
+      // activityInputForAI is already prepared by the previous useEffect
+      // const currentActivityInput = preparePreferenceInferenceInputForAdmin(selectedUser, userOwnedItems);
+      // setActivityInputForAI(currentActivityInput); // This line is redundant now
 
-      if (!currentActivityInput) {
+      if (!activityInputForAI) { // Should not happen if previous effect worked, but as a safeguard
         setInsightsError("Could not prepare activity data for the selected user.");
         setIsLoadingInsights(false);
         return;
       }
 
       try {
-        const result: InferUserPreferencesOutput = await inferUserPreferences(currentActivityInput);
+        const result: InferUserPreferencesOutput = await inferUserPreferences(activityInputForAI);
         
         if (result.errorMessage) {
             setInsightsError(result.errorMessage);
@@ -138,7 +201,7 @@ export default function AdminAIPreferenceInsights() {
 
     fetchInsights();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedUserId]); 
+  }, [activityInputForAI]); // Trigger when activityInputForAI is updated
 
 
   const renderInsights = () => {
@@ -212,6 +275,42 @@ export default function AdminAIPreferenceInsights() {
     );
   };
 
+  if (isLoadingUsers) {
+    return (
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline text-xl flex items-center gap-3">
+                <Brain className="h-6 w-6 text-accent" />
+                Live AI Preference Inference (Admin View)
+            </CardTitle>
+            <CardDescription className="font-body">
+                Select a user to see AI-inferred trading preferences based on their structured activity data.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="text-center py-10">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-muted-foreground">Loading users from Firestore...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (allUsers.length === 0 && !isLoadingUsers) {
+     return (
+      <Card>
+        <CardHeader>
+            <CardTitle className="font-headline text-xl flex items-center gap-3">
+                <Users className="h-6 w-6 text-destructive" />
+                 No Users Found
+            </CardTitle>
+        </CardHeader>
+        <CardContent>
+            <p className="text-muted-foreground">No users were found in Firestore. Please use the <Link href="/admin/data" className="text-primary hover:underline">Admin Data Management page</Link> to load dummy data.</p>
+        </CardContent>
+      </Card>
+     )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -220,18 +319,18 @@ export default function AdminAIPreferenceInsights() {
           Live AI Preference Inference (Admin View)
         </CardTitle>
         <CardDescription className="font-body">
-          Select a user to see AI-inferred trading preferences based on their structured activity data.
+          Select a user to see AI-inferred trading preferences based on their structured activity data from Firestore.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
             <label htmlFor="user-select-insights" className="text-sm font-medium font-headline block mb-1">Select User to Analyze:</label>
-            <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={isLoadingInsights}>
+            <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={isLoadingInsights || isLoadingUsers}>
                 <SelectTrigger id="user-select-insights" className="w-full md:w-[300px]">
                     <SelectValue placeholder="Select a user" />
                 </SelectTrigger>
                 <SelectContent>
-                    {dummyUsers.map(user => (
+                    {allUsers.map(user => (
                         <SelectItem key={user.id} value={user.id}>
                             <div className="flex items-center gap-2">
                                 <UserIconLucide className="h-4 w-4 text-muted-foreground" />
@@ -257,7 +356,7 @@ export default function AdminAIPreferenceInsights() {
             <Collapsible open={showActivityData} onOpenChange={setShowActivityData}>
             <div className="space-y-2">
                 <p className="text-sm font-body text-muted-foreground">
-                The AI infers preferences by analyzing structured activity data like the JSON below, generated from the user's items, current profile settings, and simulated interactions.
+                The AI infers preferences by analyzing structured activity data like the JSON below, generated from the user's items (from Firestore), current profile settings, and simulated interactions.
                 </p>
                 <CollapsibleTrigger asChild>
                 <Button variant="outline" size="sm" className="w-full flex justify-between items-center text-left">
@@ -273,7 +372,7 @@ export default function AdminAIPreferenceInsights() {
                     Structured Input for AI ({selectedUser.name})
                 </h4>
                 <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/80 p-2 bg-background rounded-sm overflow-x-auto">
-                    {activityInputForAI ? JSON.stringify(activityInputForAI, null, 2) : "Generating data..."}
+                    {activityInputForAI ? JSON.stringify(activityInputForAI, null, 2) : "Generating data or waiting for user/item selection..."}
                 </pre>
                 </div>
             </CollapsibleContent>
@@ -294,4 +393,3 @@ export default function AdminAIPreferenceInsights() {
     </Card>
   );
 }
-

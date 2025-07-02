@@ -2,8 +2,9 @@
 // This is a placeholder page for a specific trade.
 // In a real application, this page would show trade details, item comparison, and the chat window.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Repeat, Info, UserCircle, Gift, Search } from 'lucide-react';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
+import { MessageSquare, Repeat, Info, UserCircle, Gift, Search, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
+// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getItem, getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
 import type { Item, User } from '@/types';
 import Image from 'next/image';
 import Link from 'next/link';

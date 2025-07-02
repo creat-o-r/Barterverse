@@ -11,9 +11,14 @@ import { Settings, Loader2, AlertCircle, Link2 as LinkIcon } from 'lucide-react'
 import type { Item } from '@/types';
 import type { AIMatchingMode } from '@/services/ai-config-service';
 import { suggestMatchingItems, type ItemMatchInput, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
+// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced
+import { getAllItems } from '@/lib/firebase/firestoreUtils'; // Firestore access
 import ItemList from '@/components/items/ItemList'; // Assuming ItemList can be used here
 import { Badge } from '@/components/ui/badge';
+import { useToast } from "@/hooks/use-toast"; // Added useToast
+
+// Simulated current user ID for context
+const SIMULATED_CURRENT_USER_ID = 'user1';
 
 
 interface TemporaryAdminMatchTestPanelClientProps {
