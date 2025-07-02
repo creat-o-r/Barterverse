@@ -8,6 +8,7 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "baseUrl": ".", // Added for tsconfig-paths
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,

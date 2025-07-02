@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Suggests matching items for a given item based on LLM analysis.
@@ -10,12 +9,12 @@
  * - ItemMatchOutput - The return type for the suggestMatchingItems function.
  */
 
-import {ai} from '@/ai/genkit';
+import {ai} from '../genkit';
 import {z}from 'genkit';
 import { logMatchSuggestion } from '@/services/match-report-service';
 import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '@/services/ai-config-service';
-// import { dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
 import { getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import { dummyUsers } from '@/lib/dummy-data'; // Fallback for testing
 import type { UserProfilePreferences, User } from '@/types'; // Added User
 import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 
@@ -216,7 +215,7 @@ const itemMatchFlow = ai.defineFlow(
     const flowName = 'itemMatchFlow';
     let preferencesConsideredBeyondDefaultMinRating = false;
     let promptToUse: typeof simpleItemMatchPrompt | typeof advancedItemMatchPrompt = simpleItemMatchPrompt;
-    let finalInputForPrompt: any = { ...input };
+    const finalInputForPrompt: any = { ...input };
     let usedMatchingMode: 'simple' | 'advanced' = 'simple';
 
     const itemsToConsider = input.availableItems.filter(item =>
@@ -261,7 +260,11 @@ const itemMatchFlow = ai.defineFlow(
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
-      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      // Try Firestore first, fallback to dummyUsers
+      let userProfile: User | undefined | null = await getUser(input.triggeringUserId);
+      if (!userProfile) {
+        userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      }
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
       let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
