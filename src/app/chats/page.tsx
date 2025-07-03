@@ -13,9 +13,10 @@ import { getTradesForUser, getAllItems, getAllUsers } from '@/lib/firebase/fires
 import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
 
-// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
+// No longer using SIMULATED_CURRENT_USER_ID here
+// const SIMULATED_CURRENT_USER_ID = 'user1';
 
 const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
   switch (status) {

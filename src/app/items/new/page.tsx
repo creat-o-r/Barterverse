@@ -62,7 +62,7 @@ const itemFormSchemaBase = z.object({
   isGiftItForward: z.boolean().optional(),
   openToAnyOpportunity: z.boolean().optional(),
 
-  selectedLocationIdentifier: z.string().optional(),
+  selectedLocationIdentifier: z.string().min(1, { message: "Please select a location option or 'Not Specified'."}),
   itemSpecificAddress: z.string().optional(),
   deliveryMethods: z.array(deliveryMethodEnum).min(1, { message: "Please select at least one delivery method." }),
   logisticsNotes: z.string().optional(),
@@ -146,7 +146,7 @@ export default function NewItemPage() {
       listingType: 'offer',
       isGiftItForward: false,
       openToAnyOpportunity: false,
-      selectedLocationIdentifier: undefined,
+      selectedLocationIdentifier: NO_LOCATION_SPECIFIED_VALUE,
       itemSpecificAddress: '',
       deliveryMethods: ['pickup_only'],
       logisticsNotes: '',
@@ -167,7 +167,7 @@ export default function NewItemPage() {
     if (currentUser && form.reset) {
         const currentFormValues = form.getValues();
 
-        let defaultSelectedLocationId: string | undefined = undefined;
+        let defaultSelectedLocationId: string = NO_LOCATION_SPECIFIED_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
 
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
@@ -180,7 +180,7 @@ export default function NewItemPage() {
             ...currentFormValues,
             category: globalSelectedCategory || currentFormValues.category || '',
             openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false,
-            selectedLocationIdentifier: currentFormValues.selectedLocationIdentifier || defaultSelectedLocationId,
+            selectedLocationIdentifier: currentFormValues.selectedLocationIdentifier && currentFormValues.selectedLocationIdentifier !== NO_LOCATION_SPECIFIED_VALUE ? currentFormValues.selectedLocationIdentifier : defaultSelectedLocationId,
             itemSpecificAddress: (currentFormValues.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) ? (currentFormValues.itemSpecificAddress || '') : '',
             deliveryMethods: currentFormValues.deliveryMethods?.length ? currentFormValues.deliveryMethods : defaultDeliveryMethods,
             timingType: currentFormValues.timingType || 'flexible',
@@ -242,7 +242,7 @@ export default function NewItemPage() {
       let storedLocationIdForLogistics: string | undefined = undefined;
       let specificAddressForLogistics: string | undefined = undefined;
 
-      if (!data.selectedLocationIdentifier || data.selectedLocationIdentifier === NO_LOCATION_SPECIFIED_VALUE) {
+      if (data.selectedLocationIdentifier === NO_LOCATION_SPECIFIED_VALUE) {
         locationTypeForLogistics = 'not_specified';
       } else if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
         locationTypeForLogistics = 'item_specific_location';
@@ -289,7 +289,7 @@ export default function NewItemPage() {
       });
 
       if (currentUser && form.reset) {
-        let defaultSelectedLocationId: string | undefined = undefined;
+        let defaultSelectedLocationId: string = NO_LOCATION_SPECIFIED_VALUE;
         const preferredStoredLocId = currentUser.logisticsPreferences?.preferredStoredLocationId;
         if (preferredStoredLocId && currentUser.locations?.find(l => l.id === preferredStoredLocId)) {
             defaultSelectedLocationId = preferredStoredLocId;
@@ -384,15 +384,16 @@ export default function NewItemPage() {
                         value={field.value}
                         disabled={isLoadingOverall}
                     >
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select location (optional)" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select a location option..." /></SelectTrigger></FormControl>
                       <SelectContent>
+                        <SelectItem value={NO_LOCATION_SPECIFIED_VALUE}>Location not specified for this item</SelectItem>
                         {currentUser.locations && currentUser.locations.length > 0 && currentUser.locations.map((loc: UserStoredLocation) => (
                           <SelectItem key={loc.id} value={loc.id}>{loc.name} ({loc.address || 'Address not set'})</SelectItem>
                         ))}
                         <SelectItem value={ITEM_SPECIFIC_LOCATION_VALUE}>Enter a specific address for this item</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription className="font-body">Choose a stored location, enter a new one, or leave empty if no location needed.</FormDescription>
+                    <FormDescription className="font-body">Choose a stored location, enter a new one, or specify none. Optional.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />

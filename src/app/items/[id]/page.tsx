@@ -16,15 +16,15 @@ import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdmi
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import SpecificationsDisplay from '@/components/items/SpecificationsDisplay'; // Import the new client component
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
-// Simulated current user ID - replace with actual auth logic when available
-const SIMULATED_CURRENT_USER_ID = 'user1';
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
   // const item = dummyItems.find((i) => i.id === itemId); // Old way
   const item = await getItem(itemId);
   if (!item) {
-    console.warn(`Item with ID ${itemId} not found in Firestore.`);
+    console.warn(`[ItemDetailPage] Item with ID ${itemId} not found in Firestore.`);
     return null;
   }
   // const owner = dummyUsers.find((u) => u.id === item.ownerId); // Old way

@@ -8,7 +8,7 @@
  * - InferListingTypeOutput - The return type for the inferListingType function.
  */
 
-import {ai} from '../genkit';
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const InferListingTypeInputSchema = z.object({

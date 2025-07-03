@@ -11,8 +11,8 @@ jest.mock('@/ai/flows/infer-user-preferences-flow', () => ({
   inferUserPreferences: jest.fn(),
 }));
 
-const mutableDummyUsers: User[] = [];
-const mutableDummyItems: Item[] = [];
+let mutableDummyUsers: User[] = [];
+let mutableDummyItems: Item[] = [];
 jest.mock('@/lib/dummy-data', () => ({
   get dummyUsers() { return mutableDummyUsers; },
   get dummyItems() { return mutableDummyItems; },

@@ -9,7 +9,7 @@
  * - SuggestTradesOutput - The return type for the suggestTrades function.
  */
 
-import {ai} from '../genkit';
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SuggestTradesInputSchema = z.object({

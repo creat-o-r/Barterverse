@@ -1,3 +1,4 @@
+
 "use client";
 
 import { use, useState, useEffect, Suspense } from 'react';
@@ -19,8 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
-// Simulated current user ID - replace with actual auth logic when available
-const SIMULATED_CURRENT_USER_ID = 'user1';
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Removed, no longer used
 
 async function fetchUserProfileData(userIdToFetch: string): Promise<User | null> {
   const user = await getUser(userIdToFetch);
@@ -28,14 +28,18 @@ async function fetchUserProfileData(userIdToFetch: string): Promise<User | null>
     console.warn(`User with ID ${userIdToFetch} not found.`);
     return null;
   }
+  
   // Ensure some defaults if they are critical for display and might be missing
+  // This kind of logic might better live in a data transformation layer or type validation
   if (user.minimumMatchRating === undefined) {
     user.minimumMatchRating = 'Low'; // Default if not set
   }
   if (user.logisticsPreferences && !user.logisticsPreferences.defaultDeliveryMethods) {
     user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only']; // Default if not set
   }
+
   const userItems = await getItemsByOwner(userIdToFetch);
+  // No need for JSON.parse(JSON.stringify(...)) if types are handled correctly
   return { ...user, items: userItems };
 }
 
@@ -135,25 +139,25 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
   const [activityInputForAI, setActivityInputForAI] = useState<InferUserPreferencesInput | null>(null);
   const { toast } = useToast();
 
-  const currentViewingUserId = undefined; // Not used, or use auth context if needed
-  const isOwnProfile = resolvedParams.userId === 'me';
+  const currentViewingUserId = dummyUsers[0].id; 
+  const isOwnProfile = resolvedParams.userId === 'me' || resolvedParams.userId === currentViewingUserId;
 
   useEffect(() => {
     async function loadUserProfileAndSettings() {
       setLoading(true);
-      const profile = await fetchUserProfileData(resolvedParams.userId);
+      const profile = await getUserProfile(resolvedParams.userId);
       setUser(profile);
       if (isOwnProfile) {
         const allowInference = await getEnableAutomaticPreferenceInference();
         setAllowAutoPreferenceInference(allowInference);
         if (profile) {
-          setActivityInputForAI(preparePreferenceInferenceInput(profile));
+            setActivityInputForAI(preparePreferenceInferenceInput(profile));
         }
       }
       setLoading(false);
     }
     if (resolvedParams.userId) {
-      loadUserProfileAndSettings();
+        loadUserProfileAndSettings();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedParams.userId, isOwnProfile]); 
@@ -176,13 +180,17 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
       if (result.errorMessage || !result.suggestedPreferences) {
         toast({ title: "AI Preference Learning Error", description: result.errorMessage || "Could not infer preferences.", variant: "destructive" });
       } else {
-        // Update user preferences in Firestore
-        await updateUser(user.id, result.suggestedPreferences as InferredUserPreferences);
-        const updatedProfile = await fetchUserProfileData(user.id);
-        setUser(updatedProfile);
-        if(updatedProfile) setActivityInputForAI(preparePreferenceInferenceInput(updatedProfile));
+        
+        const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences as InferredUserPreferences);
+        if (updateSuccess) {
+          const updatedProfile = await getUserProfile(user.id); 
+          setUser(updatedProfile); 
+          if(updatedProfile) setActivityInputForAI(preparePreferenceInferenceInput(updatedProfile));
 
-        toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
+          toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
+        } else {
+          toast({ title: "Error Updating Preferences", description: "Could not save the learned preferences locally.", variant: "destructive" });
+        }
       }
     } catch (error: any) {
       console.error("Error calling inferUserPreferences flow:", error);
@@ -372,4 +380,4 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
     </div>
   );
 }
-
+    

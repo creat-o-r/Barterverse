@@ -8,10 +8,10 @@
  * - InferUserPreferencesOutput - The return type for the inferUserPreferences function.
  */
 
-import {ai} from '../genkit';
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference, UserProfilePreferences } from '../../types';
-import { logAIDiagnostic } from '../../services/ai-diagnostic-log-service';
+import type { UserMotivation, TradeTimingPreference, InferredUserPreferences, UserProfileLocationPreference, UserProfilePreferences } from '@/types';
+import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 
 // Define Zod enums based on string literal types from src/types for consistency
 const UserMotivationEnum = z.enum(['help-others', 'maximize-trades', 'convenience-focused', 'community-building', 'unique-finds']);
@@ -187,10 +187,9 @@ const inferUserPreferencesFlow = ai.defineFlow(
 
     try {
       console.log(`[${flowName}] Processed input being sent to prompt:`, JSON.stringify(processedInput, null, 2));
-      // @ts-expect-error TS2345 Too complex type compatibility issue for now, related to Zod schema inference in CommonJS build
       const {output} = await prompt(processedInput);
 
-      const finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
+      let finalSuggestedPreferences: InferredUserPreferences = { ...defaultInferredPreferences };
       let confidence: 'High' | 'Medium' | 'Low' = 'Low';
       let baseReasoning = "AI could not reliably infer all preferences from the provided data, or the response structure was incomplete. Default values may have been applied.";
       let errorMessage: string | undefined = undefined;

@@ -71,7 +71,7 @@ export async function logMatchSuggestion(data: Omit<LoggedMatchSuggestion, 'time
     preferencesConsidered: data.preferencesConsidered === undefined ? false : data.preferencesConsidered,
   };
 
-  const currentLogs = await readLogs();
+  let currentLogs = await readLogs();
   currentLogs.unshift(newLog);
 
   if (currentLogs.length > 500) {

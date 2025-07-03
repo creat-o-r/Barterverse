@@ -14,7 +14,7 @@ jest.mock('@/ai/flows/item-match-flow', () => ({
 }));
 
 // Keep a mutable copy of dummyItems for tests to modify
-const mutableDummyItems: Item[] = [];
+let mutableDummyItems: Item[] = [];
 jest.mock('@/lib/dummy-data', () => ({
   get dummyItems() { return mutableDummyItems; }, // Use getter to return mutable copy
   dummyUsers: [{ id: 'test-current-user-id', name: 'Test User' }], // Mocked current user

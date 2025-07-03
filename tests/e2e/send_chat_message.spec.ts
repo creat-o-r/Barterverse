@@ -45,8 +45,8 @@ test('should allow sending a message in a trade chat and see a response', async 
   const messageListLocator = page.locator('div[data-radix-scroll-area-viewport] > div');
 
   // 2. Count initial messages (should be 2: initial AI + user's new message)
-  //    Each message container has class="flex items-end gap-2 mb-4" but exclude loading indicator
-  const messageContainerSelector = 'div.flex.items-end.gap-2.mb-4:not(.typing-indicator)';
+  //    Each message container has class="flex items-end gap-2 mb-4"
+  const messageContainerSelector = 'div.flex.items-end.gap-2.mb-4';
   await expect(messageListLocator.locator(messageContainerSelector)).toHaveCount(2, { timeout: 5000 });
 
 

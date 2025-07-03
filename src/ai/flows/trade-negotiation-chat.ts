@@ -9,7 +9,7 @@
  * - TradeNegotiationChatOutput - The return type for the tradeNegotiationChat function.
  */
 
-import {ai} from '../genkit';
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const TradeNegotiationChatInputSchema = z.object({
