@@ -110,6 +110,24 @@ Central types in `src/types/index.ts`:
 - **Repository**: `Barterverse`
 - **URL**: https://github.com/creat-o-r/Barterverse
 
+### MCP GitHub Server Configuration
+**NEW**: Repository includes MCP (Model Context Protocol) server configuration for GitHub Copilot Agent Mode.
+
+**Configuration Files**:
+- `.vscode/mcp.json` - GitHub MCP server setup for VS Code Copilot
+- Enables natural language GitHub operations through Copilot Chat
+- Requires GitHub Personal Access Token for authentication
+
+**Setup Requirements**:
+- GitHub Personal Access Token with appropriate permissions
+- VS Code with GitHub Copilot extension
+
+**Features Enabled**:
+- GitHub repository operations via natural language
+- Issue/PR management through Copilot Chat
+- Enhanced code analysis with repository context
+- Automated workflow suggestions
+
 ### Issue Management
 **IMPORTANT**: MCP GitHub tools have read-only access. For creating issues:
 

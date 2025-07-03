@@ -1,0 +1,20 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "agent_mcp",
+      "description": "GitHub Personal Access Token for MCP server",
+      "password": true
+    }
+  ],
+  "servers": {
+    "agent_mcp": {
+      "type": "sse",
+      "url": "https://github-mcp-server.com/sse",
+      "headers": {
+        "Authorization": "Bearer ${input:agent_mcp}",
+        "X-GitHub-Repo": "creat-o-r/Barterverse"
+      }
+    }
+  }
+}
