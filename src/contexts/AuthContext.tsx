@@ -15,6 +15,7 @@ import {
 import { auth as firebaseAuthInstance } from '@/lib/firebase/firebaseConfig'; // Named import
 import { getUser, addUser, updateUser } from '@/lib/firebase/firestoreUtils'; // To sync/update user profile
 import type { User as AppUser } from '@/types'; // Your app's User type
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs for locations
 
 interface AuthContextType {
   currentUser: FirebaseUser | null; // Firebase Auth user object
@@ -24,6 +25,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, avatarUrl?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  signInWithFacebook: () => Promise<void>; // Added from previous step
+  signInWithX: () => Promise<void>;      // Added from previous step
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

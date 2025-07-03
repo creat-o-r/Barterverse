@@ -261,7 +261,18 @@ const itemMatchFlow = ai.defineFlow(
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
-      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      const userProfile: User | null = await getUser(input.triggeringUserId);
+
+      if (!userProfile) {
+        console.warn(`[${flowName}] Advanced mode: User profile for ${input.triggeringUserId} not found. Proceeding without user-specific preferences for advanced prompt, or it might effectively use simple logic if preferences are critical.`);
+        // To strictly fallback to simple mode:
+        // promptToUse = simpleItemMatchPrompt;
+        // usedMatchingMode = 'simple';
+        // preferencesConsideredBeyondDefaultMinRating = false;
+        // The advanced prompt will run, but `triggeringUserPreferences` will be based on a null userProfile,
+        // leading to default/empty preferences being sent.
+      }
+
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
       let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";

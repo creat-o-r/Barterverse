@@ -20,9 +20,9 @@ import { logFeedbackEntry } from '@/services/feedback-service';
 import { getPreferredAIModel, type AIModelName, type AIMatchingMode } from '@/services/ai-config-service';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
-// Simulated current user ID
-const SIMULATED_CURRENT_USER_ID = 'user1';
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
 
 // Helper to get item and owner details
 async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; owner: User } | null> {

@@ -20,8 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
-// Simulated current user ID - replace with actual auth logic when available
-const SIMULATED_CURRENT_USER_ID = 'user1';
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Removed, no longer used
 
 async function fetchUserProfileData(userIdToFetch: string): Promise<User | null> {
   const user = await getUser(userIdToFetch);

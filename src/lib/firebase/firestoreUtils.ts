@@ -12,8 +12,28 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { db } from './firebaseConfig'; // Assumes db is successfully initialized
-import type { User, Item, FirestoreTimestamp, UserProfilePreferences, ItemLogistics, ItemSpecification } from '@/types'; // Assuming Timestamp types might need conversion
+import type { User, Item, FirestoreTimestamp, UserProfilePreferences, ItemLogistics, ItemSpecification, TradeOffer } from '@/types'; // Added TradeOffer for clarity
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+
+// Helper function to convert specific fields in an object from Firestore Timestamp to Date
+function convertSpecificTimestampsToDates<T extends Record<string, any>>(data: T, fieldsToConvert: (keyof T)[]): T {
+  const convertedData = { ...data };
+  for (const field of fieldsToConvert) {
+    const value = data[field];
+    if (value instanceof Timestamp) {
+      convertedData[field] = value.toDate();
+    } else if (value && typeof value === 'object' && 'seconds' in value && 'nanoseconds' in value && typeof value.seconds === 'number' && typeof value.nanoseconds === 'number') {
+      // Handle cases where it might be a plain object resembling a Timestamp (e.g., after JSON stringify/parse)
+      // This is a more robust check if data isn't directly from Firestore snapshot.data()
+      try {
+        convertedData[field] = new Timestamp(value.seconds, value.nanoseconds).toDate();
+      } catch (e) {
+        // console.warn(`Failed to convert field ${String(field)} to Date, leaving as is.`, e);
+      }
+    }
+  }
+  return convertedData;
+}
 
 // Helper function to convert Date objects to Firestore Timestamps for relevant fields
 // This is important if your User/Item types use Date objects but Firestore expects Timestamps.
@@ -129,11 +149,16 @@ export async function addItem(itemData: Partial<Item> & Pick<Item, 'ownerId' | '
 
   const itemId = itemData.id || uuidv4();
 
-  // Fetch owner's name if not provided directly in itemData, though Item type might not require it for storage.
-  // For this example, we'll assume ownerName might be part of the itemData or not strictly needed in the 'items' collection doc.
-  // If it's needed, it should be fetched and added:
-  // const owner = await getUser(itemData.ownerId);
-  // const ownerName = owner ? owner.name : 'Unknown Owner';
+  let ownerName = itemData.ownerName; // Use passed ownerName if available
+  if (!ownerName) { // If not passed, try to fetch it
+    try {
+      const owner = await getUser(itemData.ownerId);
+      ownerName = owner ? owner.name : 'Unknown Owner';
+    } catch (e) {
+      console.warn(`Could not fetch owner name for ownerId ${itemData.ownerId} during addItem:`, e);
+      ownerName = 'Unknown Owner'; // Fallback if fetch fails
+    }
+  }
 
   const fullItemData: Item = {
     id: itemId,

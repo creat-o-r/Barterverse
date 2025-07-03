@@ -28,8 +28,9 @@ const requiredConfigKeys: (keyof typeof firebaseConfig)[] = [
 
 const missingKeys = requiredConfigKeys.filter(key => !firebaseConfig[key]);
 
-let app;
-let db;
+let app: FirebaseApp | undefined;
+let db: Firestore | undefined;
+let auth: Auth | undefined;
 
 if (missingKeys.length > 0) {
   console.warn(
@@ -38,12 +39,13 @@ if (missingKeys.length > 0) {
   );
   // You might want to throw an error here or handle this case appropriately
   // For now, we'll let the app continue without Firebase if keys are missing,
-  // but Firestore (db) and app will be undefined.
+  // but Firestore (db), Auth (auth), and app will be undefined.
 } else {
   // Initialize Firebase
   // We need to check if an app is already initialized to prevent errors, especially in Next.js HMR
   app = !getApps().length ? initializeApp(firebaseConfig as any) : getApp(); // Cast as any because TS might complain about potentially undefined values if not handled strictly
   db = getFirestore(app);
+  auth = getAuth(app);
 }
 
-export { app, db, firebaseConfig };
+export { app, db, auth, firebaseConfig };
