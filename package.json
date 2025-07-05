@@ -33,6 +33,8 @@
     "jules:check-orphans": "node scripts/jules-branch-integration.js check-orphans",
     "jules:cleanup": "node scripts/jules-branch-integration.js cleanup",
     "build:status": "node scripts/startup-build-check.js",
+    "commit-actions": "node scripts/workflows/commit-actions/commit-actions-simple-table.js",
+    "commit-actions-plus": "node scripts/workflows/commit-actions/commit-actions-plus.js",
     "prepare": "husky"
   },
   "lint-staged": {
