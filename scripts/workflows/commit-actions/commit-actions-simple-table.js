@@ -40,9 +40,23 @@ try {
   console.log('├─────────────────────────────┼──────────────┼─────────────────┤');
 
   const expectedWorkflows = [
-    { name: 'CI', should_run: true, max_delay: 5 },
-    { name: 'build-monitoring', should_run: timeSinceCommit > 15, max_delay: 20 },
-    { name: 'Deploy PR Preview', should_run: commitBranch.includes('feature'), max_delay: 10 }
+    { 
+      name: 'CI', 
+      should_run: ['master', 'testing', 'ci-cd-infrastructure'].includes(commitBranch) || 
+                  commitBranch.startsWith('feature/') || commitBranch.startsWith('feat/') || 
+                  commitBranch.startsWith('fix/') || commitBranch.startsWith('jules/'),
+      max_delay: 5 
+    },
+    { 
+      name: 'build-monitoring', 
+      should_run: false, // Scheduled workflow, not triggered by commits
+      max_delay: 20 
+    },
+    { 
+      name: 'Deploy PR Preview', 
+      should_run: true, // Firebase preview triggers on ANY pull_request
+      max_delay: 10 
+    }
   ];
 
   expectedWorkflows.forEach(expected => {
