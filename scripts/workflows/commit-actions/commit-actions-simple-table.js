@@ -67,6 +67,30 @@ try {
     console.log(`│ ${expected.name.padEnd(27)} │ ${shouldRun.padEnd(12)} │ ${status.padEnd(15)} │`);
   });
   console.log('└─────────────────────────────┴──────────────┴─────────────────┘');
+  
+  // Check for missing expected workflows - TOP PRIORITY
+  const missing = expectedWorkflows.filter(w => w.should_run && !w.found);
+  if (missing.length > 0) {
+    console.log('\n🚨 MISSING WORKFLOWS - TOP PRIORITY INVESTIGATION!');
+    console.log('┌─────────────────────────────────────────────────────────────┐');
+    console.log('│ Expected workflows that should have run but are missing:    │');
+    console.log('├─────────────────────────────────────────────────────────────┤');
+    
+    missing.forEach((workflow, index) => {
+      console.log(`│ ${(index + 1).toString().padStart(2)}. ${workflow.name.padEnd(54)} │`);
+    });
+    
+    console.log('└─────────────────────────────────────────────────────────────┘');
+    
+    console.log('\n🔍 IMMEDIATE CLAUDE ACTIONS REQUIRED:');
+    console.log('┌─────────────────────────────────────────────────────────────┐');
+    console.log('│ 1. Check if workflows exist in .github/workflows/          │');
+    console.log('│ 2. Verify branch protection rules and triggers             │');
+    console.log('│ 3. Check if commit meets workflow trigger conditions       │');
+    console.log('│ 4. Investigate repository settings and permissions         │');
+    console.log('│ 5. Manual trigger may be needed for missing workflows      │');
+    console.log('└─────────────────────────────────────────────────────────────┘');
+  }
 
   if (data.workflow_runs && data.workflow_runs.length > 0) {
     console.log('\n🎯 DIRECT WORKFLOWS (triggered by this commit)');
