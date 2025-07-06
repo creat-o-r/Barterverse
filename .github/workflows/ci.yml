@@ -2,9 +2,9 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ master, testing, ci-cd-infrastructure, feature/*, feat/*, fix/*, jules/* ]
+    branches: [ master, testing, ci-cd-infrastructure, feature/*, feat/*, fix/*, jules/*, merge/* ]
   pull_request:
-    branches: [ master, testing, ci-cd-infrastructure, feature/*, feat/*, fix/*, jules/* ]
+    branches: [ master, testing, ci-cd-infrastructure, feature/*, feat/*, fix/*, jules/*, merge/* ]
 
 jobs:
   test:

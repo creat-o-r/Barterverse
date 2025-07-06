@@ -44,7 +44,8 @@ try {
       name: 'CI', 
       should_run: ['master', 'testing', 'ci-cd-infrastructure'].includes(commitBranch) || 
                   commitBranch.startsWith('feature/') || commitBranch.startsWith('feat/') || 
-                  commitBranch.startsWith('fix/') || commitBranch.startsWith('jules/'),
+                  commitBranch.startsWith('fix/') || commitBranch.startsWith('jules/') || 
+                  commitBranch.startsWith('merge/'),
       max_delay: 5 
     },
     { 
