@@ -1,33 +1,31 @@
-
 "use client";
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Settings, Loader2, AlertCircle, Link2 as LinkIcon } from 'lucide-react'; // Renamed Link2 to LinkIcon
+import { Settings, Loader2, AlertCircle, Link2 as LinkIcon } from 'lucide-react';
 import type { Item } from '@/types';
 import type { AIMatchingMode } from '@/services/ai-config-service';
 import { suggestMatchingItems, type ItemMatchInput, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
-// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced
-import { getAllItems } from '@/lib/firebase/firestoreUtils'; // Firestore access
-import ItemList from '@/components/items/ItemList'; // Assuming ItemList can be used here
+import { getAllItems } from '@/lib/firebase/firestoreUtils';
+import ItemList from '@/components/items/ItemList';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from "@/hooks/use-toast"; // Added useToast
+import { useToast } from "@/hooks/use-toast";
 
-// Simulated current user ID for context
-const SIMULATED_CURRENT_USER_ID = 'user1';
-
+// Simulated current user ID for test context.
+// This panel tests the AI flow as if this user is triggering it.
+const SIMULATED_TRIGGERING_USER_ID = 'user1';
 
 interface TemporaryAdminMatchTestPanelClientProps {
   itemToTest: Item | null;
 }
 
 export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: TemporaryAdminMatchTestPanelClientProps) {
-  const [testMatchingMode, setTestMatchingMode] = useState<AIMatchingMode>('simple'); // This is only for UI, flow decides actual
-  const [testUseUserPrefs, setTestUseUserPrefs] = useState(false); // This is only for UI, flow decides actual
+  const [testMatchingMode, setTestMatchingMode] = useState<AIMatchingMode>('simple');
+  const [testUseUserPrefs, setTestUseUserPrefs] = useState(false);
   const [testSuggestions, setTestSuggestions] = useState<(Item & { matchScore: string })[]>([]);
   const [testReasoning, setTestReasoning] = useState<string | null>(null);
   const [testPrefsConsidered, setTestPrefsConsidered] = useState<boolean>(false);
@@ -35,8 +33,7 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
   const [testLoading, setTestLoading] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
-
-  const currentViewingUser = dummyUsers[0]; // Simulate a viewing user for test context
+  const { toast } = useToast();
 
   const handleRunTestSuggestions = async () => {
     if (!itemToTest) {
@@ -50,21 +47,37 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
     setTestModeUsed(undefined);
     setTestPrefsConsidered(false);
 
-    const otherAvailableItems = dummyItems.filter(
-      (item) => item.id !== itemToTest.id &&
-                 (item.status === 'available' || item.status === 'pending')
-    ).map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        category: item.category,
-        ownerId: item.ownerId,
-        listingType: item.listingType,
-    }));
+    let allItemsFromDB: Item[];
+    try {
+      allItemsFromDB = await getAllItems();
+    } catch (dbError: any) {
+      console.error("Failed to fetch items from Firestore for admin test panel:", dbError);
+      const dbErrMessage = "Could not load items needed for test from the database.";
+      setTestError(dbErrMessage);
+      toast({ title: "Database Error", description: dbErrMessage, variant: "destructive" });
+      setTestLoading(false);
+      return;
+    }
 
     try {
+      const otherAvailableItems = allItemsFromDB.filter(
+        (item) => item.id !== itemToTest.id &&
+                   item.ownerId !== SIMULATED_TRIGGERING_USER_ID && // Exclude items from the simulated user if desired for test
+                   (item.status === 'available' || item.status === 'pending')
+      ).map(item => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          ownerId: item.ownerId,
+          listingType: item.listingType,
+          // These fields from ItemBriefSchema for the AI flow
+          isGiftItForward: item.isGiftItForward || false,
+          openToAnyOpportunity: item.openToAnyOpportunity || false,
+      }));
+
       const inputForFlow: ItemMatchInput = {
-        triggeringUserId: currentViewingUser.id,
+        triggeringUserId: SIMULATED_TRIGGERING_USER_ID,
         currentItem: {
           id: itemToTest.id,
           name: itemToTest.name,
@@ -72,20 +85,21 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
           category: itemToTest.category,
           ownerId: itemToTest.ownerId,
           listingType: itemToTest.listingType,
+          isGiftItForward: itemToTest.isGiftItForward || false,
+          openToAnyOpportunity: itemToTest.openToAnyOpportunity || false,
         },
         availableItems: otherAvailableItems,
       };
 
-      // The flow will use the admin-configured mode and preference settings.
-      // The testMatchingMode and testUseUserPrefs here are just for UI display/intent.
       const result: ItemMatchOutput = await suggestMatchingItems(inputForFlow);
 
       setTestPrefsConsidered(result.preferencesConsidered);
       setTestModeUsed(result.usedMatchingMode);
 
       const augmentedMatchedItems = (result.suggestedMatches || []).map(match => {
-        const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
-        return itemDetails ? { ...itemDetails, matchScore: match.matchScore } : null;
+        const itemDetails = allItemsFromDB.find(dItem => dItem.id === match.itemId);
+        // Ensure matchScore is always a string, even if AI somehow doesn't provide it (though schema enforces it)
+        return itemDetails ? { ...itemDetails, matchScore: match.matchScore || "N/A" } : null;
       }).filter(Boolean) as (Item & { matchScore: string })[];
 
       setTestSuggestions(augmentedMatchedItems);
@@ -96,7 +110,9 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
 
     } catch (err: any) {
       console.error("Error in TemporaryAdminMatchTestPanelClient during suggestMatchingItems:", err);
-      setTestError(err.message || "An unknown error occurred during test suggestion.");
+      const errorMessage = err.message || "An unknown error occurred during test suggestion.";
+      setTestError(errorMessage);
+      toast({ title: "AI Test Error", description: errorMessage, variant: "destructive" });
     } finally {
       setTestLoading(false);
     }
@@ -120,7 +136,7 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
           <CardContent className="p-4 space-y-4 border-t border-dashed border-primary/30">
             <CardDescription className="text-xs font-body mb-2">
               Test the AI matching logic for this item. The flow uses admin-configured settings for matching mode and preference usage.
-              The toggles below are for documenting test intent, not direct control.
+              The toggles below are for documenting test intent, not direct control. The test runs as if user '{SIMULATED_TRIGGERING_USER_ID}' is triggering suggestions.
             </CardDescription>
             <div className="flex items-center space-x-2">
               <Switch

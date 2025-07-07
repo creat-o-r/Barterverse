@@ -1,3 +1,6 @@
+// Polyfill for fetch API in Node.js environment for Jest tests
+import 'whatwg-fetch';
+
 // This file is intentionally_left_blank for now.
 // You can use this file to set up global mocks or configurations for your tests.
 

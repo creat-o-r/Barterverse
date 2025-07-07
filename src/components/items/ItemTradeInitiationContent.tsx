@@ -1,14 +1,11 @@
-
-'use client';
+"use client";
 
 import { Button } from '@/components/ui/button';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, LogIn } from 'lucide-react'; // Added LogIn
 import type { Item } from '@/types';
 import Link from 'next/link';
-// import { dummyUsers } from '@/lib/dummy-data'; // Replaced
-
-// Simulated current user ID - replace with actual auth logic when available
-const SIMULATED_CURRENT_USER_ID = 'user1';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { usePathname } from 'next/navigation'; // To get current path for redirect
 
 interface ItemTradeInitiationContentProps {
   item: Item;
@@ -17,13 +14,38 @@ interface ItemTradeInitiationContentProps {
 }
 
 export default function ItemTradeInitiationContent({ item, ownerName, ownerId }: ItemTradeInitiationContentProps) {
-  // Simulate current user - in a real app, this would come from auth context
-  const currentUserId = dummyUsers[0]?.id || 'currentUserPlaceholder'; 
+  const { currentUser: firebaseUser, isLoading: authIsLoading } = useAuth();
+  const pathname = usePathname();
+
+  if (authIsLoading) {
+    return (
+      <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" size="lg" disabled>
+        <MessageSquare className="mr-2 h-5 w-5" />
+        Loading...
+      </Button>
+    );
+  }
+
+  if (!firebaseUser) {
+    return (
+      <>
+        <p className="text-sm font-body text-muted-foreground mb-4">
+          Want to trade for "{item.name}"? Sign in to start a conversation with {ownerName}.
+        </p>
+        <Button asChild className="w-full" size="lg">
+          <Link href={`/auth/signin?redirect=${encodeURIComponent(pathname)}`}>
+            <LogIn className="mr-2 h-5 w-5" />
+            Sign In to Negotiate
+          </Link>
+        </Button>
+      </>
+    );
+  }
+
+  // User is logged in
+  const currentUserId = firebaseUser.uid;
   
-  // Construct a tradeId. This is a simplified version.
-  // A real app might involve a backend call to create a trade record and get an ID.
-  // For this demo, we make it somewhat unique based on participants and item.
-  // Let's assume the item being viewed is what the other user is offering.
+  // Construct a tradeId.
   const tradeId = `trade-${currentUserId}-wants-${item.id}-from-${ownerId}`;
 
   return (

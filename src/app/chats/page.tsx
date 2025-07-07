@@ -15,8 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
 
-// No longer using SIMULATED_CURRENT_USER_ID here
-// const SIMULATED_CURRENT_USER_ID = 'user1';
+// const SIMULATED_CURRENT_USER_ID = 'user1'; // Ensure this is removed or properly handled
 
 const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
   switch (status) {

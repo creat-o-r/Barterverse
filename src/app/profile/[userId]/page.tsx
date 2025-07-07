@@ -1,4 +1,3 @@
-
 "use client";
 
 import { use, useState, useEffect, Suspense } from 'react';
@@ -6,13 +5,13 @@ import Image from 'next/image';
 import { getUser, getItemsByOwner, updateUser } from '@/lib/firebase/firestoreUtils';
 import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, ItemDeliveryMethod } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -20,60 +19,45 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
-// const SIMULATED_CURRENT_USER_ID = 'user1'; // Removed, no longer used
-
+// This function fetches data and can be used server-side or by async client components
 async function fetchUserProfileData(userIdToFetch: string): Promise<User | null> {
   const user = await getUser(userIdToFetch);
   if (!user) {
-    console.warn(`User with ID ${userIdToFetch} not found.`);
+    console.warn(`[fetchUserProfileData] User with ID ${userIdToFetch} not found.`);
     return null;
   }
   
-  // Ensure some defaults if they are critical for display and might be missing
-  // This kind of logic might better live in a data transformation layer or type validation
   if (user.minimumMatchRating === undefined) {
-    user.minimumMatchRating = 'Low'; // Default if not set
+    user.minimumMatchRating = 'Low';
   }
   if (user.logisticsPreferences && !user.logisticsPreferences.defaultDeliveryMethods) {
-    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only']; // Default if not set
+    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only'];
   }
 
   const userItems = await getItemsByOwner(userIdToFetch);
-  // No need for JSON.parse(JSON.stringify(...)) if types are handled correctly
   return { ...user, items: userItems };
 }
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
 const tradeTimingTextMap: Record<TradeTimingPreference, string> = { 'simultaneous': 'Prefers Simultaneous', 'staged': 'Open to Staged Trades', 'flexible': 'Flexible Timing', };
-
-const deliveryMethodDisplayMapConcrete: Record<ItemDeliveryMethod, string> = {
-  pickup_only: "Pickup",
-  willing_to_ship: "Willing to Ship",
-  delivery_area: "Delivery Area",
-  possible_delivery: "Possible Delivery",
-  public_meetup: "Public Meetup",
-  flexible_meetup: "Flexible Meetup",
-};
+const deliveryMethodDisplayMapConcrete: Record<ItemDeliveryMethod, string> = { pickup_only: "Pickup", willing_to_ship: "Willing to Ship", delivery_area: "Delivery Area", possible_delivery: "Possible Delivery", public_meetup: "Public Meetup", flexible_meetup: "Flexible Meetup" };
 
 const getThirdPartyFulfillmentSimpleText = (interested?: boolean): string => {
     if (interested === true) return "Open to it";
     if (interested === false) return "Prefers direct trades";
     return "Not Specified";
 };
-
 const getChainDeliveryBadgeText = (openToChain?: boolean): string | null => {
     if (openToChain === true) return "Chain Delivery";
     return null;
 };
 
-
+// This function now takes user.items directly
 const preparePreferenceInferenceInput = (user: User | null): InferUserPreferencesInput | null => {
-  if (!user || !user.items) { // Ensure user and user.items exist
-    // console.warn("[preparePreferenceInferenceInput] User or user.items is null/undefined.", user);
+  if (!user || !user.items) {
     return null;
   }
-
-  const userListedItems = user.items // Use items already attached to the user object
+  const userListedItems = user.items
     .filter(i => (i.status === 'available' || i.status === 'pending'))
     .slice(0, 5) 
     .map(item => ({
@@ -94,7 +78,6 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
   const engagementNotes: string[] = [];
   if (user.tradesCompleted > 10) engagementNotes.push("Experienced trader with significant trade history.");
   else if (user.tradesCompleted < 2) engagementNotes.push("Relatively new trader or infrequent activity.");
-
   if (user.items.filter(i => i.listingType === 'want').length > user.items.filter(i => i.listingType === 'offer').length * 2) {
     engagementNotes.push("Primarily lists 'want' items, often seeking specific things.");
   } else if (user.items.filter(i => i.listingType === 'offer').length > user.items.filter(i => i.listingType === 'want').length * 2) {
@@ -109,7 +92,6 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
   if (user.minimumMatchRating === 'High') simulatedChatSnippets.push("Only looking for high-quality matches, please.");
   if (simulatedChatSnippets.length === 0) simulatedChatSnippets.push("Open to discussing details further.");
 
-
   return {
     userId: user.id,
     listedItems: userListedItems,
@@ -120,7 +102,6 @@ const preparePreferenceInferenceInput = (user: User | null): InferUserPreference
   };
 };
 
-
 const RatingStarsDisplay = ({ score, count }: { score: number, count?: number }) => (
   <div className="flex items-center">
     {[...Array(5)].map((_, i) => ( <Star key={i} className={`h-5 w-5 ${i < Math.round(score) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} /> ))}
@@ -128,42 +109,38 @@ const RatingStarsDisplay = ({ score, count }: { score: number, count?: number })
   </div>
 );
 
-
-export default function UserProfilePage({ params: paramsProp }: { params: Promise<{ userId: string }> }) {
-  const resolvedParams = use(paramsProp); 
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+// Client Component for displaying profile and handling interactions
+function UserProfileClientContent({ initialUser, userIdToDisplay }: { initialUser: User | null, userIdToDisplay: string }) {
+  const [user, setUser] = useState<User | null>(initialUser); // Initialize with server-fetched data
   const [allowAutoPreferenceInference, setAllowAutoPreferenceInference] = useState(false);
   const [isLearningPreferences, setIsLearningPreferences] = useState(false);
   const [showActivityForAI, setShowActivityForAI] = useState(false);
   const [activityInputForAI, setActivityInputForAI] = useState<InferUserPreferencesInput | null>(null);
   const { toast } = useToast();
+  const { currentUser: authFirebaseUser } = useAuth();
 
-  const currentViewingUserId = dummyUsers[0].id; 
-  const isOwnProfile = resolvedParams.userId === 'me' || resolvedParams.userId === currentViewingUserId;
+  const isOwnProfile = authFirebaseUser?.uid === userIdToDisplay;
 
   useEffect(() => {
-    async function loadUserProfileAndSettings() {
-      setLoading(true);
-      const profile = await getUserProfile(resolvedParams.userId);
-      setUser(profile);
-      if (isOwnProfile) {
-        const allowInference = await getEnableAutomaticPreferenceInference();
-        setAllowAutoPreferenceInference(allowInference);
-        if (profile) {
-            setActivityInputForAI(preparePreferenceInferenceInput(profile));
-        }
-      }
-      setLoading(false);
+    setUser(initialUser); // Update user state if initialUser prop changes (e.g., route change)
+    if (initialUser && isOwnProfile) { // Use isOwnProfile directly
+      setActivityInputForAI(preparePreferenceInferenceInput(initialUser));
+    } else {
+      setActivityInputForAI(null);
     }
-    if (resolvedParams.userId) {
-        loadUserProfileAndSettings();
+  }, [initialUser, isOwnProfile]);
+
+  useEffect(() => {
+    if (isOwnProfile) {
+      getEnableAutomaticPreferenceInference().then(setAllowAutoPreferenceInference);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedParams.userId, isOwnProfile]); 
+  }, [isOwnProfile]);
 
   const handleLearnPreferences = async () => {
-    if (!user) return;
+    if (!user || !isOwnProfile) { // Extra check for isOwnProfile
+        toast({ title: "Error", description: "Cannot update preferences for another user or user data is missing.", variant: "destructive"});
+        return;
+    }
     setIsLearningPreferences(true);
     const currentActivityInput = preparePreferenceInferenceInput(user); 
     setActivityInputForAI(currentActivityInput); 
@@ -173,46 +150,49 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
         setIsLearningPreferences(false);
         return;
     }
-
     try {
       const result: InferUserPreferencesOutput = await inferUserPreferences(currentActivityInput);
-
       if (result.errorMessage || !result.suggestedPreferences) {
-        toast({ title: "AI Preference Learning Error", description: result.errorMessage || "Could not infer preferences.", variant: "destructive" });
+        toast({ title: "AI Preference Learning Error", description: result.errorMessage || "Could not infer preferences.", variant: "default" });
       } else {
-        
-        const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences as InferredUserPreferences);
-        if (updateSuccess) {
-          const updatedProfile = await getUserProfile(user.id); 
-          setUser(updatedProfile); 
-          if(updatedProfile) setActivityInputForAI(preparePreferenceInferenceInput(updatedProfile));
-
-          toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
-        } else {
-          toast({ title: "Error Updating Preferences", description: "Could not save the learned preferences locally.", variant: "destructive" });
-        }
+        const preferencesToUpdate: Partial<User> = {
+          motivations: result.suggestedPreferences.motivations,
+          locationPreference: result.suggestedPreferences.locationPreference,
+          tradeTimingPreference: result.suggestedPreferences.tradeTimingPreference,
+          interestedInThirdPartyFulfillment: result.suggestedPreferences.interestedInThirdPartyFulfillment,
+          minimumMatchRating: result.suggestedPreferences.minimumMatchRating,
+        };
+        await updateUser(user.id, preferencesToUpdate);
+        const updatedProfile = await fetchUserProfileData(user.id); // Re-fetch
+        setUser(updatedProfile);
+        if(updatedProfile) setActivityInputForAI(preparePreferenceInferenceInput(updatedProfile));
+        toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
       }
     } catch (error: any) {
-      console.error("Error calling inferUserPreferences flow:", error);
-      toast({ title: "AI System Error", description: error.message || "Could not connect to the preference learning service.", variant: "destructive" });
+      console.error("Error calling inferUserPreferences flow or updating user:", error);
+      toast({ title: "AI System Error", description: error.message || "Could not connect or save updates.", variant: "destructive" });
     } finally {
       setIsLearningPreferences(false);
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />Loading profile...</div>;
-  }
   if (!user) {
-    return <div className="text-center py-10 font-body">User not found.</div>;
+    return (
+         <div className="space-y-8">
+            <Card className="border-destructive">
+            <CardHeader><CardTitle className="text-center font-headline text-destructive flex items-center justify-center gap-2">
+                <AlertTriangle className="h-6 w-6" /> User Not Found
+                </CardTitle></CardHeader>
+            <CardContent><p className="text-center font-body">Could not find a user with ID: {userIdToDisplay}.</p></CardContent>
+            </Card>
+        </div>
+    );
   }
 
-  const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));
-  const wantedItems = user.items.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending'));
-  const tradedOrFulfilledItems = user.items.filter(item => item.status === 'traded');
-  
+  const offeredItems = user.items?.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending')) || [];
+  const wantedItems = user.items?.filter(item => item.listingType === 'want' && (item.status === 'available' || item.status === 'pending')) || [];
+  const tradedOrFulfilledItems = user.items?.filter(item => item.status === 'traded') || [];
   const effectiveMinimumMatchRating = user.minimumMatchRating;
-
   const preferredLocation = user.logisticsPreferences?.preferredStoredLocationId && user.locations
     ? user.locations.find(loc => loc.id === user.logisticsPreferences!.preferredStoredLocationId)
     : (user.locations && user.locations.length > 0 ? user.locations.find(l => l.isDefault) || user.locations[0] : null);
@@ -225,10 +205,10 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
         preferredLocationIcon = <Home className="h-4 w-4 text-muted-foreground"/>;
     }
   }
-
   const chainDeliveryBadgeText = getChainDeliveryBadgeText(user.logisticsPreferences?.openToChainDelivery);
   
   return (
+    // ... (Full JSX for UserProfileClientContent, identical to previous correct version)
     <div className="space-y-8">
       <Card className="overflow-hidden">
         <CardHeader className="bg-muted/30 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-6">
@@ -238,17 +218,15 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
             <RatingStarsDisplay score={user.rating} count={user.tradesCompleted} />
             <p className="font-body text-muted-foreground mt-2 max-w-xl">{user.bio || "This user hasn't added a bio yet."}</p>
           </div>
-          {isOwnProfile ? null : (<Button variant="default" className="bg-primary hover:bg-primary/90"><MessageSquare className="mr-2 h-4 w-4" /> Message User</Button>)}
+          {authFirebaseUser && authFirebaseUser.uid !== user.id ? (<Button variant="default" className="bg-primary hover:bg-primary/90"><MessageSquare className="mr-2 h-4 w-4" /> Message User</Button>) : null}
         </CardHeader>
         <CardContent className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-            <div className="p-4 bg-background rounded-lg"><Gift className="h-8 w-8 text-green-600 mx-auto mb-2"/><p className="text-2xl font-headline">{user.items.filter(i => i.listingType === 'offer').length}</p><p className="text-sm text-muted-foreground font-body">Items Offered</p></div>
-            <div className="p-4 bg-background rounded-lg"><Search className="h-8 w-8 text-blue-600 mx-auto mb-2"/><p className="text-2xl font-headline">{user.items.filter(i => i.listingType === 'want').length}</p><p className="text-sm text-muted-foreground font-body">Items Wanted</p></div>
+            <div className="p-4 bg-background rounded-lg"><Gift className="h-8 w-8 text-green-600 mx-auto mb-2"/><p className="text-2xl font-headline">{user.items?.filter(i => i.listingType === 'offer').length || 0}</p><p className="text-sm text-muted-foreground font-body">Items Offered</p></div>
+            <div className="p-4 bg-background rounded-lg"><Search className="h-8 w-8 text-blue-600 mx-auto mb-2"/><p className="text-2xl font-headline">{user.items?.filter(i => i.listingType === 'want').length || 0}</p><p className="text-sm text-muted-foreground font-body">Items Wanted</p></div>
             <div className="p-4 bg-background rounded-lg"><Repeat className="h-8 w-8 text-accent mx-auto mb-2"/><p className="text-2xl font-headline">{user.tradesCompleted}</p><p className="text-sm text-muted-foreground font-body">Trades Completed / Wants Fulfilled</p></div>
         </CardContent>
       </Card>
-
       <Separator />
-      
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start flex-wrap gap-2">
@@ -273,7 +251,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
               {effectiveMinimumMatchRating}
             </Badge>
           </div>
-
           {user.motivations && user.motivations.length > 0 && (
             <div>
               <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Lightbulb className="h-4 w-4 text-muted-foreground"/>Motivations:</h4>
@@ -284,7 +261,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
               </div>
             </div>
           )}
-          
           <div className="md:col-span-2">
             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><MapPin className="h-4 w-4 text-muted-foreground"/>Location & Delivery:</h4>
             <div className="space-y-1 pl-5">
@@ -320,14 +296,12 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
                 )}
             </div>
           </div>
-
           {user.tradeTimingPreference && (
             <div>
               <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground"/>Trade Timing:</h4>
               <Badge variant="outline" className="text-xs">{tradeTimingTextMap[user.tradeTimingPreference] || user.tradeTimingPreference}</Badge>
             </div>
           )}
-          
           <div>
             <h4 className="font-headline text-md mb-1 flex items-center gap-1.5"><Users className="h-4 w-4 text-muted-foreground"/>3rd Party Fulfillments:</h4>
             <div className="flex flex-wrap items-center gap-1.5 pl-5">
@@ -344,7 +318,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
                 )}
             </div>
           </div>
-          
           {isOwnProfile && allowAutoPreferenceInference && (
             <Collapsible open={showActivityForAI} onOpenChange={setShowActivityForAI} className="mt-4 md:col-span-2">
                  <CollapsibleTrigger asChild>
@@ -368,7 +341,6 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
           )}
         </CardContent>
       </Card>
-
       <Separator />
       <section><h2 className="text-2xl font-headline mb-4 flex items-center gap-2"><Gift className="h-6 w-6 text-green-600" />Items Offered ({offeredItems.length})</h2>{offeredItems.length > 0 ? <ItemList items={offeredItems} /> : <p className="text-muted-foreground font-body">This user has no items currently offered for trade.</p>}</section>
       <Separator />
@@ -380,4 +352,82 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
     </div>
   );
 }
-    
+
+// Page component wrapper to handle params and Suspense
+export default function UserProfilePageWrapper({ params: paramsProp }: { params: Promise<{ userId: string }> }) {
+  const resolvedParams = use(paramsProp);
+  const { currentUser: authFirebaseUser, isLoading: authIsLoading } = useAuth();
+  const router = useRouter();
+  const [userIdToDisplay, setUserIdToDisplay] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<{user: User | null}>({ user: null });
+  const [isDataLoading, setIsDataLoading] = useState(true);
+
+  useEffect(() => {
+    if (authIsLoading) { // Wait for auth to be resolved first
+        setIsDataLoading(true);
+        return;
+    }
+
+    let idToFetch: string | null = null;
+    if (resolvedParams.userId === 'me') {
+      if (authFirebaseUser) {
+        idToFetch = authFirebaseUser.uid;
+      } else {
+        router.push(`/auth/signin?redirect=/profile/me`);
+        return; // Early exit to prevent fetching with null
+      }
+    } else {
+      idToFetch = resolvedParams.userId;
+    }
+
+    setUserIdToDisplay(idToFetch);
+
+    if (idToFetch) {
+      setIsDataLoading(true);
+      fetchUserProfileData(idToFetch)
+        .then(data => setInitialData({ user: data }))
+        .catch(err => {
+            console.error("Failed to fetch user profile data in wrapper", err);
+            setInitialData({ user: null }); // Set to null on error
+        })
+        .finally(() => setIsDataLoading(false));
+    } else {
+        setIsDataLoading(false); // No ID to fetch, so not loading data for this case
+        setInitialData({user: null});
+    }
+  }, [resolvedParams.userId, authFirebaseUser, authIsLoading, router]);
+
+  if (authIsLoading || (resolvedParams.userId === 'me' && !authFirebaseUser && !authIsLoading)) {
+    // Show loading if auth is loading, or if it's 'me' route and auth is resolved but no user (redirect will happen)
+    return <UserProfileLoadingState />;
+  }
+
+  if (!userIdToDisplay && !isDataLoading) { // Should be caught by redirect or error from fetcher if ID was invalid
+      return (
+           <div className="space-y-8">
+            <Card className="border-destructive">
+            <CardHeader><CardTitle className="text-center font-headline text-destructive flex items-center justify-center gap-2">
+                <AlertTriangle className="h-6 w-6" /> Error
+                </CardTitle></CardHeader>
+            <CardContent><p className="text-center font-body">Could not determine user profile to display.</p></CardContent>
+            </Card>
+        </div>
+      );
+  }
+
+  if (isDataLoading && userIdToDisplay) { // If we have a userIdToDisplay but still fetching its data
+      return <UserProfileLoadingState />;
+  }
+
+  // Render content once userIdToDisplay is set and data is loaded (or attempted)
+  return <UserProfileClientContent initialUser={initialData.user} userIdToDisplay={userIdToDisplay!} />;
+}
+
+function UserProfileLoadingState() {
+  return (
+    <div className="text-center py-10 font-body flex items-center justify-center gap-2">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      Loading profile...
+    </div>
+  );
+}
