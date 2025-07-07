@@ -1,0 +1,20 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Users can upload and read their own files
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Item images can be read by anyone, but only written by the item owner
+    match /items/{itemId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // Public files (like default avatars) can be read by anyone
+    match /public/{allPaths=**} {
+      allow read: if request.auth != null;
+    }
+  }
+}
