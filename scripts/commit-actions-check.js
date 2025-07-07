@@ -63,7 +63,7 @@ try {
   
   console.log('📋 Expected workflows analysis:');
   expectedWorkflows.forEach(expected => {
-    const found = data.workflow_runs?.find(run => 
+    const found = directData.workflow_runs?.find(run => 
       (run.workflow_name || '').toLowerCase().includes(expected.name.toLowerCase())
     );
     

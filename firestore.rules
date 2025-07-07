@@ -3,35 +3,41 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Users can read and write their own user document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
       allow read: if request.auth != null; // Users can read other users' profiles
     }
     
     // Items can be read by anyone, but only written by the owner
     match /items/{itemId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        (resource == null || request.auth.uid == resource.data.ownerId);
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
     }
     
     // Trades can be read and written by participants
     match /trades/{tradeId} {
-      allow read, write: if request.auth != null && 
+      allow create: if request.auth != null && 
+        (request.auth.uid == request.resource.data.offeringUserId || 
+         request.auth.uid == request.resource.data.receivingUserId);
+      allow read, update, delete: if request.auth != null && 
         (request.auth.uid == resource.data.offeringUserId || 
          request.auth.uid == resource.data.receivingUserId);
     }
     
-    // Match reports and feedback - admin access or user's own data
+    // Match reports and feedback - users can only write their own data
     match /match-reports/{reportId} {
-      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
     match /feedback-reports/{feedbackId} {
-      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
     match /ai-diagnostic-logs/{logId} {
-      allow read, write: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
   }
 }

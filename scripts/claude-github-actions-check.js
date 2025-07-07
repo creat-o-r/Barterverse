@@ -38,6 +38,20 @@ function getWorkflowRuns(limit = 20) {
 }
 
 /**
+ * Run GitHub CLI command safely
+ */
+function runGhCommand(command) {
+  try {
+    const result = execSync(command, { encoding: 'utf8' });
+    return JSON.parse(result);
+  } catch (error) {
+    console.error(`Error running command: ${command}`);
+    console.error(error.message);
+    return null;
+  }
+}
+
+/**
  * Get specific workflow runs by name
  */
 function getWorkflowRunsByName(workflowName, limit = 10) {
