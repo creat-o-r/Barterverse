@@ -1,17 +1,17 @@
-
-'use client';
+"use client";
 
 import { useEffect, useState } from 'react';
-import type { Item } from '@/types';
+import type { Item } from '@/types'; // User type not directly needed if only ID is used for triggeringUserId
 import { suggestMatchingItems, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
 import ItemList from '@/components/items/ItemList';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { getAllItems } from '@/lib/firebase/firestoreUtils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { AIMatchingMode } from '@/services/ai-config-service';
 import { useToast } from "@/hooks/use-toast";
-
+import { useAuth } from '@/contexts/AuthContext';
+import Link from 'next/link';
 
 interface SuggestedMatchesProps {
   currentItem: Item;
@@ -27,9 +27,24 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
   const [matchModeUsed, setMatchModeUsed] = useState<AIMatchingMode | undefined>(undefined);
   const [internalReasoning, setInternalReasoning] = useState<string | null>(null);
   const { toast } = useToast();
+  const { currentUser: firebaseUser, isLoading: authIsLoading } = useAuth();
 
   useEffect(() => {
     async function fetchSuggestions() {
+      if (authIsLoading) {
+        setLoading(true);
+        return;
+      }
+
+      const triggeringUserIdToUse = firebaseUser?.uid;
+
+      if (!triggeringUserIdToUse) {
+        setLoading(false);
+        setInternalReasoning("Sign in to see personalized AI suggestions for this item.");
+        setSuggestedItems([]);
+        return;
+      }
+
       setLoading(true);
       setFetchError(null);
       setInternalReasoning(null);
@@ -38,19 +53,31 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
       setMatchModeUsed(undefined);
 
       if (!currentItem?.id) {
-          const missingItemError = "Cannot fetch suggestions: current item information is missing.";
-          setInternalReasoning(missingItemError);
-          setFetchError(missingItemError);
-          toast({ title: "Suggestion Error", description: missingItemError, variant: "destructive" });
-          setLoading(false);
-          return;
+        const missingItemError = "Cannot fetch suggestions: current item information is missing.";
+        setInternalReasoning(missingItemError);
+        setFetchError(missingItemError);
+        toast({ title: "Suggestion Error", description: missingItemError, variant: "destructive" });
+        setLoading(false);
+        return;
       }
 
-      const viewingUser = dummyUsers[0];
+      let allItemsFromDB: Item[];
+      try {
+        allItemsFromDB = await getAllItems();
+      } catch (dbError: any) {
+        console.error("Failed to fetch items from Firestore for suggestions:", dbError);
+        const dbErrMessage = "Could not load items needed for AI suggestions from the database.";
+        setInternalReasoning(dbErrMessage);
+        setFetchError(dbErrMessage);
+        toast({ title: "Database Error", description: dbErrMessage, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
 
       try {
-        const otherAvailableItems = dummyItems.filter(
+        const otherAvailableItems = allItemsFromDB.filter(
           (item) => item.id !== currentItem.id &&
+                     item.ownerId !== triggeringUserIdToUse &&
                      (item.status === 'available' || item.status === 'pending')
         ).map(item => ({
             id: item.id,
@@ -59,32 +86,30 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             category: item.category,
             ownerId: item.ownerId,
             listingType: item.listingType,
-            // minimumMatchRatingOverride: item.minimumMatchRatingOverride, // Removed
             isGiftItForward: item.isGiftItForward,
-            openToAnyOpportunity: item.openToAnyOpportunity, // Added
+            openToAnyOpportunity: item.openToAnyOpportunity,
         }));
 
         if (otherAvailableItems.length === 0) {
             const noItemsReasoning = `No other items currently available from different users to suggest matches for ${currentItem.listingType === 'want' ? 'this want' : 'this item'} "${currentItem.name}".`;
             setInternalReasoning(noItemsReasoning);
             setSuggestedItems([]);
-            setMatchModeUsed('simple');
+            setMatchModeUsed('simple'); // Default mode if no items to match
             setLoading(false);
             return;
         }
 
         const inputForFlow = {
-          triggeringUserId: viewingUser.id,
+          triggeringUserId: triggeringUserIdToUse,
           currentItem: {
             id: currentItem.id,
             name: currentItem.name,
             description: currentItem.description,
             category: currentItem.category,
-            ownerId: currentItem.ownerId,
+            ownerId: currentItem.ownerId, // This is the owner of the item being viewed
             listingType: currentItem.listingType,
-            // minimumMatchRatingOverride: currentItem.minimumMatchRatingOverride, // Removed
             isGiftItForward: currentItem.isGiftItForward,
-            openToAnyOpportunity: currentItem.openToAnyOpportunity, // Added
+            openToAnyOpportunity: currentItem.openToAnyOpportunity,
           },
           availableItems: otherAvailableItems,
         };
@@ -100,7 +125,7 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         setMatchModeUsed(result.usedMatchingMode);
 
         const itemsWithScores = (result.suggestedMatches || []).map(match => {
-          const itemDetails = dummyItems.find(dItem => dItem.id === match.itemId);
+          const itemDetails = allItemsFromDB.find(dItem => dItem.id === match.itemId);
           return itemDetails ? {
             ...itemDetails,
             matchScore: match.matchScore,
@@ -130,7 +155,6 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
             setInternalReasoning(result.reasoning);
         }
 
-
       } catch (err: any) {
         console.error("Failed to fetch item matches (client-side catch):", err);
         let clientErrorMsg = "Could not load suggestions due to a system error. Please try again later.";
@@ -143,10 +167,8 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
         } else {
             setInternalReasoning(err.message || clientErrorMsg);
         }
-
         setFetchError(clientErrorMsg);
         toast({ title: "Suggestion Error", description: clientErrorMsg, variant: toastSeverity, duration: 7000 });
-
       } finally {
         setLoading(false);
       }
@@ -154,14 +176,14 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
 
     fetchSuggestions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem.id, currentItem.name, currentItem.listingType, currentItem.ownerId, /* currentItem.minimumMatchRatingOverride removed */ currentItem.isGiftItForward, currentItem.openToAnyOpportunity]);
+  }, [currentItem.id, currentItem.name, currentItem.description, currentItem.category, currentItem.listingType, currentItem.ownerId, currentItem.isGiftItForward, currentItem.openToAnyOpportunity, toast, firebaseUser, authIsLoading]);
 
 
   const cardTitleText = currentItem.listingType === 'offer'
     ? currentItem.isGiftItForward ? `AI: Who Might Want Your Gift "${currentItem.name}"?` : `AI Matches for ${currentItem.name}`
     : `AI Fulfillments for ${currentItem.name}`;
 
-  if (loading) {
+  if (loading || authIsLoading) {
     return (
       <Card>
         <CardHeader>
@@ -183,6 +205,24 @@ export default function SuggestedMatches({ currentItem }: SuggestedMatchesProps)
               </Card>
             ))}
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!firebaseUser && !authIsLoading) { // User is definitely not logged in
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-xl flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            AI Suggestions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground font-body text-center py-4">
+            <Link href={`/auth/signin?redirect=/items/${currentItem.id}`} className="text-primary hover:underline">Sign in</Link> to see personalized AI-powered suggestions for this item.
+          </p>
         </CardContent>
       </Card>
     );

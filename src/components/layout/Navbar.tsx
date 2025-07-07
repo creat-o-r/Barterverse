@@ -5,7 +5,16 @@ import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react';
+import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus, LogOut, ChevronDown } from 'lucide-react'; // Added LogOut, ChevronDown
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // Import Dropdown components
 import {
   Select,
   SelectContent,

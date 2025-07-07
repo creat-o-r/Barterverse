@@ -25,16 +25,23 @@ import { useState, useCallback, useEffect } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data';
-import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming } from '@/types';
+// import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getUser, addItem } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming, Item as ItemType } from '@/types'; // Added ItemType
 import { useRouter } from 'next/navigation';
 import Link from 'next/link'; // Added Link
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+// import { v4 as uuidv4 } from 'uuid'; // No longer needed here, addItem handles it
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
+import { useAuth } from '@/contexts/AuthContext';
+
+// Ensure SIMULATED_CURRENT_USER_ID is fully removed if not used, or used correctly if needed for a specific purpose.
+// For fetching current user data for the form, useAuth() is the way.
+// const SIMULATED_CURRENT_USER_ID = 'user1';
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
 const NO_LOCATION_SPECIFIED_VALUE = "no_location_specified_for_item";
@@ -63,7 +70,7 @@ const itemFormSchemaBase = z.object({
   logisticsNotes: z.string().optional(),
 
   timingType: z.enum(['flexible', 'fixed_date']).optional(),
-  timingFixedDate: z.string().optional(),
+  timingFixedDate: z.string().optional(), // Storing as string from calendar, will be ISO date string part
   dynamicSpecifications: z.array(z.object({
     attributeName: z.string().min(1, "Attribute name cannot be empty."),
     attributeValue: z.string().min(1, "Attribute value cannot be empty.")
@@ -104,16 +111,33 @@ const deliveryMethodMapConcrete: Record<ItemDeliveryMethod, string> = {
 export default function NewItemPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const { selectedCategory: globalSelectedCategory } = useGlobalFilter();
+  const { selectedCategory: globalSelectedCategory, isLoadingCategories: isLoadingGlobalCategories } = useGlobalFilter();
+  const { appUser } = useAuth();
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   useEffect(() => {
-    const user = dummyUsers.find(u => u.id === 'user1');
-    setCurrentUser(user || null);
-  }, []);
+    const fetchCurrentUser = async () => {
+      setIsLoadingUser(true);
+      try {
+        if (appUser) {
+          setCurrentUser(appUser);
+        } else {
+          toast({ title: "Error", description: "User not authenticated. Please sign in.", variant: "destructive" });
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+        toast({ title: "Error", description: "Could not load current user data.", variant: "destructive" });
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    fetchCurrentUser();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appUser]);
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
@@ -260,7 +284,7 @@ export default function NewItemPage() {
         logistics: itemLogistics,
         // specifications will be handled in a later step
       };
-      const addedItem = addNewItemToDummyData(newItemData);
+      const addedItem = await addItem(newItemData);
 
       toast({
         title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,

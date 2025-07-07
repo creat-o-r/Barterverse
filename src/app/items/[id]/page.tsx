@@ -1,26 +1,35 @@
+"use client"; // Make the wrapper a client component to handle `use(paramsProp)` and then pass to server-fetched part
 
-import { use, Suspense } from 'react';
+import { use, Suspense, useEffect, useState } from 'react'; // Added useEffect, useState
 import Image from 'next/image';
 import Link from 'next/link';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
+import { getItem, getUser } from '@/lib/firebase/firestoreUtils';
 import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod, ItemTiming } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
 import TemporaryAdminMatchTestPanelClient from '@/components/items/TemporaryAdminMatchTestPanelClient';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
-import SpecificationsDisplay from '@/components/items/SpecificationsDisplay'; // Import the new client component
+import SpecificationsDisplay from '@/components/items/SpecificationsDisplay';
+import { useAuth } from '@/contexts/AuthContext';
 
+// Data fetching function remains async, can be called by server or client components
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
-  const item = dummyItems.find((i) => i.id === itemId);
-  if (!item) return null;
-  const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) return null;
+  const item = await getItem(itemId);
+  if (!item) {
+    console.warn(`[ItemDetailPage] Item with ID ${itemId} not found in Firestore.`);
+    return null;
+  }
+  const owner = await getUser(item.ownerId);
+  if (!owner) {
+    console.warn(`[ItemDetailPage] Owner with ID ${item.ownerId} for item ${itemId} not found in Firestore.`);
+    return null;
+  }
   return { item, owner };
 }
 
@@ -37,7 +46,7 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   if (!logistics) {
     return <p className="text-sm text-muted-foreground font-body">Logistics details not specified for this item.</p>;
   }
-
+  // ... (rest of LogisticsDisplay remains the same)
   let locationDisplay = "Location not specified for this item.";
   if (logistics.locationType === 'profile_stored_location' && logistics.selectedUserStoredLocationId) {
     const storedLoc = owner.locations?.find(l => l.id === logistics.selectedUserStoredLocationId);
@@ -52,20 +61,25 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
     }
   }
 
-
   let timingDisplay = "Timing not specified.";
   if (logistics.timing) {
     if (logistics.timing.type === 'flexible') {
       timingDisplay = "Flexible";
     } else if (logistics.timing.type === 'fixed_date' && logistics.timing.date) {
       try {
-        timingDisplay = `Fixed: ${format(new Date(logistics.timing.date), "PPP")}`;
+        const dateInput = (typeof logistics.timing.date === 'string' || typeof logistics.timing.date === 'number')
+                            ? logistics.timing.date
+                            : (logistics.timing.date as any)?.seconds ? (logistics.timing.date as any).toDate() : undefined;
+        if (dateInput) {
+            timingDisplay = `Fixed: ${format(new Date(dateInput), "PPP")}`;
+        } else {
+            timingDisplay = `Fixed: Invalid Date (received: ${JSON.stringify(logistics.timing.date)})`;
+        }
       } catch (e) {
-        timingDisplay = `Fixed: Invalid Date (${logistics.timing.date})`;
+        timingDisplay = `Fixed: Error formatting date (${logistics.timing.date})`;
       }
     }
   }
-
 
   return (
     <div className="space-y-3">
@@ -95,14 +109,12 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
           <p className="text-sm text-foreground/90 font-body pl-5">Not specified</p>
         )}
       </div>
-
       {logistics.timing && (
         <div>
             <h4 className="font-headline text-md flex items-center gap-1.5"><Clock className="h-4 w-4 text-muted-foreground" /> Timing:</h4>
             <p className="text-sm text-foreground/90 font-body pl-5">{timingDisplay}</p>
         </div>
       )}
-
       {logistics.notes && (
         <div>
           <h4 className="font-headline text-md flex items-center gap-1.5"><Edit2 className="h-4 w-4 text-muted-foreground" /> Notes:</h4>
@@ -113,28 +125,29 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   );
 }
 
-async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
-  const itemDetails = await getItemDetails(itemId);
+// This is now the main client component that handles displaying the fetched item.
+function ItemDetailsDisplay({ itemDetails, itemId }: { itemDetails: { item: Item; owner: User } | null, itemId: string }) {
+  const { currentUser: firebaseUser, isLoading: authIsLoading } = useAuth();
 
   if (!itemDetails) {
     return (
       <div className="space-y-8">
-        <Card>
-          <CardHeader><CardTitle className="text-center font-headline">Item Not Found</CardTitle></CardHeader>
-          <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}</p></CardContent>
+        <Card className="border-destructive">
+          <CardHeader><CardTitle className="text-center font-headline text-destructive flex items-center justify-center gap-2">
+            <AlertTriangle className="h-6 w-6" /> Item Not Found
+            </CardTitle></CardHeader>
+          <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}. It may have been removed or the ID is incorrect.</p></CardContent>
         </Card>
       </div>
     );
   }
 
   const { item, owner } = itemDetails;
-  const currentUserId = dummyUsers[0]?.id || 'user1_fallback';
-  const isCurrentUserOwner = item.ownerId === currentUserId;
+  const isCurrentUserOwner = !authIsLoading && firebaseUser ? item.ownerId === firebaseUser.uid : false;
 
   return (
     <div className="space-y-8">
       <Card className="overflow-hidden shadow-lg">
-        {/* Image Section - Full width at the top of the card */}
         <div className="relative aspect-video w-full bg-muted">
           <Image
             src={item.imageUrl || 'https://placehold.co/600x400.png'}
@@ -146,11 +159,10 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         </div>
-
-        {/* Details Section - Below the image */}
         <div className="p-6">
             <CardHeader className="p-0 pb-4">
               <CardTitle className="font-headline text-3xl mb-2">{item.name}</CardTitle>
+              {/* ... (rest of CardHeader content remains the same) ... */}
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <div className="flex items-center gap-2">
                   <Tag className="h-5 w-5 text-primary" />
@@ -175,15 +187,13 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                 )}
               </div>
             </CardHeader>
-
             <CardContent className="p-0 flex-grow">
               <p className="font-body text-foreground/80 leading-relaxed whitespace-pre-wrap break-words mb-4">{item.description}</p>
-              
               <SpecificationsDisplay specifications={item.specifications} />
-
               <Separator className="my-4" />
               <div className="space-y-3 mb-4">
                 <h3 className="font-headline text-xl flex items-center gap-2"><UserCircle className="h-6 w-6 text-primary" />Owner Details</h3>
+                {/* ... (rest of Owner Details remains the same) ... */}
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={owner.avatarUrl} alt={owner.name} data-ai-hint={owner.dataAiHint || "owner avatar"} />
@@ -203,8 +213,8 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
                 <LogisticsDisplay logistics={item.logistics} owner={owner} />
               </div>
             </CardContent>
-
             <CardFooter className="p-0 pt-6">
+              {/* Conditional rendering based on isCurrentUserOwner and item status */}
               {!isCurrentUserOwner && item.status === 'available' && (
                  item.listingType === 'offer' && item.isGiftItForward ? (
                     <Button asChild className="w-full bg-pink-500 hover:bg-pink-600 text-white" size="lg">
@@ -222,9 +232,10 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
               {item.status === 'traded' && <Badge variant="destructive" className="w-full text-center py-2 text-sm">Item Traded</Badge>}
               {item.status === 'pending' && <Badge variant="secondary" className="w-full text-center py-2 text-sm">Trade Pending</Badge>}
             </CardFooter>
-          </div>
+        </div>
       </Card>
 
+      {/* SuggestedMatches and TemporaryAdminMatchTestPanelClient are client components and will use their own auth context */}
       {!isCurrentUserOwner && item.status === 'available' && !(item.listingType === 'offer' && item.isGiftItForward) && (
         <Suspense fallback={<SuggestedMatchesLoadingState />}>
           <SuggestedMatches currentItem={item} />
@@ -235,7 +246,15 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   );
 }
 
+// Server Component to fetch data and pass to Client Component
+async function ItemDetailPageDataFetcher({ itemId }: { itemId: string }) {
+  const itemDetails = await getItemDetails(itemId);
+  return <ItemDetailsDisplay itemDetails={itemDetails} itemId={itemId} />;
+}
+
+// Loading state component remains the same
 function ItemPageLoadingState() {
+  // ... (content of ItemPageLoadingState)
   return (
     <div className="space-y-8 animate-pulse">
       <Card className="overflow-hidden shadow-lg">
@@ -247,14 +266,11 @@ function ItemPageLoadingState() {
               <div className="h-6 bg-muted-foreground/20 rounded w-1/3"></div>
             </div>
             <div className="h-5 bg-muted-foreground/20 rounded w-1/4 mb-4"></div>
-          
             <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
             <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
             <div className="h-4 bg-muted-foreground/20 rounded w-3/4 mb-4"></div>
-
             <div className="my-4 h-px bg-border"></div>
-            <div className="h-10 bg-muted-foreground/20 rounded w-full mb-4"></div> {/* Placeholder for specs collapsible */}
-
+            <div className="h-10 bg-muted-foreground/20 rounded w-full mb-4"></div>
             <div className="my-4 h-px bg-border"></div>
             <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
             <div className="flex items-center gap-3">
@@ -268,10 +284,9 @@ function ItemPageLoadingState() {
             <div className="h-6 bg-muted-foreground/20 rounded w-1/3 mb-3"></div>
             <div className="h-4 bg-muted-foreground/20 rounded w-full mb-2"></div>
             <div className="h-4 bg-muted-foreground/20 rounded w-5/6 mb-2"></div>
-          
-          <div className="pt-6">
-            <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>
-          </div>
+            <div className="pt-6">
+              <div className="h-10 bg-muted-foreground/20 rounded w-full"></div>
+            </div>
         </div>
       </Card>
       <Card className="animate-pulse">
@@ -295,8 +310,9 @@ function ItemPageLoadingState() {
     </div>
   );
 }
-
+// SuggestedMatchesLoadingState remains the same
 function SuggestedMatchesLoadingState() {
+  // ... (content of SuggestedMatchesLoadingState)
   return (
     <Card>
       <CardHeader>
@@ -322,10 +338,11 @@ function SuggestedMatchesLoadingState() {
   );
 }
 
-export default function ItemDetailPageWrapper({ params: paramsProp }: { params: Promise<{ id: string }> }) {
-  const params = use(paramsProp);
-
-  if (!params || !params.id) {
+// The main page component wrapper
+export default function ItemDetailPageWrapper({ params }: { params: Promise<{ id: string }> }) {
+  // Use the `use` hook to unwrap the params Promise
+  const unwrappedParams = use(params);
+  if (!unwrappedParams?.id) {
     return (
       <div className="space-y-8">
         <Card className="border-destructive">
@@ -338,7 +355,7 @@ export default function ItemDetailPageWrapper({ params: paramsProp }: { params: 
 
   return (
     <Suspense fallback={<ItemPageLoadingState />}>
-      <ItemDetailsDisplay itemId={params.id} />
+      <ItemDetailPageDataFetcher itemId={unwrappedParams.id} />
     </Suspense>
   );
 }
