@@ -1,62 +1,65 @@
-
-'use client';
+"use client";
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, User, Bot, Loader2 } from 'lucide-react';
-import type { Item, ChatMessage, User } from '@/types'; // Added User
+import { Send, Bot, Loader2 } from 'lucide-react'; // Removed User icon as it's part of Avatar
+import type { Item, ChatMessage } from '@/types'; // User type not needed directly here if appUser from context has enough
 import { tradeNegotiationChat } from '@/ai/flows/trade-negotiation-chat';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
-// import { dummyUsers } from '@/lib/dummy-data'; // Replaced
-import { getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
-
-// Simulated current user ID
-const SIMULATED_CURRENT_USER_ID = 'user1';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 interface ChatWindowProps {
-  currentItem: Item; // Item that forms the primary context from *other user's* side (e.g., what they offer, or what they want of yours)
-  requestedItemInitial?: Item | null; // Item that forms primary context from *current user's* side (e.g., what you offer, or what you want of theirs)
+  currentItem: Item;
+  requestedItemInitial?: Item | null;
   otherUserId: string;
   otherUserName: string;
-  tradeId: string; // To scope chat history if persisted AND determine trade initiator
+  tradeId: string;
 }
 
 export default function ChatWindow({
-  currentItem, // From other user's perspective for the negotiation (e.g. their offer, or their want that is your item)
-  requestedItemInitial, // From current user's perspective (e.g. your offer, or your want that is their item)
+  currentItem,
+  requestedItemInitial,
   otherUserId,
   otherUserName,
   tradeId,
 }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For AI response loading
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { currentUser: firebaseUser, appUser, isLoading: authIsLoading } = useAuth();
 
-  const currentUserId = dummyUsers[0].id; // Simulate current user
+  const currentUserId = firebaseUser?.uid; // Use authenticated user's ID
 
-  // Determine who initiated the trade interest based on tradeId
-  // tradeId format: trade-${INITIATOR_ID}-wants-${WANTED_ITEM_ID}-from-${WANTED_ITEM_OWNER_ID}
   const tradeIdParts = tradeId.split('-');
   const initiatorId = tradeIdParts.length > 1 ? tradeIdParts[1] : null;
-  const isCurrentUserInitiator = currentUserId === initiatorId;
+  // isCurrentUserInitiator depends on currentUserId which might be null initially
+  const isCurrentUserInitiator = currentUserId && currentUserId === initiatorId;
 
   useEffect(() => {
+    // Wait for auth to resolve before setting initial message
+    if (authIsLoading) return;
+
     let initialAiText = `Hi! I'm here to help you negotiate with ${otherUserName}. `;
-    if (isCurrentUserInitiator) {
+    if (!currentUserId) {
+      initialAiText = "Please sign in to participate in this chat.";
+    } else if (isCurrentUserInitiator) {
       initialAiText += `You're interested in their "${currentItem.name}". What would you like to propose?`;
       if (requestedItemInitial) {
         initialAiText += ` You could offer your "${requestedItemInitial.name}".`;
       }
-    } else {
-      initialAiText += `${otherUserName} is interested in your "${requestedItemInitial?.name || 'item'}". What are your thoughts?`;
-      if (currentItem) {
+    } else { // Current user is not the initiator (or currentUserId is null, handled above)
+      initialAiText += `${otherUserName} is interested in your "${requestedItemInitial?.name || currentItem.name}". What are your thoughts?`;
+      if (currentItem && otherUserId === currentItem.ownerId) { // Ensure currentItem is indeed the other user's offer
          initialAiText += ` They might offer their "${currentItem.name}".`;
+      } else if (requestedItemInitial && otherUserId === requestedItemInitial.ownerId) {
+         // This case is less likely given prop names, but as a fallback
+         initialAiText += ` They might offer their "${requestedItemInitial.name}".`;
       }
     }
 
@@ -70,7 +73,8 @@ export default function ChatWindow({
       },
     ]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentItem, otherUserName, requestedItemInitial, isCurrentUserInitiator]); // Added isCurrentUserInitiator
+  }, [currentItem.name, otherUserName, requestedItemInitial?.name, currentUserId, authIsLoading]); // isCurrentUserInitiator will change with currentUserId
+
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -84,10 +88,14 @@ export default function ChatWindow({
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
+    if (!currentUserId) {
+      toast({ title: "Error", description: "You must be logged in to send messages.", variant: "destructive"});
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      senderId: currentUserId, // Use actual currentUserId
+      senderId: currentUserId,
       text: newMessage,
       timestamp: new Date(),
     };
@@ -101,20 +109,27 @@ export default function ChatWindow({
       let itemOfferedForFlowDesc = "Not specified";
       let itemWantedForFlowDesc = "Not specified";
 
+      // This logic needs to be robust based on who owns `currentItem` and `requestedItemInitial`
+      // Assuming `currentItem` is what the other user has that *this* user is interested in,
+      // OR what *this* user has that the other user is interested in (if this user is not initiator).
+      // And `requestedItemInitial` is what *this* user might offer.
+
       if (isCurrentUserInitiator) {
-        // Current user wants `currentItem` (from other user) and offers `requestedItemInitial` (their own)
+        // Current user (initiator) wants `currentItem` (from other user).
+        // `requestedItemInitial` is what current user might offer.
+        itemWantedForFlowDesc = `${currentItem.name}: ${currentItem.description}`;
         itemOfferedForFlowDesc = requestedItemInitial 
           ? `${requestedItemInitial.name}: ${requestedItemInitial.description}` 
-          : "User's offer is being discussed.";
-        itemWantedForFlowDesc = `${currentItem.name}: ${currentItem.description}`;
+          : "User's specific offer is being discussed.";
       } else {
-        // Other user wants `requestedItemInitial` (current user's item) and offers `currentItem` (their own)
-        itemOfferedForFlowDesc = currentItem 
-          ? `${currentItem.name}: ${currentItem.description}`
-          : "Other user's offer is being discussed.";
+        // Other user (initiator) wants `requestedItemInitial` (current user's item).
+        // `currentItem` is what other user might offer.
         itemWantedForFlowDesc = requestedItemInitial
           ? `${requestedItemInitial.name}: ${requestedItemInitial.description}`
-          : "Item wanted is being discussed.";
+          : "The item they want from you is being discussed.";
+        itemOfferedForFlowDesc = currentItem
+          ? `${currentItem.name}: ${currentItem.description}`
+          : "Their specific offer is being discussed.";
       }
       
       const aiResponse = await tradeNegotiationChat({
@@ -163,7 +178,7 @@ export default function ChatWindow({
               message.senderId === currentUserId ? 'justify-end' : 'justify-start'
             )}
           >
-            {message.senderId !== currentUserId && (
+            {message.senderId !== currentUserId && ( // AI or other user (if expanded for group chat)
               <Avatar className="h-8 w-8">
                 <AvatarFallback><Bot size={18}/></AvatarFallback>
               </Avatar>
@@ -187,13 +202,13 @@ export default function ChatWindow({
             </div>
             {message.senderId === currentUserId && (
               <Avatar className="h-8 w-8">
-                 {/* Add user avatar image if available, otherwise fallback to initial */}
-                <AvatarFallback>{dummyUsers.find(u=>u.id === currentUserId)?.name.charAt(0) || 'U'}</AvatarFallback>
+                <AvatarImage src={appUser?.avatarUrl || firebaseUser?.photoURL || undefined} alt={appUser?.name || firebaseUser?.displayName || "User"} />
+                <AvatarFallback>{appUser?.name?.charAt(0) || firebaseUser?.displayName?.charAt(0) || firebaseUser?.email?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
               </Avatar>
             )}
           </div>
         ))}
-        {isLoading && (
+        {isLoading && ( // AI response loading
            <div className="flex items-end gap-2 mb-4 justify-start">
              <Avatar className="h-8 w-8">
                 <AvatarFallback><Bot size={18}/></AvatarFallback>
@@ -207,13 +222,13 @@ export default function ChatWindow({
       <form onSubmit={handleSendMessage} className="flex items-center p-3 border-t">
         <Input
           type="text"
-          placeholder="Type your message..."
+          placeholder={currentUserId ? "Type your message..." : "Sign in to chat"}
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           className="flex-grow mr-2"
-          disabled={isLoading}
+          disabled={isLoading || authIsLoading || !currentUserId}
         />
-        <Button type="submit" size="icon" disabled={isLoading || !newMessage.trim()} className="bg-primary hover:bg-primary/90">
+        <Button type="submit" size="icon" disabled={isLoading || authIsLoading || !currentUserId || !newMessage.trim()} className="bg-primary hover:bg-primary/90">
           <Send className="h-5 w-5" />
         </Button>
       </form>
