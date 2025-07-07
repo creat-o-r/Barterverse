@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -22,7 +22,7 @@ const signinSchema = z.object({
 
 type SigninFormValues = z.infer<typeof signinSchema>;
 
-export default function SigninPage() {
+function SigninForm() {
   const { signIn, isLoading: authLoading, error: authError } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams(); // To get redirect URL
@@ -97,5 +97,13 @@ export default function SigninPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function SigninPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <SigninForm />
+    </Suspense>
   );
 }
