@@ -52,16 +52,32 @@ The same security rules apply to all prefixed collections, ensuring proper acces
 
 ### Local Development
 ```bash
-# Uses .env.local
-npm run dev                    # Auto-deploy app, dev_ collections
-npm run firebase:emulators     # Local Firebase emulators (optional)
+# Option 1: Use production Firebase (dev_ collections)
+npm run dev                    # Uses .env.local → dev_ collections
+
+# Option 2: Use local emulators (recommended for development)
+npm run firebase:emulators     # Start emulators (separate terminal)
+npm run firebase:seed-emulator # Seed emulator with test data
+# Then copy .env.development to .env.local
+npm run dev                    # Uses emulators → test_ collections
+```
+
+### Testing
+```bash
+# Option 1: Run tests with emulators (recommended)
+npm run test:emulators         # Starts emulators, runs tests, stops emulators
+
+# Option 2: Manual emulator testing
+npm run firebase:emulators     # Start emulators (separate terminal)
+npm run test:setup             # Seed emulator with test data
+npm test                       # Run tests against emulators
 ```
 
 ### Preview Instances  
 ```bash
 # Uses .env.preview automatically
 # Deploys to: barterverse-auto-deploy.web.app
-# Data: dev_* collections
+# Data: dev_* collections (safe, isolated from production)
 ```
 
 ### Production Deployment
@@ -75,7 +91,9 @@ npm run firebase:emulators     # Local Firebase emulators (optional)
 
 ### Seeding Development Data
 ```bash
-npm run firebase:seed          # Seeds dev_* collections
+npm run firebase:seed          # Seeds dev_* collections in production Firebase
+npm run firebase:seed-emulator # Seeds test_* collections in local emulator
+npm run test:setup             # Alias for firebase:seed-emulator
 ```
 
 ### Monitoring Collections

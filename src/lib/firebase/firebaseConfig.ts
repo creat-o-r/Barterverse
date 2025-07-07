@@ -1,13 +1,16 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app'; // Added FirebaseApp type
 import { getFirestore, type Firestore } from 'firebase/firestore'; // Added Firestore type
-import { getAuth, type Auth } from 'firebase/auth'; // Added Auth and getAuth
+import { getAuth, type Auth, connectAuthEmulator } from 'firebase/auth'; // Added Auth and getAuth
+import { connectFirestoreEmulator } from 'firebase/firestore';
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Environment detection
 const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'development';
 const firebaseEnv = process.env.NEXT_PUBLIC_FIREBASE_ENV || 'auto-deploy';
+const useEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === 'true' || 
+                    process.env.NODE_ENV === 'test';
 
 // Your web app's Firebase configuration, loaded from environment variables
 const firebaseConfig = {
@@ -47,6 +50,7 @@ const missingKeys = requiredConfigKeys.filter(key => !firebaseConfig[key]);
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
 let auth: Auth | undefined;
+let emulatorsConnected = false;
 
 if (missingKeys.length > 0) {
   console.warn(
@@ -62,6 +66,24 @@ if (missingKeys.length > 0) {
   app = !getApps().length ? initializeApp(firebaseConfig as any) : getApp(); // Cast as any because TS might complain about potentially undefined values if not handled strictly
   db = getFirestore(app);
   auth = getAuth(app);
+  
+  // Connect to emulators if in development/test environment
+  if (useEmulators && !emulatorsConnected) {
+    try {
+      connectFirestoreEmulator(db, 'localhost', 8080);
+      connectAuthEmulator(auth, 'http://localhost:9099');
+      emulatorsConnected = true;
+      console.log('🔧 Connected to Firebase emulators');
+    } catch (error: any) {
+      // Ignore errors if emulators are already connected
+      if (error.message?.includes('already')) {
+        emulatorsConnected = true;
+        console.log('🔧 Firebase emulators already connected');
+      } else {
+        console.warn('⚠️ Could not connect to Firebase emulators:', error);
+      }
+    }
+  }
 }
 
 export { app, db, auth, firebaseConfig, environment, firebaseEnv, getCollectionPrefix };
