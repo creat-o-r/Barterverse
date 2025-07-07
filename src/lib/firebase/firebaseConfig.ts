@@ -5,6 +5,10 @@ import { getAuth, type Auth } from 'firebase/auth'; // Added Auth and getAuth
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
+// Environment detection
+const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || 'development';
+const firebaseEnv = process.env.NEXT_PUBLIC_FIREBASE_ENV || 'auto-deploy';
+
 // Your web app's Firebase configuration, loaded from environment variables
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,6 +18,18 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID // Optional
+};
+
+// Collection prefix based on environment to segregate data
+const getCollectionPrefix = () => {
+  switch (firebaseEnv) {
+    case 'production':
+      return ''; // No prefix for production
+    case 'auto-deploy':
+      return 'dev_'; // Prefix for development/preview
+    default:
+      return 'test_'; // Prefix for testing
+  }
 };
 
 // Validate that all necessary Firebase config values are present
@@ -48,4 +64,4 @@ if (missingKeys.length > 0) {
   auth = getAuth(app);
 }
 
-export { app, db, auth, firebaseConfig };
+export { app, db, auth, firebaseConfig, environment, firebaseEnv, getCollectionPrefix };

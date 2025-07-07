@@ -11,9 +11,15 @@ import {
   serverTimestamp, // For creation/update timestamps if needed
   updateDoc,
 } from 'firebase/firestore';
-import { db } from './firebaseConfig'; // Assumes db is successfully initialized
+import { db, getCollectionPrefix } from './firebaseConfig'; // Assumes db is successfully initialized
 import type { User, Item, TradeOffer } from '@/types'; // Added TradeOffer for clarity
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+
+// Helper function to get collection name with environment prefix
+function getCollectionName(baseName: string): string {
+  const prefix = getCollectionPrefix();
+  return `${prefix}${baseName}`;
+}
 
 // Helper function to convert specific fields in an object from Firestore Timestamp to Date
 function convertSpecificTimestampsToDates<T extends Record<string, any>>(data: T, fieldsToConvert: (keyof T)[]): T {
@@ -57,7 +63,7 @@ export async function addUser(userData: User): Promise<void> {
     console.error("User ID is required to add a user.");
     throw new Error("User ID is required.");
   }
-  const userRef = doc(db, 'users', userData.id);
+  const userRef = doc(db, getCollectionName('users'), userData.id);
   // TODO: Add data transformation if User type uses Date objects for any fields
   // For example:
   // const firestoreUserData = {
@@ -77,7 +83,7 @@ export async function getUser(userId: string): Promise<User | null> {
     console.error("Firestore not initialized. Skipping getUser.");
     return null;
   }
-  const userRef = doc(db, 'users', userId);
+  const userRef = doc(db, getCollectionName('users'), userId);
   const userSnap = await getDoc(userRef);
 
   if (userSnap.exists()) {
@@ -106,7 +112,7 @@ export async function updateUser(userId: string, userData: Partial<User>): Promi
     console.error("User ID is required to update a user.");
     throw new Error("User ID is required.");
   }
-  const userRef = doc(db, 'users', userId);
+  const userRef = doc(db, getCollectionName('users'), userId);
   // Ensure 'id' is not part of the data payload if it's already in the ref path
   const { id, ...dataToUpdate } = userData;
   await setDoc(userRef, dataToUpdate, { merge: true });
@@ -121,7 +127,7 @@ export async function getAllUsers(): Promise<User[]> {
     console.error("Firestore not initialized. Skipping getAllUsers.");
     return [];
   }
-  const usersCol = collection(db, 'users');
+  const usersCol = collection(db, getCollectionName('users'));
   const usersSnap = await getDocs(usersCol);
   return usersSnap.docs.map(docSnap => {
     const userData = docSnap.data() as User;
@@ -174,7 +180,7 @@ export async function addItem(itemData: Partial<Item> & Pick<Item, 'ownerId' | '
     openToAnyOpportunity: itemData.openToAnyOpportunity || false,
   };
 
-  const itemRef = doc(db, 'items', fullItemData.id);
+  const itemRef = doc(db, getCollectionName('items'), fullItemData.id);
   // TODO: Convert Date fields in fullItemData to Timestamps if necessary
   // e.g., if fullItemData.logistics.timing.date is a JS Date object.
   await setDoc(itemRef, fullItemData);
@@ -189,7 +195,7 @@ export async function getItem(itemId: string): Promise<Item | null> {
     console.error("Firestore not initialized. Skipping getItem.");
     return null;
   }
-  const itemRef = doc(db, 'items', itemId);
+  const itemRef = doc(db, getCollectionName('items'), itemId);
   const itemSnap = await getDoc(itemRef);
 
   if (itemSnap.exists()) {
@@ -208,7 +214,7 @@ export async function getItemsByOwner(ownerId: string): Promise<Item[]> {
     console.error("Firestore not initialized. Skipping getItemsByOwner.");
     return [];
   }
-  const itemsCol = collection(db, 'items');
+  const itemsCol = collection(db, getCollectionName('items'));
   const q = query(itemsCol, where('ownerId', '==', ownerId));
   const itemsSnap = await getDocs(q);
   return itemsSnap.docs.map(docSnap => docSnap.data() as Item); // TODO: Timestamp conversion
@@ -222,7 +228,7 @@ export async function getAllItems(): Promise<Item[]> {
     console.error("Firestore not initialized. Skipping getAllItems.");
     return [];
   }
-  const itemsCol = collection(db, 'items');
+  const itemsCol = collection(db, getCollectionName('items'));
   const itemsSnap = await getDocs(itemsCol);
   return itemsSnap.docs.map(docSnap => docSnap.data() as Item); // TODO: Timestamp conversion
 }
@@ -243,7 +249,7 @@ export async function addTrade(tradeData: TradeOffer): Promise<void> {
     console.error("Trade ID is required to add a trade offer.");
     throw new Error("Trade ID is required.");
   }
-  const tradeRef = doc(db, 'trades', tradeData.id);
+  const tradeRef = doc(db, getCollectionName('trades'), tradeData.id);
 
   const firestoreTradeData = {
     ...tradeData,
@@ -262,7 +268,7 @@ export async function getTrade(tradeId: string): Promise<TradeOffer | null> {
     console.error("Firestore not initialized. Skipping getTrade.");
     return null;
   }
-  const tradeRef = doc(db, 'trades', tradeId);
+  const tradeRef = doc(db, getCollectionName('trades'), tradeId);
   const tradeSnap = await getDoc(tradeRef);
 
   if (tradeSnap.exists()) {
@@ -287,7 +293,7 @@ export async function getTradesForUser(userId: string): Promise<TradeOffer[]> {
     console.error("Firestore not initialized. Skipping getTradesForUser.");
     return [];
   }
-  const tradesCol = collection(db, 'trades');
+  const tradesCol = collection(db, getCollectionName('trades'));
 
   // Query for trades where user is offeringUserId
   const offeringQuery = query(tradesCol, where('offeringUserId', '==', userId));
