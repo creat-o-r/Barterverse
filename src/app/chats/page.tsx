@@ -1,28 +1,24 @@
-
-"use client"; // Mark as a Client Component
+"use client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Repeat, CheckCircle, XCircle, Hourglass, Bot, Loader2 } from 'lucide-react'; // Added Loader2
+import { MessageSquare, Repeat, CheckCircle, XCircle, Hourglass, Bot, Loader2 } from 'lucide-react';
 import type { TradeOffer, Item, User } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced
-import { getTradesForUser, getAllItems, getAllUsers } from '@/lib/firebase/firestoreUtils'; // Removed getItem, getUser as they are not directly used here after caching
+import { getTradesForUser, getAllItems, getAllUsers } from '@/lib/firebase/firestoreUtils';
 import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/contexts/AuthContext';
-
-// const SIMULATED_CURRENT_USER_ID = 'user1'; // Ensure this is removed or properly handled
 
 const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
   switch (status) {
     case 'pending': return <Hourglass className="h-5 w-5 text-yellow-500" />;
     case 'accepted': return <CheckCircle className="h-5 w-5 text-green-500" />;
     case 'rejected': return <XCircle className="h-5 w-5 text-red-500" />;
-    case 'completed': return <Repeat className="h-5 w-5 text-blue-500" />; // Example, adjust icon as needed
+    case 'completed': return <Repeat className="h-5 w-5 text-blue-500" />;
     case 'cancelled': return <XCircle className="h-5 w-5 text-gray-400" />;
     default: return <MessageSquare className="h-5 w-5 text-gray-500" />;
   }
@@ -34,18 +30,32 @@ export default function ChatsPage() {
   const [userDetailsCache, setUserDetailsCache] = useState<Record<string, User | null>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { currentUser: firebaseUser, isLoading: authIsLoading } = useAuth();
 
   useEffect(() => {
     const fetchChatData = async () => {
+      if (authIsLoading) {
+        setIsLoading(true);
+        return;
+      }
+
+      if (!firebaseUser) {
+        setIsLoading(false);
+        setActiveChats([]);
+        setItemDetailsCache({});
+        setUserDetailsCache({});
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const trades = await getTradesForUser(SIMULATED_CURRENT_USER_ID);
+        // Use actual authenticated user's ID
+        const trades = await getTradesForUser(firebaseUser.uid);
         const filteredTrades = trades.filter(trade =>
             (trade.status === 'pending' || trade.status === 'accepted')
         );
         setActiveChats(filteredTrades);
 
-        // Pre-fetch all items and users for name lookups to minimize individual fetches
         const allItems = await getAllItems();
         const allUsers = await getAllUsers();
 
@@ -67,18 +77,16 @@ export default function ChatsPage() {
 
     fetchChatData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Current user ID is constant for now
+  }, [firebaseUser, authIsLoading, toast]);
 
-  // Helper to get item name from cache
   const getItemName = (itemId: string) => itemDetailsCache[itemId]?.name || 'Unknown Item';
 
-  // Helper to get user name from cache (simplified)
-  const getUserName = (userId: string, currentUserId: string) => {
-      if (userId === currentUserId) return "You";
+  const getUserName = (userId: string, currentAuthUserId: string | undefined) => {
+      if (userId === currentAuthUserId) return "You";
       return userDetailsCache[userId]?.name || `User (${userId.substring(0,4)})`;
-  }
+  };
 
-  if (isLoading) {
+  if (isLoading || authIsLoading) {
     return (
       <div className="max-w-3xl mx-auto space-y-8 p-4">
         <Card>
@@ -90,6 +98,40 @@ export default function ChatsPage() {
           </CardHeader>
           <CardContent className="text-center py-10">
             <p className="text-muted-foreground">Fetching your conversations...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!firebaseUser && !authIsLoading) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-8 p-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline text-3xl flex items-center gap-3">
+              <MessageSquare className="h-8 w-8 text-primary" />
+              Your Trade Chats
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center py-10">
+            <p className="text-muted-foreground font-body">Please <Link href="/auth/signin?redirect=/chats" className="text-primary hover:underline">sign in</Link> to view your trade chats.</p>
+          </CardContent>
+        </Card>
+        {/* Keep the Direct Assistant Chat accessible even if not logged in, or decide to hide it too */}
+        <Separator />
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline text-3xl flex items-center gap-3">
+              <Bot className="h-8 w-8 text-accent" />
+              Direct Assistant Chat
+            </CardTitle>
+            <CardDescription className="font-body">
+              Have a question or need help? Chat directly with our AI assistant.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GeneralChatWindow />
           </CardContent>
         </Card>
       </div>
@@ -114,13 +156,15 @@ export default function ChatsPage() {
           ) : (
             <div className="space-y-4">
               {activeChats.map((trade) => {
-                const otherPartyId = trade.offeringUserId === SIMULATED_CURRENT_USER_ID ? trade.receivingUserId : trade.offeringUserId;
-                const otherPartyName = getUserName(otherPartyId, SIMULATED_CURRENT_USER_ID);
+                // Ensure firebaseUser is not null here before accessing uid
+                const currentAuthUserId = firebaseUser.uid;
+                const otherPartyId = trade.offeringUserId === currentAuthUserId ? trade.receivingUserId : trade.offeringUserId;
+                const otherPartyName = getUserName(otherPartyId, currentAuthUserId);
                 
                 let itemCurrentUserOffersName = 'Something';
                 let itemOtherUserOffersName = 'Something';
 
-                if (trade.offeringUserId === SIMULATED_CURRENT_USER_ID) {
+                if (trade.offeringUserId === currentAuthUserId) {
                   itemCurrentUserOffersName = getItemName(trade.offeredItemId);
                   itemOtherUserOffersName = getItemName(trade.requestedItemId);
                 } else {

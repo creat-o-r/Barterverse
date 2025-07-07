@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Settings, Loader2, AlertCircle, Link2 as LinkIcon } from 'lucide-react';
+import { Settings, Loader2, AlertCircle, Link2 as LinkIcon, UserCircle2 } from 'lucide-react';
 import type { Item } from '@/types';
 import type { AIMatchingMode } from '@/services/ai-config-service';
 import { suggestMatchingItems, type ItemMatchInput, type ItemMatchOutput } from '@/ai/flows/item-match-flow';
@@ -14,10 +14,8 @@ import { getAllItems } from '@/lib/firebase/firestoreUtils';
 import ItemList from '@/components/items/ItemList';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
-
-// Simulated current user ID for test context.
-// This panel tests the AI flow as if this user is triggering it.
-const SIMULATED_TRIGGERING_USER_ID = 'user1';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import Link from 'next/link'; // For sign-in link
 
 interface TemporaryAdminMatchTestPanelClientProps {
   itemToTest: Item | null;
@@ -25,7 +23,7 @@ interface TemporaryAdminMatchTestPanelClientProps {
 
 export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: TemporaryAdminMatchTestPanelClientProps) {
   const [testMatchingMode, setTestMatchingMode] = useState<AIMatchingMode>('simple');
-  const [testUseUserPrefs, setTestUseUserPrefs] = useState(false);
+  const [testUseUserPrefs, setTestUseUserPrefs] = useState(false); // This UI toggle doesn't directly control the flow's use of prefs, flow checks global config
   const [testSuggestions, setTestSuggestions] = useState<(Item & { matchScore: string })[]>([]);
   const [testReasoning, setTestReasoning] = useState<string | null>(null);
   const [testPrefsConsidered, setTestPrefsConsidered] = useState<boolean>(false);
@@ -34,12 +32,19 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
   const [testError, setTestError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const { toast } = useToast();
+  const { currentUser: firebaseUser, isLoading: authIsLoading, appUser } = useAuth();
 
   const handleRunTestSuggestions = async () => {
     if (!itemToTest) {
       setTestError("Item to test not available.");
       return;
     }
+    if (!firebaseUser) {
+      setTestError("You must be logged in to run AI suggestion tests.");
+      toast({ title: "Authentication Required", description: "Please sign in to run tests.", variant: "destructive" });
+      return;
+    }
+
     setTestLoading(true);
     setTestError(null);
     setTestSuggestions([]);
@@ -62,7 +67,7 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
     try {
       const otherAvailableItems = allItemsFromDB.filter(
         (item) => item.id !== itemToTest.id &&
-                   item.ownerId !== SIMULATED_TRIGGERING_USER_ID && // Exclude items from the simulated user if desired for test
+                   item.ownerId !== firebaseUser.uid && // Exclude items from the currently logged-in (admin) user
                    (item.status === 'available' || item.status === 'pending')
       ).map(item => ({
           id: item.id,
@@ -71,13 +76,12 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
           category: item.category,
           ownerId: item.ownerId,
           listingType: item.listingType,
-          // These fields from ItemBriefSchema for the AI flow
           isGiftItForward: item.isGiftItForward || false,
           openToAnyOpportunity: item.openToAnyOpportunity || false,
       }));
 
       const inputForFlow: ItemMatchInput = {
-        triggeringUserId: SIMULATED_TRIGGERING_USER_ID,
+        triggeringUserId: firebaseUser.uid,
         currentItem: {
           id: itemToTest.id,
           name: itemToTest.name,
@@ -98,7 +102,6 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
 
       const augmentedMatchedItems = (result.suggestedMatches || []).map(match => {
         const itemDetails = allItemsFromDB.find(dItem => dItem.id === match.itemId);
-        // Ensure matchScore is always a string, even if AI somehow doesn't provide it (though schema enforces it)
         return itemDetails ? { ...itemDetails, matchScore: match.matchScore || "N/A" } : null;
       }).filter(Boolean) as (Item & { matchScore: string })[];
 
@@ -120,6 +123,37 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
 
   if (!itemToTest) return null;
 
+  if (authIsLoading) {
+    return (
+      <Card className="mt-8 border-dashed border-primary/50">
+        <CardHeader className="py-3 px-4">
+            <span className="font-headline text-md flex items-center gap-2 text-primary">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading Admin Test Panel...
+            </span>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (!firebaseUser) {
+    return (
+      <Card className="mt-8 border-dashed border-destructive/50">
+         <CardHeader className="py-3 px-4">
+            <span className="font-headline text-md flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                Admin Test Panel Unavailable
+            </span>
+        </CardHeader>
+        <CardContent className="p-4 border-t border-dashed border-destructive/30">
+            <p className="text-sm text-muted-foreground">
+                Please <Link href="/auth/signin" className="text-primary hover:underline">sign in</Link> to use the AI suggestion test panel.
+            </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card className="mt-8 border-dashed border-primary/50">
       <Collapsible open={panelOpen} onOpenChange={setPanelOpen} className="w-full">
@@ -136,7 +170,7 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
           <CardContent className="p-4 space-y-4 border-t border-dashed border-primary/30">
             <CardDescription className="text-xs font-body mb-2">
               Test the AI matching logic for this item. The flow uses admin-configured settings for matching mode and preference usage.
-              The toggles below are for documenting test intent, not direct control. The test runs as if user '{SIMULATED_TRIGGERING_USER_ID}' is triggering suggestions.
+              The toggles below are for documenting test intent, not direct control. The test runs as the currently logged-in user ({appUser?.name || firebaseUser.email}).
             </CardDescription>
             <div className="flex items-center space-x-2">
               <Switch
@@ -156,7 +190,7 @@ export default function TemporaryAdminMatchTestPanelClient({ itemToTest }: Tempo
               />
               <Label htmlFor={`test-prefs-switch-${itemToTest.id}`} className="font-headline text-sm">Test Intent: Consider User Preferences</Label>
             </div>
-            <Button onClick={handleRunTestSuggestions} disabled={testLoading || !itemToTest} size="sm">
+            <Button onClick={handleRunTestSuggestions} disabled={testLoading || !itemToTest || !firebaseUser || authIsLoading} size="sm">
               {testLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LinkIcon className="mr-2 h-4 w-4" />}
               Run Test AI Suggestions
             </Button>

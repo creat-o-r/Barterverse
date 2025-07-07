@@ -1,4 +1,3 @@
-
 // src/app/opportunities/page.tsx
 'use client';
 
@@ -6,13 +5,12 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
-import { getItem, getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import { getItem, getUser } from '@/lib/firebase/firestoreUtils';
 import type { Item, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake, PackagePlus, Brain } from 'lucide-react';
+import { MessageSquare, ArrowRightLeft, Eye, Gift, Search, Star, Handshake, FileText, Loader2, AlertCircle, Info, Flag, FileWarning, HeartHandshake, PackagePlus, Brain, LogIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { explainMatchRationale, type ExplainMatchRationaleOutput, type ExplainMatchRationaleInput } from '@/ai/flows/explain-match-rationale-flow';
@@ -20,41 +18,38 @@ import { logFeedbackEntry } from '@/services/feedback-service';
 import { getPreferredAIModel, type AIModelName, type AIMatchingMode } from '@/services/ai-config-service';
 import { useToast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
+import { usePathname } from 'next/navigation';
 
-// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
-
-// Helper to get item and owner details
 async function getItemAndOwner(itemId: string | null): Promise<{ item: Item; owner: User } | null> {
   if (!itemId) return null;
-  // const item = dummyItems.find((i) => i.id === itemId); // Old way
   const item = await getItem(itemId);
   if (!item) {
     console.warn(`[OpportunitiesPage] Item with ID ${itemId} not found.`);
     return null;
   }
-  // const owner = dummyUsers.find((u) => u.id === item.ownerId); // Old way
   const owner = await getUser(item.ownerId);
   if (!owner) {
     console.warn(`[OpportunitiesPage] Owner with ID ${item.ownerId} for item ${itemId} not found.`);
-    return null; // Or return item with a placeholder owner if design allows
+    return null;
   }
   return { item: { ...item, isGiftItForward: !!item.isGiftItForward }, owner };
 }
 
-// Display component for each item in the opportunity
 function OpportunityItemCard({
     item,
     owner,
     opportunityContextLabel,
     isReciprocal = false,
     cardClassName,
+    currentAuthUserId
 }: {
     item: Item;
     owner: User;
     opportunityContextLabel: string;
     isReciprocal?: boolean;
     cardClassName?: string;
+    currentAuthUserId?: string | null;
 }) {
   return (
     <Card className={cn(`flex flex-col h-full shadow-lg ${isReciprocal ? 'bg-accent/10 border-accent/50' : ''}`, cardClassName)}>
@@ -101,50 +96,18 @@ function OpportunityItemCard({
 }
 
 const generalMatchScoreCriteria: Record<string, { title: string; points: string[] }> = {
-  high: {
-    title: "What a \"High\" Match Score Generally Means:",
-    points: [
-      "Strong direct relevance between items.",
-      "Categories are very similar or highly complementary.",
-      "Keywords in names/descriptions show clear overlap or direct need fulfillment.",
-      "Offer/Want types align well (e.g., an offer fulfilling a specific want).",
-      "If both are 'offer' or 'want', they are desirable items in the same niche.",
-      "Gift It Forward items fulfilling a want are often high matches.",
-      "Strong reciprocal potential: the other user offers something you likely want.",
-    ],
-  },
-  medium: {
-    title: "What a \"Medium\" Match Score Generally Means:",
-    points: [
-      "Good general relevance.",
-      "Categories are related or appeal to similar users.",
-      "Some overlap in keywords or purpose.",
-      "A plausible trade scenario, even if not a perfect keyword match.",
-      "Some reciprocal potential: the other user offers something that might interest you.",
-    ],
-  },
-  low: {
-    title: "What a \"Low\" Match Score Generally Means:",
-    points: [
-      "Possible, but less direct, relevance.",
-      "Categories might be different but could have niche appeal or indirect connection.",
-      "Loose association by theme or potential utility not immediately obvious.",
-      "Could be interesting for users with broad interests or unstated needs.",
-      "Little to no obvious reciprocal item offered by the other user.",
-    ],
-  },
+  high: { title: "What a \"High\" Match Score Generally Means:", points: ["Strong direct relevance between items.","Categories are very similar or highly complementary.","Keywords in names/descriptions show clear overlap or direct need fulfillment.","Offer/Want types align well (e.g., an offer fulfilling a specific want).","If both are 'offer' or 'want', they are desirable items in the same niche.","Gift It Forward items fulfilling a want are often high matches.","Strong reciprocal potential: the other user offers something you likely want.",],},
+  medium: { title: "What a \"Medium\" Match Score Generally Means:", points: ["Good general relevance.","Categories are related or appeal to similar users.","Some overlap in keywords or purpose.","A plausible trade scenario, even if not a perfect keyword match.","Some reciprocal potential: the other user offers something that might interest you.",],},
+  low: { title: "What a \"Low\" Match Score Generally Means:", points: ["Possible, but less direct, relevance.","Categories might be different but could have niche appeal or indirect connection.","Loose association by theme or potential utility not immediately obvious.","Could be interesting for users with broad interests or unstated needs.","Little to no obvious reciprocal item offered by the other user.",],},
 };
-
-const modelDisplayMap: Record<AIModelName, string> = {
-  'gemini-1.5-pro-latest': 'Gemini 1.5 Pro',
-  'gemini-1.0-pro': 'Gemini 1.0 Pro',
-  'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview',
-};
-
+const modelDisplayMap: Record<AIModelName, string> = { 'gemini-1.5-pro-latest': 'Gemini 1.5 Pro', 'gemini-1.0-pro': 'Gemini 1.0 Pro', 'gemini-2.5-pro-preview-05-06': 'Gemini 2.5 Pro Preview'};
 
 function OpportunityMatchPageContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { currentUser: firebaseUser, isLoading: authIsLoading } = useAuth();
+  const pathname = usePathname();
+  const currentAuthUserId = firebaseUser?.uid;
 
   const mainItemIdQuery = searchParams.get('mainItemId');
   const suggestedItemIdQuery = searchParams.get('suggestedItemId');
@@ -152,7 +115,6 @@ function OpportunityMatchPageContent() {
   const reciprocalItemIdQuery = searchParams.get('reciprocalItemId');
   const usedMatchingModeQuery = searchParams.get('usedMatchingMode') as AIMatchingMode | null;
   const preferencesConsideredQuery = searchParams.get('preferencesConsidered');
-
 
   const [mainItemDetails, setMainItemDetails] = useState<{ item: Item; owner: User } | null>(null);
   const [suggestedItemDetails, setSuggestedItemDetails] = useState<{ item: Item; owner: User } | null>(null);
@@ -166,20 +128,14 @@ function OpportunityMatchPageContent() {
   const [isReportingReasoning, setIsReportingReasoning] = useState(false);
   const [currentAiModelForRationale, setCurrentAiModelForRationale] = useState<AIModelName | null>(null);
 
-  const currentUser = dummyUsers[0];
-
   const originalSuggestionMatchingMode = useMemo(() => usedMatchingModeQuery, [usedMatchingModeQuery]);
   const originalSuggestionPrefsConsidered = useMemo(() => preferencesConsideredQuery === 'true', [preferencesConsideredQuery]);
 
   useEffect(() => {
     async function fetchDataAndReasoning() {
       setLoading(true);
-      setMainItemDetails(null);
-      setSuggestedItemDetails(null);
-      setReciprocalItemDetails(null);
-      setOpportunityReasoning(null);
-      setInsightsError(null);
-      setCurrentAiModelForRationale(null);
+      setMainItemDetails(null); setSuggestedItemDetails(null); setReciprocalItemDetails(null);
+      setOpportunityReasoning(null); setInsightsError(null); setCurrentAiModelForRationale(null);
       
       const scoreFromQuery = matchScoreQuery?.toLowerCase() || null;
       setMatchScore(scoreFromQuery);
@@ -187,146 +143,60 @@ function OpportunityMatchPageContent() {
       try {
         const modelForRationale = await getPreferredAIModel();
         setCurrentAiModelForRationale(modelForRationale);
-      } catch (e) {
-        console.error("Failed to get current AI model for rationale:", e);
-        setInsightsError("Could not determine AI model for current rationale.");
-      }
+      } catch (e) { console.error("Failed to get current AI model for rationale:", e); setInsightsError("Could not determine AI model for current rationale."); }
 
       const mainPromise = getItemAndOwner(mainItemIdQuery);
       const suggestedPromise = getItemAndOwner(suggestedItemIdQuery);
       const reciprocalPromise = reciprocalItemIdQuery ? getItemAndOwner(reciprocalItemIdQuery) : Promise.resolve(null);
-
       const [mainD, suggestedD, reciprocalD] = await Promise.all([mainPromise, suggestedPromise, reciprocalPromise]);
 
       if (mainD && suggestedD) {
-        setMainItemDetails(mainD);
-        setSuggestedItemDetails(suggestedD);
-        if (reciprocalD) {
-          setReciprocalItemDetails(reciprocalD);
-        }
+        setMainItemDetails(mainD); setSuggestedItemDetails(suggestedD);
+        if (reciprocalD) setReciprocalItemDetails(reciprocalD);
         
         setLoadingReasoning(true);
         try {
-            const inputForRationale: ExplainMatchRationaleInput = {
-                itemA: {
-                    name: mainD.item.name,
-                    description: mainD.item.description,
-                    category: mainD.item.category,
-                    listingType: mainD.item.listingType,
-                    isGiftItForward: !!mainD.item.isGiftItForward,
-                },
-                itemB: {
-                    name: suggestedD.item.name,
-                    description: suggestedD.item.description,
-                    category: suggestedD.item.category,
-                    listingType: suggestedD.item.listingType,
-                    isGiftItForward: !!suggestedD.item.isGiftItForward,
-                }
-            };
+          const inputForRationale: ExplainMatchRationaleInput = { itemA: { name: mainD.item.name, description: mainD.item.description, category: mainD.item.category, listingType: mainD.item.listingType, isGiftItForward: !!mainD.item.isGiftItForward }, itemB: { name: suggestedD.item.name, description: suggestedD.item.description, category: suggestedD.item.category, listingType: suggestedD.item.listingType, isGiftItForward: !!suggestedD.item.isGiftItForward }};
+          if (reciprocalD) { inputForRationale.itemC = { name: reciprocalD.item.name, description: reciprocalD.item.description, category: reciprocalD.item.category, listingType: reciprocalD.item.listingType, isGiftItForward: !!reciprocalD.item.isGiftItForward }; }
 
-            if (reciprocalD) {
-                inputForRationale.itemC = {
-                    name: reciprocalD.item.name,
-                    description: reciprocalD.item.description,
-                    category: reciprocalD.item.category,
-                    listingType: reciprocalD.item.listingType,
-                    isGiftItForward: !!reciprocalD.item.isGiftItForward,
-                };
-            }
-            
-            const rationaleResult: ExplainMatchRationaleOutput = await explainMatchRationale(inputForRationale);
-            
-            if (rationaleResult.errorMessage) {
-                setInsightsError(rationaleResult.errorMessage);
-                setOpportunityReasoning("Could not load AI rationale: " + rationaleResult.errorMessage); 
-            } else if (rationaleResult.rationale) {
-                 setOpportunityReasoning(rationaleResult.rationale);
-            } else {
-                const defaultError = "AI did not provide reasoning for this specific match.";
-                setInsightsError(defaultError);
-                setOpportunityReasoning(defaultError);
-            }
-        } catch (error: any) {
-            console.error("Error fetching opportunity rationale:", error);
-            const fetchErrorMsg = "Could not load AI rationale for this match due to a system error. " + (error.message || "");
-            setInsightsError(fetchErrorMsg);
-            setOpportunityReasoning(fetchErrorMsg);
-        } finally {
-            setLoadingReasoning(false);
-        }
-
-      } else {
-        setMainItemDetails(null);
-        setSuggestedItemDetails(null);
-        setReciprocalItemDetails(null);
-      }
+          const rationaleResult: ExplainMatchRationaleOutput = await explainMatchRationale(inputForRationale);
+          if (rationaleResult.errorMessage) { setInsightsError(rationaleResult.errorMessage); setOpportunityReasoning("Could not load AI rationale: " + rationaleResult.errorMessage);  }
+          else if (rationaleResult.rationale) { setOpportunityReasoning(rationaleResult.rationale); }
+          else { const e="AI did not provide reasoning."; setInsightsError(e); setOpportunityReasoning(e); }
+        } catch (error: any) { const m="Could not load AI rationale. "+(error.message||""); setInsightsError(m); setOpportunityReasoning(m); }
+        finally { setLoadingReasoning(false); }
+      } else { setMainItemDetails(null); setSuggestedItemDetails(null); setReciprocalItemDetails(null); }
       setLoading(false);
     }
-    if (mainItemIdQuery && suggestedItemIdQuery) {
-        fetchDataAndReasoning();
-    } else {
-        setLoading(false); 
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (mainItemIdQuery && suggestedItemIdQuery) fetchDataAndReasoning();
+    else setLoading(false);
   }, [mainItemIdQuery, suggestedItemIdQuery, matchScoreQuery, reciprocalItemIdQuery]);
 
   const handleReportScore = async () => {
-    if (!matchScore) return;
+    if (!matchScore || !currentAuthUserId) { toast({title: "Cannot Report", description: "You must be signed in to report.", variant: "destructive"}); return; }
     setIsReportingScore(true);
-    let modelUsedForContext: AIModelName | undefined;
     try {
-      modelUsedForContext = await getPreferredAIModel(); // Get current model for context
-      const result = await logFeedbackEntry({
-        feedbackType: 'match-score',
-        reportedValue: matchScore,
-        mainItemId: mainItemIdQuery,
-        suggestedItemId: suggestedItemIdQuery,
-        reportingUserId: currentUser.id,
-        modelUsedContext: modelUsedForContext,
-      });
-      if (result.success) {
-        toast({ title: "Score Reported", description: "Thank you for your feedback on the match score!" });
-      } else {
-        toast({ title: "Report Failed", description: result.message || "Could not log score feedback.", variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Report Error", description: "An error occurred while reporting the score.", variant: "destructive" });
-    } finally {
-      setIsReportingScore(false);
-    }
+      const modelUsedForContext = await getPreferredAIModel();
+      const result = await logFeedbackEntry({ feedbackType: 'match-score', reportedValue: matchScore, mainItemId: mainItemIdQuery, suggestedItemId: suggestedItemIdQuery, reportingUserId: currentAuthUserId, modelUsedContext });
+      if (result.success) toast({ title: "Score Reported" }); else toast({ title: "Report Failed", variant: "destructive" });
+    } catch (e) { toast({ title: "Report Error", variant: "destructive" }); }
+    finally { setIsReportingScore(false); }
   };
 
   const handleReportReasoning = async () => {
-    if (!opportunityReasoning) return;
+    if (!opportunityReasoning || !currentAuthUserId) { toast({title: "Cannot Report", description: "You must be signed in to report.", variant: "destructive"}); return; }
     setIsReportingReasoning(true);
-    let modelUsedForContext: AIModelName | undefined;
     try {
-      modelUsedForContext = await getPreferredAIModel(); // Get current model for context
-      const result = await logFeedbackEntry({
-        feedbackType: 'match-reasoning',
-        reportedValue: opportunityReasoning,
-        mainItemId: mainItemIdQuery,
-        suggestedItemId: suggestedItemIdQuery,
-        reportingUserId: currentUser.id,
-        modelUsedContext: modelUsedForContext,
-      });
-      if (result.success) {
-        toast({ title: "Reasoning Reported", description: "Thank you for your feedback on the reasoning!" });
-      } else {
-        toast({ title: "Report Failed", description: result.message || "Could not log reasoning feedback.", variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Report Error", description: "An error occurred while reporting the reasoning.", variant: "destructive" });
-    } finally {
-      setIsReportingReasoning(false);
-    }
+      const modelUsedForContext = await getPreferredAIModel();
+      const result = await logFeedbackEntry({ feedbackType: 'match-reasoning', reportedValue: opportunityReasoning, mainItemId: mainItemIdQuery, suggestedItemId: suggestedItemIdQuery, reportingUserId: currentAuthUserId, modelUsedContext });
+      if (result.success) toast({ title: "Reasoning Reported" }); else toast({ title: "Report Failed", variant: "destructive" });
+    } catch (e) { toast({ title: "Report Error", variant: "destructive" }); }
+    finally { setIsReportingReasoning(false); }
   };
 
-
-  if (loading) {
+  if (authIsLoading || loading) {
     return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><ArrowRightLeft className="h-5 w-5 animate-spin" /> Loading opportunity details...</div>;
   }
-
   if (!mainItemDetails || !suggestedItemDetails) {
     return <div className="text-center py-10 font-body text-destructive">Could not load opportunity. Items may be invalid or no longer available. Ensure both mainItemId and suggestedItemId are provided.</div>;
   }
@@ -344,206 +214,84 @@ function OpportunityMatchPageContent() {
   const mainIsGiftOffer = mainItem.listingType === 'offer' && mainItem.isGiftItForward;
   const suggestedIsGiftOffer = suggestedItem.listingType === 'offer' && suggestedItem.isGiftItForward;
 
-  if (mainIsGiftOffer && suggestedItem.listingType === 'want') {
-    pageTitle = "Potential Gift Fulfillment";
-    pageDescription = `Your gift "${mainItem.name}" could fulfill a want from ${suggestedItemOwner.name}.`;
-    chatButtonText = `Contact ${suggestedItemOwner.name} about Gifting`;
-    actionButtonLink = `/profile/${suggestedItemOwner.id}`; 
-    actionButtonIcon = <HeartHandshake className="mr-2 h-5 w-5" />;
-  } else if (mainItem.listingType === 'want' && suggestedIsGiftOffer) {
-    pageTitle = "Potential Gift Found!";
-    pageDescription = `A gift "${suggestedItem.name}" from ${suggestedItemOwner.name} might fulfill your want!`;
-    chatButtonText = `View Gift & Contact ${suggestedItemOwner.name}`;
-    actionButtonLink = `/items/${suggestedItem.id}`; 
-    actionButtonIcon = <Gift className="mr-2 h-5 w-5" />;
-  } else {
-    if (mainItem.ownerId === currentUser.id) { 
-      tradeId = `trade-${currentUser.id}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`;
-      chatButtonText = `Negotiate for "${suggestedItem.name}"`;
-    } else { 
-      tradeId = `trade-${currentUser.id}-wants-${mainItem.id}-from-${mainItem.ownerId}`;
-      chatButtonText = `Negotiate for "${mainItem.name}"`;
-    }
-    if (mainItem.ownerId === currentUser.id && suggestedItem.ownerId === currentUser.id) {
-       chatButtonText = "View Items (Cannot trade with self)"; 
-       actionButtonLink = `/items/${mainItem.id}`; 
-    } else {
-        actionButtonLink = `/trades/${tradeId}`;
-    }
+  if (mainIsGiftOffer && suggestedItem.listingType === 'want') { pageTitle = "Potential Gift Fulfillment"; pageDescription = `Your gift "${mainItem.name}" could fulfill a want from ${suggestedItemOwner.name}.`; chatButtonText = `Contact ${suggestedItemOwner.name} about Gifting`; actionButtonLink = `/profile/${suggestedItemOwner.id}`; actionButtonIcon = <HeartHandshake className="mr-2 h-5 w-5" />; }
+  else if (mainItem.listingType === 'want' && suggestedIsGiftOffer) { pageTitle = "Potential Gift Found!"; pageDescription = `A gift "${suggestedItem.name}" from ${suggestedItemOwner.name} might fulfill your want!`; chatButtonText = `View Gift & Contact ${suggestedItemOwner.name}`; actionButtonLink = `/items/${suggestedItem.id}`; actionButtonIcon = <Gift className="mr-2 h-5 w-5" />; }
+  else if (currentAuthUserId) {
+    if (mainItem.ownerId === currentAuthUserId) { tradeId = `trade-${currentAuthUserId}-wants-${suggestedItem.id}-from-${suggestedItem.ownerId}`; chatButtonText = `Negotiate for "${suggestedItem.name}"`; }
+    else { tradeId = `trade-${currentAuthUserId}-wants-${mainItem.id}-from-${mainItem.ownerId}`; chatButtonText = `Negotiate for "${mainItem.name}"`; }
+    if (mainItem.ownerId === currentAuthUserId && suggestedItem.ownerId === currentAuthUserId) { chatButtonText = "View Items (Cannot trade with self)"; actionButtonLink = `/items/${mainItem.id}`;  }
+    else { actionButtonLink = `/trades/${tradeId}`; }
+  }
+  if (!currentAuthUserId && !actionButtonLink && (mainIsGiftOffer || suggestedIsGiftOffer) ) { // For gift items, allow viewing even if not logged in
+     if(mainIsGiftOffer && suggestedItem.listingType === 'want') actionButtonLink = `/profile/${suggestedItemOwner.id}`;
+     else if(mainItem.listingType === 'want' && suggestedIsGiftOffer) actionButtonLink = `/items/${suggestedItem.id}`;
+     if(actionButtonLink) chatButtonText = mainIsGiftOffer ? `Contact ${suggestedItemOwner.name}` : `View Gift`;
+  } else if (!currentAuthUserId && !actionButtonLink) {
+    chatButtonText = "View Item Details";
   }
    
   const scoreCriteria = matchScore ? generalMatchScoreCriteria[matchScore] : null;
   const HeaderIcon = mainIsGiftOffer || suggestedIsGiftOffer ? HeartHandshake : Handshake;
 
-
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       <Card>
-        <CardHeader className="text-center pb-4">
-          <CardTitle className="font-headline text-3xl flex items-center justify-center gap-2">
-            <HeaderIcon className="h-8 w-8 text-primary" />
-            {pageTitle}
-          </CardTitle>
-          <CardDescription className="font-body">
-            {pageDescription}
-          </CardDescription>
-        </CardHeader>
+        <CardHeader className="text-center pb-4"> <CardTitle className="font-headline text-3xl flex items-center justify-center gap-2"><HeaderIcon className="h-8 w-8 text-primary" />{pageTitle}</CardTitle> <CardDescription className="font-body">{pageDescription}</CardDescription> </CardHeader>
         <CardContent className="space-y-6">
-          
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-stretch gap-4 md:gap-6">
-            <OpportunityItemCard
-                item={mainItem}
-                owner={mainItemOwner}
-                opportunityContextLabel={mainItem.ownerId === currentUser.id ? `Your ${mainItem.listingType}` : `${mainItemOwner.name}'s ${mainItem.listingType}`}
-                cardClassName="border-primary/30"
-            />
-            <div className="hidden md:flex items-center justify-center">
-                <ArrowRightLeft className="h-10 w-10 text-muted-foreground" />
-            </div>
-             <div className="block md:hidden text-center my-2">
-                <ArrowRightLeft className="h-8 w-8 text-muted-foreground mx-auto rotate-90" />
-            </div>
-
+            <OpportunityItemCard item={mainItem} owner={mainItemOwner} opportunityContextLabel={currentAuthUserId && mainItem.ownerId === currentAuthUserId ? `Your ${mainItem.listingType}` : `${mainItemOwner.name}'s ${mainItem.listingType}`} cardClassName="border-primary/30" currentAuthUserId={currentAuthUserId}/>
+            <div className="hidden md:flex items-center justify-center"><ArrowRightLeft className="h-10 w-10 text-muted-foreground" /></div>
+            <div className="block md:hidden text-center my-2"><ArrowRightLeft className="h-8 w-8 text-muted-foreground mx-auto rotate-90" /></div>
             <div className="flex flex-col gap-4">
-              <OpportunityItemCard
-                  item={suggestedItem}
-                  owner={suggestedItemOwner}
-                  opportunityContextLabel={suggestedItem.ownerId === currentUser.id ? `Your ${suggestedItem.listingType}` : `${suggestedItemOwner.name}'s ${suggestedItem.listingType}`}
-                  cardClassName="border-primary/30"
-              />
-              {reciprocalItemDetails && suggestedItemDetails && (
-                <div className="mt-2 p-3 border-l-4 border-accent bg-accent/5 rounded-md shadow-sm">
-                  <h4 className="font-headline text-md text-accent-foreground flex items-center gap-1.5 mb-2">
-                    <PackagePlus className="h-5 w-5" />
-                    Also from {suggestedItemDetails.owner.name} (For You):
-                  </h4>
-                  <OpportunityItemCard
-                    item={reciprocalItemDetails.item}
-                    owner={reciprocalItemDetails.owner}
-                    opportunityContextLabel={`Their Additional Offer`}
-                    isReciprocal={true}
-                    cardClassName="shadow-none border-accent/40"
-                  />
-                </div>
-              )}
+              <OpportunityItemCard item={suggestedItem} owner={suggestedItemOwner} opportunityContextLabel={currentAuthUserId && suggestedItem.ownerId === currentAuthUserId ? `Your ${suggestedItem.listingType}` : `${suggestedItemOwner.name}'s ${suggestedItem.listingType}`} cardClassName="border-primary/30" currentAuthUserId={currentAuthUserId}/>
+              {reciprocalItemDetails && suggestedItemDetails && ( <div className="mt-2 p-3 border-l-4 border-accent bg-accent/5 rounded-md shadow-sm"> <h4 className="font-headline text-md text-accent-foreground flex items-center gap-1.5 mb-2"> <PackagePlus className="h-5 w-5" /> Also from {suggestedItemDetails.owner.name} (For You): </h4> <OpportunityItemCard item={reciprocalItemDetails.item} owner={reciprocalItemDetails.owner} opportunityContextLabel={`Their Additional Offer`} isReciprocal={true} cardClassName="shadow-none border-accent/40" currentAuthUserId={currentAuthUserId}/> </div> )}
             </div>
           </div>
-
-
           <div className="mt-6 pt-6 border-t">
-            {loadingReasoning && (
-                <div className="text-center text-muted-foreground font-body py-3 flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Insights...
-                </div>
-            )}
+            {loadingReasoning && ( <div className="text-center text-muted-foreground font-body py-3 flex items-center justify-center gap-2"> <Loader2 className="h-4 w-4 animate-spin" /> Loading AI Insights... </div> )}
             {!loadingReasoning && (currentAiModelForRationale || opportunityReasoning || matchScore || insightsError || originalSuggestionMatchingMode !== null) && (
                 <Card className={insightsError ? "border-destructive/50 bg-destructive/5" : "bg-muted/30 border-primary/30"}>
-                    <CardHeader className="pb-2 pt-3">
-                        <CardTitle className={`font-headline text-lg flex items-center gap-2 ${insightsError ? 'text-destructive-foreground' : 'text-primary'}`}>
-                            {insightsError && !opportunityReasoning ? <AlertCircle className="h-5 w-5"/> : <Info className="h-5 w-5"/>}
-                            AI Insights & Context
-                        </CardTitle>
-                    </CardHeader>
+                    <CardHeader className="pb-2 pt-3"> <CardTitle className={`font-headline text-lg flex items-center gap-2 ${insightsError ? 'text-destructive-foreground' : 'text-primary'}`}> {insightsError && !opportunityReasoning ? <AlertCircle className="h-5 w-5"/> : <Info className="h-5 w-5"/>} AI Insights & Context </CardTitle> </CardHeader>
                     <CardContent className="pt-0 space-y-3">
-                        {currentAiModelForRationale && (
-                            <div>
-                                <span className="font-semibold text-sm">Rationale AI Model: </span>
-                                <Badge variant="outline" className="text-xs capitalize">
-                                  <Brain className="mr-1.5 h-3.5 w-3.5"/>
-                                  {modelDisplayMap[currentAiModelForRationale] || currentAiModelForRationale}
-                                </Badge>
-                            </div>
-                        )}
-                        {originalSuggestionMatchingMode && (
-                             <div>
-                                <span className="font-semibold text-sm">Original Suggestion Mode: </span>
-                                <Badge variant="outline" className="text-xs capitalize">{originalSuggestionMatchingMode}</Badge>
-                            </div>
-                        )}
-                         <div>
-                            <span className="font-semibold text-sm">Original Prefs Considered: </span>
-                            <Badge variant={originalSuggestionPrefsConsidered ? 'default' : 'secondary'} className="text-xs">{originalSuggestionPrefsConsidered ? 'Yes' : 'No'}</Badge>
-                        </div>
-                        {matchScore && !insightsError && (
-                            <div>
-                                <span className="font-semibold text-sm">Match Score: </span>
-                                <Badge variant={
-                                    matchScore.toLowerCase() === 'high' ? 'default' :
-                                    matchScore.toLowerCase() === 'medium' ? 'secondary' :
-                                    'outline' 
-                                } className="capitalize text-sm py-1 px-2.5">
-                                    {matchScore}
-                                </Badge>
-                            </div>
-                        )}
-                        {scoreCriteria && !insightsError && (
-                            <div className="mt-1">
-                                <h4 className="font-semibold text-xs mb-0.5">{scoreCriteria.title}</h4>
-                                <ul className="list-disc list-inside text-[11px] text-muted-foreground space-y-0.5 font-body">
-                                    {scoreCriteria.points.map((point, idx) => (
-                                        <li key={idx}>{point}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                        {opportunityReasoning && (
-                             <div className="pt-1">
-                                <span className="font-semibold text-sm">AI Rationale for this Match: </span>
-                                <p className={`text-sm font-body ${insightsError ? 'text-destructive-foreground/90' : 'text-muted-foreground'}`}>{opportunityReasoning}</p>
-                             </div>
-                        )}
-                         {!opportunityReasoning && insightsError && !matchScore && ( 
-                            <p className="text-sm font-body text-destructive-foreground/90">{insightsError}</p>
-                        )}
-                         {!opportunityReasoning && !insightsError && !matchScore && !scoreCriteria && !originalSuggestionMatchingMode && ( 
-                            <p className="text-sm font-body text-muted-foreground">No AI insights available for this specific pairing.</p>
-                        )}
+                        {currentAiModelForRationale && (<div><span className="font-semibold text-sm">Rationale AI Model: </span><Badge variant="outline" className="text-xs capitalize"><Brain className="mr-1.5 h-3.5 w-3.5"/>{modelDisplayMap[currentAiModelForRationale] || currentAiModelForRationale}</Badge></div>)}
+                        {originalSuggestionMatchingMode && (<div><span className="font-semibold text-sm">Original Suggestion Mode: </span><Badge variant="outline" className="text-xs capitalize">{originalSuggestionMatchingMode}</Badge></div>)}
+                         <div><span className="font-semibold text-sm">Original Prefs Considered: </span><Badge variant={originalSuggestionPrefsConsidered ? 'default' : 'secondary'} className="text-xs">{originalSuggestionPrefsConsidered ? 'Yes' : 'No'}</Badge></div>
+                        {matchScore && !insightsError && (<div><span className="font-semibold text-sm">Match Score: </span><Badge variant={ matchScore.toLowerCase() === 'high' ? 'default' : matchScore.toLowerCase() === 'medium' ? 'secondary' : 'outline' } className="capitalize text-sm py-1 px-2.5">{matchScore}</Badge></div>)}
+                        {scoreCriteria && !insightsError && (<div className="mt-1"><h4 className="font-semibold text-xs mb-0.5">{scoreCriteria.title}</h4><ul className="list-disc list-inside text-[11px] text-muted-foreground space-y-0.5 font-body">{scoreCriteria.points.map((point, idx) => (<li key={idx}>{point}</li>))}</ul></div>)}
+                        {opportunityReasoning && (<div className="pt-1"><span className="font-semibold text-sm">AI Rationale for this Match: </span><p className={`text-sm font-body ${insightsError ? 'text-destructive-foreground/90' : 'text-muted-foreground'}`}>{opportunityReasoning}</p></div>)}
+                         {!opportunityReasoning && insightsError && !matchScore && ( <p className="text-sm font-body text-destructive-foreground/90">{insightsError}</p> )}
+                         {!opportunityReasoning && !insightsError && !matchScore && !scoreCriteria && !originalSuggestionMatchingMode && ( <p className="text-sm font-body text-muted-foreground">No AI insights available for this specific pairing.</p> )}
                     </CardContent>
                     <CardFooter className="pt-4 flex flex-col sm:flex-row gap-2 justify-end border-t mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleReportScore}
-                        disabled={isReportingScore || !matchScore || !!insightsError || loadingReasoning}
-                        className="text-xs"
-                      >
-                        {isReportingScore ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Flag className="mr-1.5 h-3.5 w-3.5" />}
-                        Report Score
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleReportReasoning}
-                        disabled={isReportingReasoning || !opportunityReasoning || !!insightsError || loadingReasoning}
-                        className="text-xs"
-                      >
-                        {isReportingReasoning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileWarning className="mr-1.5 h-3.5 w-3.5" />}
-                        Report Reasoning
-                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleReportScore} disabled={isReportingScore || !matchScore || !!insightsError || loadingReasoning || !firebaseUser} className="text-xs"> {isReportingScore ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Flag className="mr-1.5 h-3.5 w-3.5" />} {firebaseUser ? "Report Score" : "Sign in to Report"} </Button>
+                      <Button variant="outline" size="sm" onClick={handleReportReasoning} disabled={isReportingReasoning || !opportunityReasoning || !!insightsError || loadingReasoning || !firebaseUser} className="text-xs"> {isReportingReasoning ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileWarning className="mr-1.5 h-3.5 w-3.5" />} {firebaseUser ? "Report Reasoning" : "Sign in to Report"} </Button>
                     </CardFooter>
                 </Card>
             )}
           </div>
-          
           <Separator className="my-6 md:my-8" />
           <div className="text-center">
             <h3 className="font-headline text-xl mb-3">Ready to Proceed?</h3>
-            {actionButtonLink ? (
+            {currentAuthUserId && actionButtonLink ? (
                  <Button asChild size="lg" className={`${mainIsGiftOffer || suggestedIsGiftOffer ? 'bg-pink-500 hover:bg-pink-600 text-white' : 'bg-accent hover:bg-accent/90 text-accent-foreground'} px-8 py-6 text-base`}>
-                    <Link href={actionButtonLink}>
-                        {actionButtonIcon} {chatButtonText}
-                    </Link>
+                    <Link href={actionButtonLink}>{actionButtonIcon} {chatButtonText}</Link>
                 </Button>
-            ) : (
+            ) : !currentAuthUserId ? (
+                 <Button asChild size="lg" className="px-8 py-6 text-base">
+                    <Link href={`/auth/signin?redirect=${encodeURIComponent(pathname + searchParams.toString())}`}><LogIn className="mr-2 h-5 w-5"/>Sign in to Interact</Link>
+                </Button>
+            ) : ( /* Fallback if user logged in but no specific actionButtonLink (e.g. trade with self, or non-trade gift view) */
                 <div className="space-y-2">
-                    <p className="text-muted-foreground font-body">
-                        This opportunity may involve items from multiple other users or your own items where direct negotiation isn't straightforward from this view.
-                        Please visit the individual item pages to initiate contact or explore further.
-                    </p>
-                    <div className="flex gap-2 justify-center">
-                        <Button asChild><Link href={`/items/${mainItem.id}`}>View {mainItem.name}</Link></Button>
-                        <Button asChild><Link href={`/items/${suggestedItem.id}`}>View {suggestedItem.name}</Link></Button>
-                    </div>
+                    { (mainIsGiftOffer || suggestedIsGiftOffer) && actionButtonLink ? ( // Special case for viewing gift details when logged in but tradeId might not make sense
+                         <Button asChild size="lg" className={`${mainIsGiftOffer || suggestedIsGiftOffer ? 'bg-pink-500 hover:bg-pink-600 text-white' : ''} px-8 py-6 text-base`}>
+                            <Link href={actionButtonLink}>{actionButtonIcon} {chatButtonText}</Link>
+                        </Button>
+                    ) : (
+                        <>
+                        <p className="text-muted-foreground font-body"> This opportunity may involve items where direct negotiation isn't straightforward from this view, or it may involve your own items. Please visit the individual item pages to explore further. </p>
+                        <div className="flex gap-2 justify-center"> <Button asChild><Link href={`/items/${mainItem.id}`}>View {mainItem.name}</Link></Button> <Button asChild><Link href={`/items/${suggestedItem.id}`}>View {suggestedItem.name}</Link></Button> </div>
+                        </>
+                    )}
                 </div>
             )}
           </div>
@@ -560,4 +308,3 @@ export default function OpportunityMatchPage() {
     </Suspense>
   );
 }
-

@@ -37,9 +37,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
 
-// const SIMULATED_CURRENT_USER_ID = 'user1'; // Replaced by AuthContext
+// Ensure SIMULATED_CURRENT_USER_ID is fully removed if not used, or used correctly if needed for a specific purpose.
+// For fetching current user data for the form, useAuth() is the way.
+// const SIMULATED_CURRENT_USER_ID = 'user1';
 
 const ITEM_SPECIFIC_LOCATION_VALUE = "item_specific_address_selected";
 const NO_LOCATION_SPECIFIED_VALUE = "no_location_specified_for_item";
