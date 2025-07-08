@@ -61,8 +61,8 @@ export const testAuthHelpers = {
       
       const unsubscribe = auth.onAuthStateChanged(() => {
         unsubscribe();
-        // Give a small delay for React state to update
-        setTimeout(resolve, 100);
+        // Give more time for React state to update
+        setTimeout(resolve, 500);
       });
     });
   }

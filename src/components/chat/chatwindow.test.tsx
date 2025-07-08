@@ -101,9 +101,9 @@ describe('ChatWindow Component', () => {
 
     test('CurrentUser as Initiator: renders correct initial AI message when authenticated', async () => {
       // Sign in a test user
-      await testAuthHelpers.createAndSignInTestUser('chattest@example.com');
+      const user = await testAuthHelpers.createAndSignInTestUser('chattest@example.com');
       
-      const tradeIdAsInitiator = `trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`;
+      const tradeIdAsInitiator = `trade-${user.uid}-wants-${otherUsersItem.id}-from-${otherUserId}`;
       render(
         <AuthProvider>
           <ChatWindow
@@ -116,17 +116,20 @@ describe('ChatWindow Component', () => {
         </AuthProvider>
       );
 
+      // Wait for auth state to settle
+      await testAuthHelpers.waitForAuthState();
+
       await waitFor(() => {
         expect(screen.getByText(/Hi! I'm here to help you negotiate/i)).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
       
       await waitFor(() => {
         expect(screen.getByText(new RegExp(`You're interested in their "${otherUsersItem.name}"`, "i"))).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
       
       await waitFor(() => {
         expect(screen.getByText(new RegExp(`You could offer your "${currentUsersItem.name}"`, "i"))).toBeInTheDocument();
-      });
+      }, { timeout: 3000 });
     });
   });
 
@@ -135,7 +138,8 @@ describe('ChatWindow Component', () => {
 
     test('sends a message, shows loading, receives and displays AI response', async () => {
       // Sign in a test user
-      await testAuthHelpers.createAndSignInTestUser('chattest2@example.com');
+      const user = await testAuthHelpers.createAndSignInTestUser('chattest2@example.com');
+      await testAuthHelpers.waitForAuthState();
       const aiResponseText = "That's an interesting proposal!";
       let resolveChatPromise: (value: { response: string }) => void;
       (mockTradeNegotiationChat as jest.Mock).mockImplementationOnce(

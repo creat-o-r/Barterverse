@@ -5,6 +5,16 @@ config({ path: '.env.test' });
 // Polyfill for fetch API in Node.js environment for Jest tests
 import 'whatwg-fetch';
 
+// Polyfill for setImmediate (needed for Firebase in Node.js test environment)
+if (typeof global.setImmediate === 'undefined') {
+  global.setImmediate = (callback, ...args) => {
+    return setTimeout(callback, 0, ...args);
+  };
+  global.clearImmediate = (id) => {
+    clearTimeout(id);
+  };
+}
+
 // This file is intentionally_left_blank for now.
 // You can use this file to set up global mocks or configurations for your tests.
 
@@ -41,5 +51,5 @@ process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS = 'true';
 
 // Firebase emulator configuration
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-barterverse';
-process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8081';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
