@@ -27,12 +27,27 @@ jobs:
 
       - name: Start Firebase emulators
         run: |
-          firebase emulators:start --only firestore,auth --project demo-barterverse &
-          # Wait for emulators to start
-          sleep 10
-        env:
-          FIRESTORE_EMULATOR_HOST: localhost:8080
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          firebase emulators:start --only firestore,auth --project demo-barterverse > emulator.log 2>&1 &
+          EMULATOR_PID=$!
+          echo "Emulator PID: $EMULATOR_PID"
+          
+          # Wait for emulators to start with timeout
+          timeout=30
+          while [ $timeout -gt 0 ]; do
+            if curl -s http://localhost:8080 > /dev/null 2>&1 && curl -s http://localhost:9099 > /dev/null 2>&1; then
+              echo "Emulators are ready"
+              break
+            fi
+            echo "Waiting for emulators... ($timeout seconds left)"
+            sleep 2
+            timeout=$((timeout - 2))
+          done
+          
+          if [ $timeout -le 0 ]; then
+            echo "Emulators failed to start within 30 seconds"
+            cat emulator.log
+            exit 1
+          fi
 
       - name: Run unit tests (REQUIRED)
         run: npm run test:unit -- --coverage --coverageThreshold='{"global":{"lines":70,"branches":60,"statements":70,"functions":60}}'
