@@ -1,113 +1,110 @@
+// src/app/trades/[tradeId]/page.tsx
 
-// This is a placeholder page for a specific trade.
-// In a real application, this page would show trade details, item comparison, and the chat window.
+import { Suspense } from 'react';
+import { use } from 'react'; // Required for resolving promise params in Server Components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Repeat, Info, UserCircle, Gift, Search } from 'lucide-react';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
+import { MessageSquare, Repeat, Gift, Search, AlertTriangle, UserCircle } from 'lucide-react';
+import { getItem, getUser } from '@/lib/firebase/firestoreUtils';
 import type { Item, User } from '@/types';
 import Image from 'next/image';
 import Link from 'next/link';
-import ChatWindow from '@/components/chat/ChatWindow';
-import { Button } from '@/components/ui/button'; 
+import ChatWindow from '@/components/chat/ChatWindow'; // This will be a Client Component
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
-interface TradeContext {
+interface TradePageContext {
   tradeId: string;
-  currentUser: User;
-  otherUser: User;
-  itemOfferedByOther: Item; // The item the current user is interested in (owned by otherUser)
-  itemCurrentUserMightOffer: Item | null; // An item current User might offer in exchange
+  initiator: User;          // User who wants the targetItem (User A)
+  targetItemOwner: User;    // User who owns targetItem (User B)
+  targetItem: Item;         // The item User A wants from User B
+  // We remove initiatorItemOffer from server-side context; ChatWindow can handle this selection.
 }
 
-async function getTradeContext(tradeId: string, currentUserId: string): Promise<TradeContext | null> {
+async function getTradePageContext(tradeId: string): Promise<TradePageContext | null> {
   const parts = tradeId.split('-');
+  // Expected format: trade-${initiatorId}-wants-${targetItemId}-from-${targetItemOwnerId}
   if (parts.length < 6 || parts[0] !== 'trade' || parts[2] !== 'wants' || parts[4] !== 'from') {
-    console.warn("Invalid tradeId format for context:", tradeId);
+    console.warn("Invalid tradeId format for TradeDetailPage context:", tradeId);
     return null;
   }
 
-  const initiatorId = parts[1]; // User who wants the item
-  const targetItemId = parts[3]; // The item being wanted
-  const targetItemOwnerId = parts[5]; // Owner of the targetItem
+  const initiatorId = parts[1];
+  const targetItemId = parts[3];
+  const targetItemOwnerId = parts[5];
 
-  const currentUser = dummyUsers.find(u => u.id === currentUserId);
-  if (!currentUser) return null;
+  const [initiator, targetItemOwner, targetItem] = await Promise.all([
+    getUser(initiatorId),
+    getUser(targetItemOwnerId),
+    getItem(targetItemId)
+  ]);
 
-  let otherUser: User | undefined;
-  let itemOfferedByOther: Item | undefined; // This is targetItem, owned by targetItemOwner
-  let itemCurrentUserMightOffer: Item | null = null; 
-
-  if (currentUserId === initiatorId) {
-    // Current user is initiating, wants targetItem from targetItemOwner
-    otherUser = dummyUsers.find(u => u.id === targetItemOwnerId);
-    itemOfferedByOther = dummyItems.find(i => i.id === targetItemId && i.ownerId === targetItemOwnerId);
-    // Try to find an item current user owns to pre-fill as potential offer
-    itemCurrentUserMightOffer = dummyItems.find(i => i.ownerId === currentUserId && i.listingType === 'offer' && i.status === 'available') || null;
-
-  } else if (currentUserId === targetItemOwnerId) {
-    // Current user owns the targetItem, initiatorId wants it
-    otherUser = dummyUsers.find(u => u.id === initiatorId);
-    itemOfferedByOther = dummyItems.find(i => i.id === targetItemId && i.ownerId === currentUserId); // This item is current user's
-    // Try to find an item initiator owns to pre-fill as what they might offer
-    itemCurrentUserMightOffer = dummyItems.find(i => i.ownerId === initiatorId && i.listingType === 'offer' && i.status === 'available') || null;
-  } else {
-    console.warn(`User ${currentUserId} not directly involved in tradeId ${tradeId} as initiator or target owner.`);
-    return null; 
-  }
-
-  if (!otherUser || !itemOfferedByOther) {
-    console.warn("Could not determine otherUser or itemOfferedByOther for tradeId:", tradeId);
+  if (!initiator || !targetItemOwner || !targetItem) {
+    console.warn(`Could not fetch all necessary data for tradeId ${tradeId}: initiator: ${!!initiator}, targetItemOwner: ${!!targetItemOwner}, targetItem: ${!!targetItem}`);
     return null;
   }
-  
-  // Re-evaluate roles for ChatWindow props:
-  // ChatWindow's 'currentItem' = The item the 'otherUser' is offering (that 'currentUser' is interested in).
-  // ChatWindow's 'requestedItemInitial' = The item 'currentUser' might offer in return.
 
-  let chatWindowCurrentItem: Item;
-  let chatWindowRequestedItem: Item | null;
-
-  if (currentUserId === initiatorId) { // Current user wants itemOfferedByOther
-      chatWindowCurrentItem = itemOfferedByOther;
-      chatWindowRequestedItem = itemCurrentUserMightOffer; // What current user might offer
-  } else { // currentUserId === targetItemOwnerId. Other user (initiatorId) wants itemOfferedByOther (which is current user's item)
-      chatWindowCurrentItem = itemCurrentUserMightOffer!; // This is what the other user (initiator) offers. Could be null.
-                                                        // If null, it means the other user has no obvious item.
-                                                        // ChatWindow needs a currentItem. If initiator has no obvious item to offer,
-                                                        // the "currentItem" for chat is still targetItem (owned by current user).
-                                                        // The negotiation is "about" the targetItem.
-      if (itemCurrentUserMightOffer) { // If initiator has an item to offer
-         chatWindowCurrentItem = itemCurrentUserMightOffer;
-         chatWindowRequestedItem = itemOfferedByOther; // What current user (targetItemOwner) might give up
-      } else { // Initiator has no obvious item to offer. Negotiation is about current user's item.
-         chatWindowCurrentItem = itemOfferedByOther; // This is the item current user owns, that other user wants
-         chatWindowRequestedItem = null; // Other user's offer is TBD
-      }
+  // Validate ownership: targetItem must be owned by targetItemOwner
+  if (targetItem.ownerId !== targetItemOwner.id) {
+    console.warn(`Item ownership mismatch for tradeId ${tradeId}: item ${targetItemId} owner is ${targetItem.ownerId}, expected ${targetItemOwner.id}`);
+    return null;
   }
-
+  // Validate initiator is not the same as target owner for this tradeId structure
+  if (initiatorId === targetItemOwnerId) {
+    console.warn(`Initiator and target owner are the same for tradeId ${tradeId}. This trade structure is for two distinct users.`);
+    return null;
+  }
 
   return {
     tradeId,
-    currentUser,
-    otherUser,
-    itemOfferedByOther: chatWindowCurrentItem, 
-    itemCurrentUserMightOffer: chatWindowRequestedItem,
+    initiator,
+    targetItemOwner,
+    targetItem,
   };
 }
 
-
-export default async function TradeDetailPage({ params }: { params: { tradeId: string } }) {
-  const currentUserId = dummyUsers[0].id; 
-  const tradeContext = await getTradeContext(params.tradeId, currentUserId);
-
-  if (!tradeContext) {
-    return (
+function TradeDetailPageLoading() {
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 p-4 animate-pulse">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-2xl text-destructive">Trade Not Found</CardTitle>
+          <div className="h-8 bg-muted rounded w-3/4"></div>
+          <div className="h-4 bg-muted rounded w-1/2 mt-2"></div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="shadow-md">
+              <CardHeader><div className="h-6 bg-muted rounded w-1/2"></div></CardHeader>
+              <CardContent><div className="aspect-video w-full bg-muted rounded-md mb-2"></div><div className="h-5 bg-muted rounded w-3/4"></div></CardContent>
+            </Card>
+            <Card className="shadow-md">
+              <CardHeader><div className="h-6 bg-muted rounded w-1/2"></div></CardHeader>
+              <CardContent><div className="aspect-video w-full bg-muted rounded-md mb-2"></div><div className="h-5 bg-muted rounded w-3/4"></div></CardContent>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><div className="h-7 bg-muted rounded w-1/3"></div></CardHeader>
+        <CardContent><div className="h-64 bg-muted rounded"></div></CardContent>
+      </Card>
+    </div>
+  );
+}
+
+async function TradeDetailContent({ tradeId }: { tradeId: string }) {
+  const context = await getTradePageContext(tradeId);
+
+  if (!context) {
+    return (
+      <Card className="max-w-4xl mx-auto my-8">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl text-destructive flex items-center gap-2">
+            <AlertTriangle /> Trade Information Error
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="font-body">The details for this trade could not be loaded. It might be an invalid link or the trade no longer exists.</p>
-          <Button asChild variant="link" className="mt-4">
+          <p className="font-body">The details for this trade (ID: {tradeId}) could not be loaded. The link might be invalid, or associated users/items may no longer exist.</p>
+          <Button asChild variant="link" className="mt-4 px-0">
             <Link href="/chats">Back to Chats</Link>
           </Button>
         </CardContent>
@@ -115,10 +112,39 @@ export default async function TradeDetailPage({ params }: { params: { tradeId: s
     );
   }
 
-  const { tradeId, currentUser, otherUser, itemOfferedByOther, itemCurrentUserMightOffer } = tradeContext;
+  const { initiator, targetItemOwner, targetItem } = context;
   
+  // Props for ChatWindow:
+  // - currentItem: The item the other party has that the current user is interested in.
+  // - requestedItemInitial: An item the current user might initially offer (can be null).
+  // - otherUserId: The ID of the other user in the chat.
+  // - otherUserName: The name of the other user.
+  // ChatWindow will use useAuth() to determine its own identity and perspective.
+
+  // From the perspective of the trade defined by tradeId (initiator wants targetItem from targetItemOwner):
+  // The primary item of interest is targetItem.
+  // The other party involved with targetItem is targetItemOwner.
+  // The initiator (initiator) might offer something (or nothing initially).
+
+  // The ChatWindow needs to be flexible. We pass it the core item of negotiation (targetItem)
+  // and the details of the *other* user involved *relative to the perspective of the trade link*.
+  // If the logged-in user is `initiator`, then `otherUser` is `targetItemOwner`.
+  // If the logged-in user is `targetItemOwner`, then `otherUser` is `initiator`.
+  // The `ChatWindow` component handles this internal perspective via `useAuth`.
+
+  // So, for the props of ChatWindow:
+  // - `currentItem` = `targetItem` (the item being negotiated over)
+  // - `otherUserId` = (this will be dynamically determined by ChatWindow based on who is logged in between initiator and targetItemOwner)
+  // - `otherUserName` = (similarly dynamic)
+  // - `tradeId` = `tradeId`
+  // - `requestedItemInitial` = null (let user select in chat)
+
+  // We need to pass enough info for ChatWindow to figure out the participants.
+  // Let's pass the item being negotiated (targetItem) and the two participants.
+  // ChatWindow will use useAuth() to determine which participant is "self" and which is "other".
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 p-4 md:p-0"> {/* Added padding for mobile */}
       <Card>
         <CardHeader>
           <CardTitle className="font-headline text-3xl flex items-center gap-2">
@@ -126,55 +152,46 @@ export default async function TradeDetailPage({ params }: { params: { tradeId: s
             Trade Negotiation
           </CardTitle>
           <CardDescription className="font-body">
-            Discussing trade with <Link href={`/profile/${otherUser.id}`} className="text-primary hover:underline font-semibold">{otherUser.name}</Link> for <span className="font-semibold">&quot;{itemOfferedByOther.name}&quot;</span>.
-            {itemCurrentUserMightOffer && ` You might offer your "${itemCurrentUserMightOffer.name}".`}
+            Negotiation between <Link href={`/profile/${initiator.id}`} className="text-primary hover:underline font-semibold">{initiator.name}</Link> (wants item)
+            and <Link href={`/profile/${targetItemOwner.id}`} className="text-primary hover:underline font-semibold">{targetItemOwner.name}</Link> (owns item)
+            regarding &quot;{targetItem.name}&quot;.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Item targetItemOwner has (that initiator wants) */}
             <Card className="shadow-md">
               <CardHeader>
                 <CardTitle className="font-headline text-xl flex items-center gap-2">
-                    {itemOfferedByOther.listingType === 'offer' ? <Gift className="text-green-600" /> : <Search className="text-blue-600" />}
-                    {otherUser.name} Offers / Wants
+                  {targetItem.listingType === 'offer' ? <Gift className="text-green-600" /> : <Search className="text-blue-600" />}
+                  {targetItemOwner.name} Has: &quot;{targetItem.name}&quot;
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="relative aspect-video w-full mb-2 rounded-md overflow-hidden">
-                    <Image src={itemOfferedByOther.imageUrl || 'https://placehold.co/600x400.png'} alt={itemOfferedByOther.name} fill className="object-cover" data-ai-hint={itemOfferedByOther.dataAiHint || "item offered by other"} sizes="(max-width: 768px) 100vw, 50vw"/>
+                    <Image src={targetItem.imageUrl || 'https://placehold.co/600x400.png'} alt={targetItem.name} fill className="object-cover" data-ai-hint={targetItem.dataAiHint || "target item"} sizes="(max-width: 768px) 100vw, 50vw"/>
                 </div>
-                <h4 className="font-semibold text-lg">{itemOfferedByOther.name}</h4>
-                <p className="text-sm text-muted-foreground line-clamp-2">{itemOfferedByOther.description}</p>
+                <h4 className="font-semibold text-lg">{targetItem.name}</h4>
+                <p className="text-sm text-muted-foreground line-clamp-2">{targetItem.description}</p>
                 <Button variant="outline" size="sm" asChild className="mt-2">
-                    <Link href={`/items/${itemOfferedByOther.id}`}>View Item</Link>
+                    <Link href={`/items/${targetItem.id}`}>View Item</Link>
                 </Button>
               </CardContent>
             </Card>
             
+            {/* Placeholder for what initiator might offer */}
             <Card className="shadow-md">
               <CardHeader>
                 <CardTitle className="font-headline text-xl flex items-center gap-2">
                     <UserCircle className="text-primary" />
-                     Your Potential Offer / Fulfillment
+                     {initiator.name}'s Potential Offer
                 </CardTitle>
-                </CardHeader>
+              </CardHeader>
               <CardContent>
-                {itemCurrentUserMightOffer ? (
-                  <>
-                    <div className="relative aspect-video w-full mb-2 rounded-md overflow-hidden">
-                        <Image src={itemCurrentUserMightOffer.imageUrl || 'https://placehold.co/600x400.png'} alt={itemCurrentUserMightOffer.name} fill className="object-cover" data-ai-hint={itemCurrentUserMightOffer.dataAiHint || "item you might offer"} sizes="(max-width: 768px) 100vw, 50vw"/>
-                    </div>
-                    <h4 className="font-semibold text-lg">{itemCurrentUserMightOffer.name}</h4>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{itemCurrentUserMightOffer.description}</p>
-                     <Button variant="outline" size="sm" asChild className="mt-2">
-                        <Link href={`/items/${itemCurrentUserMightOffer.id}`}>View Your Item</Link>
-                    </Button>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground font-body">You can discuss what you'd like to offer from your items, or how you can fulfill their want, in the chat below.
-                  Browse <Link href={`/profile/${currentUser.id}`} className="text-primary hover:underline">your inventory</Link>.
+                  <p className="text-sm text-muted-foreground font-body">
+                    {initiator.name} can propose an item or discuss terms in the chat below.
+                    They can browse <Link href={`/profile/${initiator.id}`} className="text-primary hover:underline">their inventory</Link>.
                   </p>
-                )}
               </CardContent>
             </Card>
           </div>
@@ -189,15 +206,25 @@ export default async function TradeDetailPage({ params }: { params: { tradeId: s
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Pass all necessary context for ChatWindow to determine roles based on its own auth state */}
           <ChatWindow 
-            currentItem={itemOfferedByOther} 
-            requestedItemInitial={itemCurrentUserMightOffer} 
-            otherUserId={otherUser.id}
-            otherUserName={otherUser.name}
             tradeId={tradeId}
+            currentItem={targetItem} // The item the trade is fundamentally about
+            otherUserId={targetItemOwner.id}
+            otherUserName={targetItemOwner.name}
           />
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Wrapper component to handle the promise from params
+export default function TradeDetailPageWrapper({ params: paramsProp }: { params: Promise<{ tradeId: string }> }) {
+  const params = use(paramsProp);
+  return (
+    <Suspense fallback={<TradeDetailPageLoading/>}>
+      <TradeDetailContent tradeId={params.tradeId} />
+    </Suspense>
   );
 }
