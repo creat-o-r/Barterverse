@@ -36,10 +36,17 @@ jobs:
           echo "GOOGLE_API_KEY=$API_KEY" > .env.production
           rm /tmp/service-account.json
       
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      
       - name: Load Firebase Configuration
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BARTERVERSE_L9UQ3 }}' > /tmp/service-account.json
           gcloud auth activate-service-account --key-file=/tmp/service-account.json
+          
+          # Set Firebase CLI environment variables
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/service-account.json
+          export FIREBASE_TOKEN="$(gcloud auth print-access-token)"
           
           # Use our centralized Firebase config loader
           npm run firebase:config:preview > firebase-env.txt
