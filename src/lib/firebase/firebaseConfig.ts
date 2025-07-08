@@ -70,8 +70,12 @@ if (missingKeys.length > 0) {
   // Connect to emulators if in development/test environment
   if (useEmulators && !emulatorsConnected) {
     try {
-      connectFirestoreEmulator(db, 'localhost', 8080);
-      connectAuthEmulator(auth, 'http://localhost:9099');
+      const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST || 'localhost:8080';
+      const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || 'localhost:9099';
+      
+      const [fsHost, fsPort] = firestoreHost.split(':');
+      connectFirestoreEmulator(db, fsHost, parseInt(fsPort));
+      connectAuthEmulator(auth, `http://${authHost}`);
       emulatorsConnected = true;
       console.log('🔧 Connected to Firebase emulators');
     } catch (error: any) {
