@@ -34,7 +34,7 @@ jobs:
           # Wait for emulators to start with timeout
           timeout=30
           while [ $timeout -gt 0 ]; do
-            if curl -s http://localhost:8080 > /dev/null 2>&1 && curl -s http://localhost:9099 > /dev/null 2>&1; then
+            if curl -s http://127.0.0.1:8081 > /dev/null 2>&1 && curl -s http://127.0.0.1:9099 > /dev/null 2>&1; then
               echo "Emulators are ready"
               break
             fi
@@ -53,8 +53,8 @@ jobs:
         run: npm run test:unit -- --coverage --coverageThreshold='{"global":{"lines":70,"branches":60,"statements":70,"functions":60}}'
         env:
           NEXT_PUBLIC_USE_FIREBASE_EMULATORS: true
-          FIRESTORE_EMULATOR_HOST: localhost:8080
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8081
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
 
       - name: Build application (REQUIRED)
         run: npm run build
@@ -83,8 +83,8 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           NEXT_PUBLIC_USE_FIREBASE_EMULATORS: true
-          FIRESTORE_EMULATOR_HOST: localhost:8080
-          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8081
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
 
       - name: Upload Playwright HTML report
         if: always()

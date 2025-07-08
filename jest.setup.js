@@ -41,5 +41,5 @@ process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS = 'true';
 
 // Firebase emulator configuration
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-barterverse';
-process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
-process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
+process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8081';
+process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
