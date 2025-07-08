@@ -163,6 +163,12 @@ describe('ChatWindow Component', () => {
         expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
       });
 
+      // Wait for authentication to complete and form to be enabled
+      await waitFor(() => {
+        const input = screen.getByPlaceholderText('Type your message...');
+        expect(input).not.toBeDisabled();
+      }, { timeout: 3000 });
+
       const input = screen.getByPlaceholderText('Type your message...');
       const sendButton = screen.getByRole('button', { type: 'submit' });
 
@@ -195,11 +201,11 @@ describe('ChatWindow Component', () => {
 
       // Check chatHistory parts
       expect(actualArgs.chatHistory).toContain("AI: Hi! I'm here to help you negotiate");
-      expect(actualArgs.chatHistory).toContain(`User (${mockCurrentUserId}): Hello, interested in a trade?`);
+      expect(actualArgs.chatHistory).toContain(`User (${user.uid}): Hello, interested in a trade?`);
 
-      // Check item descriptions
-      expect(actualArgs.itemOfferedDescription).toBe(`${currentUsersItem.name}: ${currentUsersItem.description}`);
-      expect(actualArgs.itemWantedDescription).toBe(`${otherUsersItem.name}: ${otherUsersItem.description}`);
+      // Check item descriptions  
+      expect(actualArgs.itemOfferedDescription).toBe(`${otherUsersItem.name}: ${otherUsersItem.description}`);
+      expect(actualArgs.itemWantedDescription).toBe(`${currentUsersItem.name}: ${currentUsersItem.description}`);
 
       expect(actualArgs.userMessage).toBe('Hello, interested in a trade?');
 
