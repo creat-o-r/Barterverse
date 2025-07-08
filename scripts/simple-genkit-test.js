@@ -17,6 +17,8 @@ process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS = 'true';
 process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-barterverse';
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8081';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+// Set dummy API key for testing (won't be used in real calls)
+process.env.GOOGLE_API_KEY = 'test-key-for-genkit-structure-testing';
 
 // Simpler test approach - just run a basic flow test
 async function runSimpleFlowTest() {

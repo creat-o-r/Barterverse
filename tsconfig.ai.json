@@ -9,7 +9,10 @@
     "skipLibCheck": true // Often useful to speed up compilation
   },
   "include": [
-    "src/ai/**/*.ts"   // Only include AI related files
+    "src/ai/**/*.ts",        // AI related files
+    "src/services/**/*.ts",  // Services needed by AI
+    "src/lib/**/*.ts",       // Utilities needed by AI  
+    "src/types/**/*.ts"      // Type definitions
   ],
   "exclude": [
     "node_modules",

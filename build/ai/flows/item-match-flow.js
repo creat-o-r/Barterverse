@@ -13,11 +13,11 @@ exports.suggestMatchingItems = suggestMatchingItems;
  */
 const genkit_1 = require("../genkit");
 const genkit_2 = require("genkit");
-const match_report_service_1 = require("@/services/match-report-service");
-const ai_config_service_1 = require("@/services/ai-config-service");
-// import { dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
-const firestoreUtils_1 = require("@/lib/firebase/firestoreUtils"); // Firestore access
-const ai_diagnostic_log_service_1 = require("@/services/ai-diagnostic-log-service");
+const match_report_service_1 = require("../../services/match-report-service");
+const ai_config_service_1 = require("../../services/ai-config-service");
+// import { dummyUsers } from '../../lib/dummy-data'; // Replaced with Firestore
+const firestoreUtils_1 = require("../../lib/firebase/firestoreUtils"); // Firestore access
+const ai_diagnostic_log_service_1 = require("../../services/ai-diagnostic-log-service");
 const ItemBriefSchema = genkit_2.z.object({
     id: genkit_2.z.string(),
     name: genkit_2.z.string(),

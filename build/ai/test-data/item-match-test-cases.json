@@ -1,0 +1,113 @@
+[
+  {
+    "name": "Simple Offer Matching",
+    "input": {
+      "triggeringUserId": "user1",
+      "triggeringItem": {
+        "id": "item1",
+        "name": "Vintage Leather Journal",
+        "description": "A beautifully crafted leather-bound journal, perfect for sketching or writing",
+        "category": "Books & Stationery",
+        "ownerId": "user1",
+        "listingType": "offer",
+        "isGiftItForward": false,
+        "openToAnyOpportunity": false
+      },
+      "availableItems": [
+        {
+          "id": "item2",
+          "name": "Retro Gaming Console",
+          "description": "A classic gaming console from the 90s with controllers",
+          "category": "Electronics",
+          "ownerId": "user2",
+          "listingType": "offer",
+          "isGiftItForward": false,
+          "openToAnyOpportunity": false
+        },
+        {
+          "id": "item3",
+          "name": "Looking for: Art Supplies",
+          "description": "Seeking quality art supplies for creative projects",
+          "category": "Art & Crafts",
+          "ownerId": "user3",
+          "listingType": "want",
+          "isGiftItForward": false,
+          "openToAnyOpportunity": true
+        }
+      ]
+    },
+    "expectedBehavior": {
+      "shouldFindMatches": true,
+      "expectedMatchCount": 1,
+      "expectedMatchedItemId": "item3",
+      "reason": "Art supplies want should match with vintage journal offer for creative use"
+    }
+  },
+  {
+    "name": "Gift It Forward Matching",
+    "input": {
+      "triggeringUserId": "user1",
+      "triggeringItem": {
+        "id": "item4",
+        "name": "Hand-knitted Scarf (Gift It Forward!)",
+        "description": "A cozy scarf, happy to gift this to someone who will love it",
+        "category": "Fashion & Accessories",
+        "ownerId": "user1",
+        "listingType": "offer",
+        "isGiftItForward": true,
+        "openToAnyOpportunity": true
+      },
+      "availableItems": [
+        {
+          "id": "item5",
+          "name": "Wanted: Winter Clothing",
+          "description": "Looking for warm winter items",
+          "category": "Fashion & Accessories",
+          "ownerId": "user2",
+          "listingType": "want",
+          "isGiftItForward": false,
+          "openToAnyOpportunity": false
+        }
+      ]
+    },
+    "expectedBehavior": {
+      "shouldFindMatches": true,
+      "expectedMatchCount": 1,
+      "expectedMatchedItemId": "item5",
+      "reason": "Gift it forward scarf should match with winter clothing want"
+    }
+  },
+  {
+    "name": "No Matches Available",
+    "input": {
+      "triggeringUserId": "user1",
+      "triggeringItem": {
+        "id": "item6",
+        "name": "Specialized Technical Equipment",
+        "description": "Very specific technical equipment for niche applications",
+        "category": "Electronics",
+        "ownerId": "user1",
+        "listingType": "offer",
+        "isGiftItForward": false,
+        "openToAnyOpportunity": false
+      },
+      "availableItems": [
+        {
+          "id": "item7",
+          "name": "Children's Toys",
+          "description": "Collection of children's educational toys",
+          "category": "Toys & Games",
+          "ownerId": "user2",
+          "listingType": "offer",
+          "isGiftItForward": false,
+          "openToAnyOpportunity": false
+        }
+      ]
+    },
+    "expectedBehavior": {
+      "shouldFindMatches": false,
+      "expectedMatchCount": 0,
+      "reason": "Technical equipment and children's toys have no logical connection"
+    }
+  }
+]
