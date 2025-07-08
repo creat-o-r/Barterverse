@@ -4,6 +4,7 @@ import ChatWindow from './ChatWindow';
 import type { Item, ChatMessage } from '@/types';
 import { tradeNegotiationChat as mockTradeNegotiationChat } from '@/ai/flows/trade-negotiation-chat';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { testAuthHelpers } from '@/test-utils/auth-helpers';
 // For typing, actual mock is below, not importing dummyUsers directly into test logic
 // import { dummyUsers as mockActualDummyUsers } from '@/lib/dummy-data';
 import { useToast as mockUseToast } from "@/hooks/use-toast";
@@ -48,8 +49,15 @@ const otherUserName = 'Other User Name';
 
 
 describe('ChatWindow Component', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    // Clean up any existing auth state
+    await testAuthHelpers.signOutTestUser();
+  });
+
+  afterEach(async () => {
+    // Clean up auth state after each test
+    await testAuthHelpers.signOutTestUser();
   });
 
   describe('Initial Rendering', () => {
@@ -90,12 +98,44 @@ describe('ChatWindow Component', () => {
         expect(screen.getByPlaceholderText(/sign in to chat/i)).toBeInTheDocument();
       });
     });
+
+    test('CurrentUser as Initiator: renders correct initial AI message when authenticated', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest@example.com');
+      
+      const tradeIdAsInitiator = `trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`;
+      render(
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={tradeIdAsInitiator}
+          />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/Hi! I'm here to help you negotiate/i)).toBeInTheDocument();
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText(new RegExp(`You're interested in their "${otherUsersItem.name}"`, "i"))).toBeInTheDocument();
+      });
+      
+      await waitFor(() => {
+        expect(screen.getByText(new RegExp(`You could offer your "${currentUsersItem.name}"`, "i"))).toBeInTheDocument();
+      });
+    });
   });
 
   describe('Sending Messages & AI Interaction', () => {
     const tradeId = `trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`;
 
-    test.skip('sends a message, shows loading, receives and displays AI response', async () => {
+    test('sends a message, shows loading, receives and displays AI response', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest2@example.com');
       const aiResponseText = "That's an interesting proposal!";
       let resolveChatPromise: (value: { response: string }) => void;
       (mockTradeNegotiationChat as jest.Mock).mockImplementationOnce(
@@ -113,6 +153,11 @@ describe('ChatWindow Component', () => {
           />
         </AuthProvider>
       );
+
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText('Type your message...');
       const sendButton = screen.getByRole('button', { type: 'submit' });
@@ -157,7 +202,9 @@ describe('ChatWindow Component', () => {
       expect(document.querySelector('svg.animate-spin')).not.toBeInTheDocument();
     });
 
-    test.skip('handles AI error, shows error message, and calls toast', async () => {
+    test('handles AI error, shows error message, and calls toast', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest3@example.com');
       let rejectChatPromise: (reason?: any) => void;
       (mockTradeNegotiationChat as jest.Mock).mockImplementationOnce(
         () => new Promise((_, reject) => { rejectChatPromise = reject; })
@@ -173,6 +220,11 @@ describe('ChatWindow Component', () => {
           />
         </AuthProvider>
       );
+
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText('Type your message...');
       const sendButton = screen.getByRole('button', { type: 'submit' });
@@ -226,7 +278,9 @@ describe('ChatWindow Component', () => {
       });
     });
 
-    test.skip('Input and Send button are disabled during AI response loading', async () => {
+    test('Input and Send button are disabled during AI response loading', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest4@example.com');
       (mockTradeNegotiationChat as jest.Mock).mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ response: "Delayed" }), 100)));
       render(
         <AuthProvider>
@@ -239,6 +293,12 @@ describe('ChatWindow Component', () => {
           />
         </AuthProvider>
       );
+      
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
+      
       const input = screen.getByPlaceholderText('Type your message...') as HTMLInputElement;
       const sendButton = screen.getByRole('button', { type: 'submit' });
 
@@ -261,7 +321,9 @@ describe('ChatWindow Component', () => {
   });
 
   describe('Message Styling/Alignment', () => {
-    test.skip('User message has user-specific styling, AI message has AI-specific styling', async () => {
+    test('User message has user-specific styling, AI message has AI-specific styling', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest5@example.com');
       const aiResponseText = "AI reply here.";
       (mockTradeNegotiationChat as jest.Mock).mockResolvedValue({ response: aiResponseText });
       render(
@@ -275,6 +337,11 @@ describe('ChatWindow Component', () => {
           />
         </AuthProvider>
       );
+
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText('Type your message...');
       const sendButton = screen.getByRole('button', { type: 'submit' });
