@@ -68,7 +68,8 @@ function GlobalCategoryFilter() {
 
 
 export default function Navbar() {
-  const isLoggedIn = true; // Placeholder for auth state
+  const { currentUser, appUser, isLoading } = useAuth();
+  const isLoggedIn = !!currentUser && !isLoading;
   const unreadCount = 3; // Placeholder for unread chat count
 
   return (
