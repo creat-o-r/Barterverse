@@ -37,7 +37,7 @@ jobs:
           # Wait for emulators to start with timeout
           timeout=30
           while [ $timeout -gt 0 ]; do
-            if curl -s http://127.0.0.1:8080 > /dev/null 2>&1 && curl -s http://127.0.0.1:9099 > /dev/null 2>&1; then
+            if curl -s http://127.0.0.1:8081 > /dev/null 2>&1 && curl -s http://127.0.0.1:9099 > /dev/null 2>&1; then
               echo "Emulators are ready"
               break
             fi
@@ -56,7 +56,7 @@ jobs:
         run: npm run test:unit -- --coverage --coverageThreshold='{"global":{"lines":70,"branches":60,"statements":70,"functions":60}}'
         env:
           NEXT_PUBLIC_USE_FIREBASE_EMULATORS: true
-          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8081
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
 
       - name: Build application (REQUIRED)
@@ -65,10 +65,13 @@ jobs:
           GOOGLE_API_KEY: placeholder_for_build
           NEXT_PUBLIC_FIREBASE_API_KEY: placeholder_for_build
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: placeholder.firebaseapp.com
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID: placeholder-project
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-barterverse
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: placeholder.appspot.com
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: placeholder
           NEXT_PUBLIC_FIREBASE_APP_ID: placeholder
+          NEXT_PUBLIC_ENVIRONMENT: test
+          NEXT_PUBLIC_FIREBASE_ENV: development
+          NEXT_PUBLIC_USE_FIREBASE_EMULATORS: true
 
       - name: Run linters
         run: npm run lint
@@ -86,7 +89,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           NEXT_PUBLIC_USE_FIREBASE_EMULATORS: true
-          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8081
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
 
       - name: Upload Playwright HTML report
