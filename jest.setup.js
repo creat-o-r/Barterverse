@@ -1,3 +1,7 @@
+// Load test environment variables
+import { config } from 'dotenv';
+config({ path: '.env.test' });
+
 // Polyfill for fetch API in Node.js environment for Jest tests
 import 'whatwg-fetch';
 
@@ -29,20 +33,13 @@ if (typeof window !== 'undefined') {
   Element.prototype.scrollIntoView = jest.fn();
 }
 
-// Set test environment variables to use emulators
+// Set test environment variables for Firebase emulators
 process.env.NODE_ENV = 'test';
 process.env.NEXT_PUBLIC_ENVIRONMENT = 'test';
-process.env.NEXT_PUBLIC_FIREBASE_ENV = 'test';
+process.env.NEXT_PUBLIC_FIREBASE_ENV = 'development';
 process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS = 'true';
 
-// Firebase test configuration for emulators
-process.env.NEXT_PUBLIC_FIREBASE_API_KEY = 'demo-api-key';
-process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = 'demo-project.firebaseapp.com';
-process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-project';
-process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = 'demo-project.appspot.com';
-process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = '123456789';
-process.env.NEXT_PUBLIC_FIREBASE_APP_ID = '1:123456789:web:demo';
-
-// Emulator host configuration
+// Firebase emulator configuration
+process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = 'demo-barterverse';
 process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
