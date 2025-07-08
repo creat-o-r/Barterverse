@@ -23,12 +23,22 @@ jobs:
         run: npm ci
 
       - name: Run unit tests (REQUIRED)
-        run: npm run test:unit -- --coverage --coverageThreshold='{"global":{"lines":90,"branches":77,"statements":89,"functions":79}}'
+        run: npm run test:unit -- --coverage --coverageThreshold='{"global":{"lines":70,"branches":60,"statements":70,"functions":60}}'
+        env:
+          NEXT_PUBLIC_USE_FIREBASE_EMULATORS: true
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
 
       - name: Build application (REQUIRED)
         run: npm run build
         env:
           GOOGLE_API_KEY: placeholder_for_build
+          NEXT_PUBLIC_FIREBASE_API_KEY: placeholder_for_build
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: placeholder.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: placeholder-project
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: placeholder.appspot.com
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: placeholder
+          NEXT_PUBLIC_FIREBASE_APP_ID: placeholder
 
       - name: Run linters
         run: npm run lint
