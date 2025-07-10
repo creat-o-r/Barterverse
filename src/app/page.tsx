@@ -30,46 +30,61 @@ export default function HomePage() {
   const [userItemSuggestions, setUserItemSuggestions] = useState<UserItemSuggestion[]>([]);
   const [allBrowseItems, setAllBrowseItems] = useState<Item[]>([]);
   const [searchResults, setSearchResults] = useState<Item[] | null>(null); // null: no search, []: search done, no results
-  const [overallLoading, setOverallLoading] = useState(true); // For AI suggestions section
-  const [browseItemsLoading, setBrowseItemsLoading] = useState(true); // For "Browse All" / Search Results section
-  const { toast } = useToast();
-  const { currentUser: authCurrentUser, loading: authLoading } = useAuth();
-  const { selectedCategory: globalSelectedCategory } = useGlobalFilter();
-
-  const [allBrowseItems, setAllBrowseItems] = useState<Item[]>([]);
-  const [searchResults, setSearchResults] = useState<Item[] | null>(null);
   const [overallLoading, setOverallLoading] = useState(true);
   const [browseItemsLoading, setBrowseItemsLoading] = useState(true);
   const { toast } = useToast();
   const { currentUser: authCurrentUser, loading: authLoading } = useAuth();
   const { selectedCategory: globalSelectedCategory } = useGlobalFilter();
 
-  // Fetch initial browse items
+  // New state for storing all items fetched once
+  const [allExistingItemsFromDb, setAllExistingItemsFromDb] = useState<Item[]>([]);
+  const [allExistingItemsLoading, setAllExistingItemsLoading] = useState(true);
+
+  // Effect to fetch all items once
   useEffect(() => {
-    async function loadInitialBrowseItems() {
-      if (searchResults !== null) {
-        console.log('[HomePage] Skipping initial browse items load due to active search results.');
-        return;
-      }
-      console.log('[HomePage] Loading initial browse items...');
-      setBrowseItemsLoading(true);
+    async function fetchAllDatabaseItemsOnce() {
+      console.log('[HomePage] Fetching all items from database ONCE...');
+      setAllExistingItemsLoading(true);
       try {
-        const itemsFromDb = await getAllItemsFromDb();
-        const filteredItems = authCurrentUser
-          ? itemsFromDb.filter(item => item.ownerId !== authCurrentUser.uid && (item.status === 'available' || item.status === 'pending'))
-          : itemsFromDb.filter(item => item.status === 'available' || item.status === 'pending'));
-        setAllBrowseItems(filteredItems);
-        console.log(`[HomePage] Loaded ${filteredItems.length} initial browse items.`);
+        const items = await getAllItemsFromDb();
+        setAllExistingItemsFromDb(items);
+        console.log(`[HomePage] Fetched ${items.length} total items ONCE from database.`);
       } catch (error: any) {
-        console.error("[HomePage] Error fetching initial browse items:", error.message, error.stack);
-        toast({ title: "Error", description: "Could not load items for browsing.", variant: "destructive" });
-        setAllBrowseItems([]);
+        console.error("[HomePage] Error fetching all items from database ONCE:", error.message, error.stack);
+        toast({ title: "Error", description: "Could not load all item data.", variant: "destructive" });
+        setAllExistingItemsFromDb([]);
       } finally {
-        setBrowseItemsLoading(false);
+        setAllExistingItemsLoading(false);
       }
     }
-    loadInitialBrowseItems();
-  }, [authCurrentUser, toast, searchResults]);
+    fetchAllDatabaseItemsOnce();
+  }, [toast]); // Runs once on mount, toast is a stable dependency
+
+  // Effect to set up initial browse items from allExistingItemsFromDb
+  useEffect(() => {
+    if (allExistingItemsLoading || searchResults !== null) {
+      // Wait for all items to be loaded or if a search is active, don't override browse items
+      if(searchResults !== null) console.log('[HomePage] Skipping initial browse items setup due to active search results.');
+      else console.log('[HomePage] Waiting for allExistingItemsFromDb to load before setting up browse items.');
+      return;
+    }
+
+    console.log('[HomePage] Setting up initial browse items from allExistingItemsFromDb...');
+    setBrowseItemsLoading(true); // Still use this for the browse section's own loading perception
+    try {
+      const filteredItems = authCurrentUser
+        ? allExistingItemsFromDb.filter(item => item.ownerId !== authCurrentUser.uid && (item.status === 'available' || item.status === 'pending'))
+        : allExistingItemsFromDb.filter(item => item.status === 'available' || item.status === 'pending'));
+      setAllBrowseItems(filteredItems);
+      console.log(`[HomePage] Setup ${filteredItems.length} initial browse items from allExistingItemsFromDb.`);
+    } catch (error: any) { // Should be less likely now as data is already fetched
+      console.error("[HomePage] Error filtering initial browse items:", error.message, error.stack);
+      toast({ title: "Error", description: "Could not prepare items for browsing.", variant: "destructive" });
+      setAllBrowseItems([]);
+    } finally {
+      setBrowseItemsLoading(false);
+    }
+  }, [authCurrentUser, toast, searchResults, allExistingItemsFromDb, allExistingItemsLoading]);
 
 
   const handleExecuteSearch = async (searchText: string) => {
@@ -105,11 +120,11 @@ export default function HomePage() {
   // Fetch user's items and AI suggestions
   useEffect(() => {
     async function fetchUserSpecificDataAndSuggestions() {
-      if (authLoading) {
-        console.log('[HomePage] Auth state loading, deferring user-specific data fetch.');
+      if (authLoading || allExistingItemsLoading) { // Also wait for allExistingItems to load
+        console.log(`[HomePage] Deferring user-specific data/suggestions. Auth Loading: ${authLoading}, All Items Loading: ${allExistingItemsLoading}`);
         return;
       }
-      console.log('[HomePage] Attempting to fetch user-specific data and AI suggestions.');
+      console.log('[HomePage] Attempting to fetch user-specific data and AI suggestions using pre-fetched allExistingItemsFromDb.');
       setOverallLoading(true);
       setUserItemSuggestions([]);
 
@@ -128,13 +143,15 @@ export default function HomePage() {
       }
       console.log(`[HomePage] User ${authCurrentUser.uid} authenticated. Fetching active listings.`);
       try {
+        // currentUserActiveListings still needs to be fetched per user
         const currentUserActiveListings = (await getItemsByUserId(authCurrentUser.uid)).filter(
           (item) => (item.listingType === 'offer' || item.listingType === 'want') && (item.status === 'available' || item.status === 'pending')
         );
         console.log(`[HomePage] Found ${currentUserActiveListings.length} active listings for user ${authCurrentUser.uid}.`);
 
-        const allItemsFromDatabase = await getAllItemsFromDb();
-        console.log(`[HomePage] Fetched ${allItemsFromDatabase.length} total items for matching pool.`);
+        // Use the already fetched allExistingItemsFromDb for the matching pool
+        const allItemsFromDatabase = allExistingItemsFromDb;
+        console.log(`[HomePage] Using ${allItemsFromDatabase.length} pre-fetched total items for matching pool.`);
 
         if (currentUserActiveListings.length === 0) {
           console.log(`[HomePage] No active listings for user ${authCurrentUser.uid}. Setting suggestions to "no-active-listings" state.`);
@@ -266,9 +283,9 @@ export default function HomePage() {
       setOverallLoading(false); 
     }
 
-    fetchAllUserItemMatches();
+    fetchUserSpecificDataAndSuggestions(); // Renamed from fetchAllUserItemMatches
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]); // Added dependencies
 
 
   return (

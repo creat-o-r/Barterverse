@@ -128,9 +128,10 @@ export default function SignUpPage() {
             {formError && (
               <p className="text-sm text-destructive text-center">{formError}</p>
             )}
-            {authError && !formError && ( // Display general auth error if not handled by form
+            {/* The following block displaying generic authError has been removed:
+            {authError && !formError && (
               <p className="text-sm text-destructive text-center">{(authError as AuthError).message || 'An authentication error occurred.'}</p>
-            )}
+            )} */}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting || authLoading}>

@@ -66,7 +66,7 @@ export default function Navbar() {
   const { currentUser, logout, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  // const isLoggedIn = !!currentUser; // This is already correct from previous step
+  const isLoggedIn = !!currentUser; // Ensure isLoggedIn is defined based on currentUser
   const unreadCount = 3; // Placeholder for unread chat count - will remain for now
 
   const handleLogout = async () => {
@@ -80,7 +80,7 @@ export default function Navbar() {
     }
   };
 
-  const filteredPrimaryNavLinks = primaryNavLinks.filter(link => !link.requiresAuth || isLoggedIn);
+  const filteredPrimaryNavLinks = primaryNavLinks.filter(link => !link.requiresAuth || isLoggedIn); // Now uses the correctly defined isLoggedIn
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">

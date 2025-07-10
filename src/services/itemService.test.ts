@@ -156,7 +156,7 @@ describe('itemService', () => {
 
     it('should find items by prefix text search (case-insensitive)', async () => {
       const results = await searchItems('alpha');
-      expect(results.length).toBe(2); // Alpha Test Item, Alphabet Soup, Alpha Another Category (but this one is available)
+      expect(results.length).toBe(3); // Corrected: Alpha Test Item, Alphabet Soup, Alpha Another Category
       expect(results.some(item => item.name === item1Name)).toBe(true);
       expect(results.some(item => item.name === item2Name)).toBe(true); // "alphabet"
       expect(results.some(item => item.name === item4Name)).toBe(true);
