@@ -282,7 +282,7 @@ export default function HomePage() {
       });
       setOverallLoading(false); 
     }
-    fetchUserSpecificDataAndSuggestions(); // Removed blank line before this call
+    fetchUserSpecificDataAndSuggestions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]);
 
