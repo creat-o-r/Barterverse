@@ -282,12 +282,11 @@ export default function HomePage() {
       });
       setOverallLoading(false); 
     }
-
-    fetchUserSpecificDataAndSuggestions();
+    fetchUserSpecificDataAndSuggestions(); // Removed blank line before this call
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]); // Correctly closes useEffect
+  }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]);
 
-  return ( // This is the main return for HomePage
+  return (
     <div className="space-y-8">
       
 
