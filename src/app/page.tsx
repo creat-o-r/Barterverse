@@ -74,7 +74,7 @@ export default function HomePage() {
     try {
       const filteredItems = authCurrentUser
         ? allExistingItemsFromDb.filter(item => item.ownerId !== authCurrentUser.uid && (item.status === 'available' || item.status === 'pending'))
-        : allExistingItemsFromDb.filter(item => item.status === 'available' || item.status === 'pending'); // Corrected: removed extra parenthesis
+        : allExistingItemsFromDb.filter(item => item.status === 'available' || item.status === 'pending');
       setAllBrowseItems(filteredItems);
       console.log(`[HomePage] Setup ${filteredItems.length} initial browse items from allExistingItemsFromDb.`);
     } catch (error: any) {

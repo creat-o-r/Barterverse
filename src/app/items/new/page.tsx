@@ -312,10 +312,10 @@ function NewItemPageContent() {
     }
   }
 
-  const { currentUser: authCurrentUser, loading: authLoading } = useAuth(); // Get actual auth user
+  // const { currentUser: authCurrentUser, loading: authLoading } = useAuth(); // REMOVED: Duplicate declaration
 
   const isLoadingAi = isSuggestingCategory || isInferringListingType;
-  // Ensure authCurrentUser is loaded before enabling the form or removing loading state
+  // Ensure authCurrentUser (from top of component scope) is loaded before enabling the form or removing loading state
   const isLoadingOverall = isLoadingAi || isSubmitting || authLoading || !authCurrentUser;
 
   // Update onSubmit to use the real authCurrentUser.uid for ownerId
