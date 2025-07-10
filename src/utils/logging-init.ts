@@ -12,19 +12,16 @@ import { setupGlobalErrorLogging } from './client-error-logger';
 
 // Auto-execute when imported (IIFE pattern)
 if (typeof window !== 'undefined') {
-  // Only activate in production/staging or when explicitly enabled
-  const shouldActivate = 
-    process.env.NODE_ENV === 'production' || 
-    process.env.NEXT_PUBLIC_ENABLE_ERROR_LOGGING === 'true';
+  // Only disable if explicitly disabled
+  const shouldDisable = process.env.NEXT_PUBLIC_DISABLE_ERROR_LOGGING === 'true';
 
-  if (shouldActivate) {
+  if (!shouldDisable) {
     // Initialize global error logging
     setupGlobalErrorLogging({
       // Optional: Add default context for all errors
       additionalContext: {
         environment: process.env.NODE_ENV,
-        buildTime: process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString(),
-        version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0'
+        timestamp: new Date().toISOString()
       }
     });
 
