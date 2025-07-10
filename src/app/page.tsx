@@ -286,7 +286,7 @@ export default function HomePage() {
     fetchUserSpecificDataAndSuggestions(); // Renamed from fetchAllUserItemMatches
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]); // Added dependencies
-
+} // <<< ADDED MISSING CLOSING BRACE FOR useEffect CALLBACK BODY
 
   return (
     <div className="space-y-8">
