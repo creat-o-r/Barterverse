@@ -1,4 +1,6 @@
 
+'use client'; // Add use client directive
+
 import { use, Suspense, useState, useEffect } from 'react'; // Added useState, useEffect
 import Image from 'next/image';
 import Link from 'next/link';

@@ -74,10 +74,10 @@ export default function HomePage() {
     try {
       const filteredItems = authCurrentUser
         ? allExistingItemsFromDb.filter(item => item.ownerId !== authCurrentUser.uid && (item.status === 'available' || item.status === 'pending'))
-        : allExistingItemsFromDb.filter(item => item.status === 'available' || item.status === 'pending'));
+        : allExistingItemsFromDb.filter(item => item.status === 'available' || item.status === 'pending'); // Corrected: removed extra parenthesis
       setAllBrowseItems(filteredItems);
       console.log(`[HomePage] Setup ${filteredItems.length} initial browse items from allExistingItemsFromDb.`);
-    } catch (error: any) { // Should be less likely now as data is already fetched
+    } catch (error: any) {
       console.error("[HomePage] Error filtering initial browse items:", error.message, error.stack);
       toast({ title: "Error", description: "Could not prepare items for browsing.", variant: "destructive" });
       setAllBrowseItems([]);

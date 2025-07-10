@@ -109,7 +109,7 @@ function NewItemPageContent() {
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { currentUser: authCurrentUser, userProfile, loading: authLoading } = useAuth(); // Get userProfile here
+  const { currentUser: authCurrentUser, userProfile, loading: authLoading } = useAuth();
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
