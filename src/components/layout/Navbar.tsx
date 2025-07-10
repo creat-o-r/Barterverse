@@ -4,8 +4,8 @@
 import Link from 'next/link';
 import React from 'react'; // Import React for React.cloneElement
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus } from 'lucide-react';
+// import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Not used currently
+import { Package, PlusCircle, UserCircle, MessageSquare, LogIn, UserPlus, LogOut, Loader2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,16 +14,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGlobalFilter } from '@/contexts/GlobalFilterContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 // Define link configurations
 const primaryNavLinks = [
-  { href: '/', label: 'Match', icon: <Package className="h-4 w-4" /> },
-  { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" /> },
+  { href: '/', label: 'Match', icon: <Package className="h-4 w-4" />, requiresAuth: false },
+  { href: '/items/new', label: 'List Item', icon: <PlusCircle className="h-4 w-4" />, requiresAuth: true },
   {
     href: '/chats',
     label: 'Chats',
     icon: <MessageSquare className="h-4 w-4" />,
-    hasNotification: true
+    hasNotification: true,
+    requiresAuth: true,
   },
 ];
 const profileLinkConfig = { href: '/profile/me', label: 'Profile', icon: <UserCircle className="h-4 w-4" /> };
@@ -59,8 +63,24 @@ function GlobalCategoryFilter() {
 
 
 export default function Navbar() {
-  const isLoggedIn = true; // Placeholder for auth state
-  const unreadCount = 3; // Placeholder for unread chat count
+  const { currentUser, logout, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  // const isLoggedIn = !!currentUser; // This is already correct from previous step
+  const unreadCount = 3; // Placeholder for unread chat count - will remain for now
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({ title: "Signed Out", description: "You have been successfully signed out." });
+      router.push('/'); // Redirect to home or login page after logout
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast({ title: "Logout Failed", description: "Could not sign you out. Please try again.", variant: "destructive" });
+    }
+  };
+
+  const filteredPrimaryNavLinks = primaryNavLinks.filter(link => !link.requiresAuth || isLoggedIn);
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
@@ -75,7 +95,7 @@ export default function Navbar() {
 
           {/* Center: Primary Nav Icons */}
           <nav className="flex items-center gap-1"> 
-            {primaryNavLinks.map((link) => (
+            {filteredPrimaryNavLinks.map((link) => (
               <Button key={`mobile-icon-${link.label}`} variant="ghost" size="icon" asChild>
                 <Link href={link.href} aria-label={link.label} className="relative flex items-center justify-center w-9 h-9">
                   {React.cloneElement(link.icon, { className: "h-5 w-5" })}
@@ -90,13 +110,18 @@ export default function Navbar() {
           </nav>
 
           {/* Right: Auth/Profile Icons */}
-          <div className="flex-none flex items-center gap-0.5 ml-auto"> 
-            {isLoggedIn ? (
+          <div className="flex-none flex items-center gap-0.5 ml-auto">
+            {authLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : isLoggedIn ? (
               <>
                 <Button key="mobile-profile-icon" variant="ghost" size="icon" asChild>
                   <Link href={profileLinkConfig.href} aria-label={profileLinkConfig.label} className="flex items-center justify-center w-9 h-9">
                     {React.cloneElement(profileLinkConfig.icon, { className: "h-5 w-5" })}
                   </Link>
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Logout" className="flex items-center justify-center w-9 h-9">
+                  <LogOut className="h-5 w-5" />
                 </Button>
               </>
             ) : (
@@ -121,7 +146,7 @@ export default function Navbar() {
           <div className="mr-4"> 
              <GlobalCategoryFilter />
           </div>
-          {primaryNavLinks.map((link) => (
+          {filteredPrimaryNavLinks.map((link) => (
             <Button key={link.label} variant="ghost" asChild>
               <Link href={link.href} className="relative flex items-center gap-2 text-sm px-3 py-2">
                 {link.icon}
@@ -136,23 +161,35 @@ export default function Navbar() {
           ))}
         </nav>
 
-        <div className="ml-auto hidden md:flex items-center">
-          {isLoggedIn ? (
-            <Button variant="ghost" asChild className="flex items-center gap-2 text-sm px-3 py-2">
-              <Link href={profileLinkConfig.href}>
-                {React.cloneElement(profileLinkConfig.icon, { className: "h-4 w-4" })}
-                {profileLinkConfig.label}
-              </Link>
-            </Button>
+        <div className="ml-auto hidden md:flex items-center gap-2">
+          {authLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : isLoggedIn ? (
+            <>
+              <Button variant="ghost" asChild className="flex items-center gap-2 text-sm px-3 py-2">
+                <Link href={profileLinkConfig.href}>
+                  {React.cloneElement(profileLinkConfig.icon, { className: "h-4 w-4" })}
+                  {profileLinkConfig.label}
+                </Link>
+              </Button>
+              {/* Display user email or name if available */}
+              {currentUser.email && (
+                <span className="text-sm text-muted-foreground hidden lg:inline">{currentUser.email}</span>
+              )}
+              <Button variant="outline" size="sm" onClick={handleLogout} className="flex items-center gap-1.5">
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </Button>
+            </>
           ) : (
-             <div className="flex items-center gap-2">
+             <>
               <Button variant="default" size="sm" asChild>
                 <Link href="/auth/signin">Login</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link href="/auth/signup">Sign Up</Link>
               </Button>
-            </div>
+            </>
           )}
         </div>
       </div>

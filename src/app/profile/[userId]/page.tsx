@@ -1,11 +1,14 @@
 
 "use client";
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, ReactNode } from 'react'; // Added ReactNode
 import Image from 'next/image';
-import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
+import { getUserProfile as getUserProfileFromDb, updateUserProfile } from '@/services/userService'; // Import userService
+import { getItemsByUserId } from '@/services/itemService'; // Import itemService
 import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, ItemDeliveryMethod } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useRouter } from 'next/navigation'; // Import useRouter for redirection
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,23 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
-
-async function getUserProfile(userId: string): Promise<User | null> {
-  const actualUserId = userId === 'me' ? dummyUsers[0].id : userId;
-  const user = dummyUsers.find((u) => u.id === actualUserId);
-  if (!user) return null;
-  
-  if (user.minimumMatchRating === undefined) {
-    user.minimumMatchRating = 'Low';
-  }
-  if (user.logisticsPreferences && !user.logisticsPreferences.defaultDeliveryMethods) {
-    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only'];
-  }
-
-
-  const userItemsFromGlobal = dummyItems.filter(item => item.ownerId === user.id);
-  return JSON.parse(JSON.stringify({...user, items: userItemsFromGlobal}));
-}
+// Removed local getUserProfile function. Will use services directly.
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
 const tradeTimingTextMap: Record<TradeTimingPreference, string> = { 'simultaneous': 'Prefers Simultaneous', 'staged': 'Open to Staged Trades', 'flexible': 'Flexible Timing', };
@@ -61,10 +48,11 @@ const getChainDeliveryBadgeText = (openToChain?: boolean): string | null => {
 
 
 const preparePreferenceInferenceInput = (user: User | null): InferUserPreferencesInput | null => {
-  if (!user) return null;
+  if (!user || !user.items) return null; // Ensure user and user.items exist
 
-  const userListedItems = dummyItems
-    .filter(i => i.ownerId === user.id && (i.status === 'available' || i.status === 'pending'))
+  // Use user.items (already fetched from Firestore)
+  const userListedItems = user.items
+    .filter(i => (i.status === 'available' || i.status === 'pending')) // ownerId check is implicitly done by getItemsByUserId
     .slice(0, 5) 
     .map(item => ({
       name: item.name,
@@ -128,32 +116,63 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
   const [showActivityForAI, setShowActivityForAI] = useState(false);
   const [activityInputForAI, setActivityInputForAI] = useState<InferUserPreferencesInput | null>(null);
   const { toast } = useToast();
+  const { currentUser: authCurrentUser, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-  const currentViewingUserId = dummyUsers[0].id; 
-  const isOwnProfile = resolvedParams.userId === 'me' || resolvedParams.userId === currentViewingUserId;
+  // Determine if this is the authenticated user's own profile
+  const isOwnProfile = resolvedParams.userId === 'me' || (authCurrentUser?.uid && resolvedParams.userId === authCurrentUser.uid);
+  const effectiveUserId = resolvedParams.userId === 'me' ? authCurrentUser?.uid : resolvedParams.userId;
 
   useEffect(() => {
     async function loadUserProfileAndSettings() {
-      setLoading(true);
-      const profile = await getUserProfile(resolvedParams.userId);
-      setUser(profile);
-      if (isOwnProfile) {
-        const allowInference = await getEnableAutomaticPreferenceInference();
-        setAllowAutoPreferenceInference(allowInference);
-        if (profile) {
-            setActivityInputForAI(preparePreferenceInferenceInput(profile));
-        }
+      if (!effectiveUserId) {
+        // If 'me' and not logged in, or no userId, then nothing to load.
+        // Auth check below will handle redirection if needed for 'me'.
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+      setLoading(true);
+      try {
+        const profileData = await getUserProfileFromDb(effectiveUserId);
+        if (profileData) {
+          const userItems = await getItemsByUserId(effectiveUserId);
+          // Ensure items are part of the user object for preparePreferenceInferenceInput and rendering
+          const fullProfile = { ...profileData, items: userItems };
+          setUser(fullProfile);
+
+          if (isOwnProfile && fullProfile) {
+            const allowInference = await getEnableAutomaticPreferenceInference();
+            setAllowAutoPreferenceInference(allowInference);
+            // preparePreferenceInferenceInput expects items on the user object
+            setActivityInputForAI(preparePreferenceInferenceInput(fullProfile));
+          }
+        } else {
+          setUser(null); // User not found
+        }
+      } catch (error) {
+        console.error("Error loading user profile and items:", error);
+        setUser(null);
+        toast({ title: "Error", description: "Could not load user profile.", variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
     }
-    if (resolvedParams.userId) {
-        loadUserProfileAndSettings();
+    loadUserProfileAndSettings();
+  }, [resolvedParams.userId, effectiveUserId, isOwnProfile, toast]); // Added toast to deps
+
+  // Auth check: If accessing 'me' profile and not authenticated (after initial auth load)
+  useEffect(() => {
+    if (resolvedParams.userId === 'me' && !authLoading && !authCurrentUser) {
+      router.push('/auth/signin');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedParams.userId, isOwnProfile]); 
+  }, [resolvedParams.userId, authLoading, authCurrentUser, router]);
+
 
   const handleLearnPreferences = async () => {
-    if (!user) return;
+    if (!user || !authCurrentUser || user.id !== authCurrentUser.uid) { // Ensure it's own profile for learning
+        toast({title: "Error", description: "Cannot learn preferences for another user.", variant: "destructive"});
+        return;
+    }
     setIsLearningPreferences(true);
     const currentActivityInput = preparePreferenceInferenceInput(user); 
     setActivityInputForAI(currentActivityInput); 
@@ -170,16 +189,24 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
       if (result.errorMessage || !result.suggestedPreferences) {
         toast({ title: "AI Preference Learning Error", description: result.errorMessage || "Could not infer preferences.", variant: "destructive" });
       } else {
-        
-        const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences as InferredUserPreferences);
-        if (updateSuccess) {
-          const updatedProfile = await getUserProfile(user.id); 
-          setUser(updatedProfile); 
-          if(updatedProfile) setActivityInputForAI(preparePreferenceInferenceInput(updatedProfile));
+        try {
+          // Update user profile in Firestore
+          await updateUserProfile(user.id, result.suggestedPreferences as Partial<User>);
 
-          toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
-        } else {
-          toast({ title: "Error Updating Preferences", description: "Could not save the learned preferences locally.", variant: "destructive" });
+          // Refetch the full profile including items
+          const profileData = await getUserProfileFromDb(user.id);
+          if (profileData) {
+            const userItems = await getItemsByUserId(user.id);
+            const fullProfile = { ...profileData, items: userItems };
+            setUser(fullProfile);
+            if(fullProfile) setActivityInputForAI(preparePreferenceInferenceInput(fullProfile));
+            toast({ title: "AI Learned Preferences!", description: `Preferences updated. Confidence: ${result.confidence}. Reasoning: ${result.reasoning || 'N/A'}`, duration: 7000 });
+          } else {
+            toast({ title: "Error Fetching Updated Profile", description: "Preferences saved, but could not refetch profile.", variant: "destructive" });
+          }
+        } catch (updateError: any) {
+          console.error("Error updating user preferences in Firestore:", updateError);
+          toast({ title: "Error Saving Preferences", description: updateError.message || "Could not save learned preferences to the database.", variant: "destructive" });
         }
       }
     } catch (error: any) {
@@ -190,11 +217,23 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
     }
   };
 
+  if (authLoading && resolvedParams.userId === 'me' && !authCurrentUser) {
+    // Show loading state specifically for 'me' profile while auth is resolving
+    return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />Verifying user session...</div>;
+  }
+
   if (loading) {
     return <div className="text-center py-10 font-body flex items-center justify-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />Loading profile...</div>;
   }
+
+  // If trying to access 'me' but not logged in (and auth is done loading), this message will show before redirection effect kicks in.
+  if (resolvedParams.userId === 'me' && !authCurrentUser) {
+    return <div className="text-center py-10 font-body">Please sign in to view your profile. Redirecting...</div>;
+  }
+
   if (!user) {
-    return <div className="text-center py-10 font-body">User not found.</div>;
+    // This can happen if a specific userId is invalid, or if 'me' was requested but user data couldn't be loaded (e.g. new user not in dummy data)
+    return <div className="text-center py-10 font-body">User profile not found for ID: {effectiveUserId || resolvedParams.userId}.</div>;
   }
 
   const offeredItems = user.items.filter(item => item.listingType === 'offer' && (item.status === 'available' || item.status === 'pending'));

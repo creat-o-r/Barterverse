@@ -1,6 +1,18 @@
 // Test file for item-match-flow.ts - Core matching algorithm
 
 import type { ItemMatchInput, ItemMatchOutput } from './item-match-flow';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getFirestore, connectFirestoreEmulator, clearFirestoreData, terminate } from 'firebase/firestore';
+import { firebaseConfig } from '@/lib/firebaseConfig';
+import { createUserProfileDocument as seedUserProfile } from '@/services/userService'; // To seed user profiles
+import type { User as AppUserType, UserProfilePreferences } from '@/types';
+
+
+// --- Firebase Test Setup ---
+let testApp: any;
+let testDb: any;
+const PROJECT_ID = firebaseConfig.projectId;
+
 
 // Mock the genkit module completely
 jest.mock('@/ai/genkit', () => {
@@ -28,21 +40,9 @@ jest.mock('../../services/ai-diagnostic-log-service', () => ({
   logAIDiagnostic: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/dummy-data', () => ({
-  dummyUsers: [
-    {
-      id: 'user-1',
-      name: 'Test User',
-      minimumMatchRating: 'Medium',
-      motivations: ['help-others'],
-      locationPreference: { isSensitive: false },
-      tradeTimingPreference: 'flexible',
-      interestedInThirdPartyFulfillment: true,
-    },
-  ],
-}));
+// REMOVE: jest.mock('@/lib/dummy-data', ...) - No longer mocking dummy data
 
-// Import after mocking
+// Import after mocking genkit and other services, but BEFORE describe block
 import { suggestMatchingItems } from './item-match-flow';
 import * as genkitModule from '@/ai/genkit';
 import * as aiConfigService from '../../services/ai-config-service';
@@ -56,10 +56,34 @@ let originalConsoleError: typeof console.error;
 let originalConsoleWarn: typeof console.warn;
 
 describe('Item Match Flow', () => {
-  beforeEach(() => {
+  beforeAll(async () => {
+    testApp = initializeApp(firebaseConfig, `item-match-flow-test-app-${Date.now()}`);
+    testDb = getFirestore(testApp);
+    try {
+      // Note: item-match-flow.ts uses client SDK for userService, which uses the main `db` instance.
+      // For these tests to work against the emulator via userService, the MAIN `db` instance
+      // (from @/lib/firebaseConfig) needs to be connected to the emulator.
+      // This is usually handled by `connectToEmulators()` in `ClientLayoutWrapper` for the app,
+      // or by setting FIRESTORE_EMULATOR_HOST for test environments.
+      // The `connectFirestoreEmulator(testDb, ...)` here configures this specific `testDb` instance.
+      // If userService uses the global `db` from firebaseConfig, that global `db` must also point to emulator.
+      // Assuming FIRESTORE_EMULATOR_HOST is set for Jest tests, or connectToEmulators() is called in a global setup.
+      connectFirestoreEmulator(testDb, 'localhost', 8080); // Connects this testDb instance
+    } catch (e) { /* console.warn('ItemMatchFlowTest: Emulator connection error', e); */ }
+  });
+
+  afterAll(async () => {
+    if (testDb) await terminate(testDb);
+    if (testApp) await deleteApp(testApp);
+  });
+
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockPromptFn.mockReset();
     
+    // Clear Firestore data
+    try { await clearFirestoreData({ projectId: PROJECT_ID }); } catch (e) { /* console.error('ItemMatchFlowTest: Firestore clear error', e); */ }
+
     // Mock console methods
     originalConsoleError = console.error;
     originalConsoleWarn = console.warn;
@@ -176,9 +200,51 @@ describe('Item Match Flow', () => {
   });
 
   describe('Advanced Mode Matching', () => {
-    beforeEach(() => {
+    beforeEach(async () => { // Made async
       (aiConfigService.getAIMatchingMode as jest.Mock).mockResolvedValue('advanced');
       (aiConfigService.getUseUserProfilePreferencesInMatching as jest.Mock).mockResolvedValue(true);
+
+      // Seed a user profile for 'user-1' for advanced mode tests
+      // Note: The actual Firebase Auth user object isn't created here, just the Firestore profile.
+      // The flow's `input.triggeringUserId` is what's used to fetch this profile.
+      // This means we are testing the flow's ability to use profile data from Firestore,
+      // not its interaction with Firebase Auth itself (which is out of scope for this flow).
+      const userProfileData: Partial<AppUserType> = {
+        // id: 'user-1', // doc ID will be 'user-1'
+        uid: 'user-1', // Ensure uid field if userService expects it for merging
+        email: 'user1@example.com', // Required by AppUserType
+        name: 'Test User 1',
+        minimumMatchRating: 'Medium',
+        motivations: ['help-others'],
+        locationPreference: { isSensitive: false },
+        tradeTimingPreference: 'flexible',
+        interestedInThirdPartyFulfillment: true,
+        // Add other fields as per AppUserType to make it valid if userService.createUserProfileDocument is strict
+        // For now, assuming these are the key ones for the flow's preference logic.
+        // The createUserProfileDocument in userService.ts has defaults, so we only need to provide what we want to override.
+      };
+      // Using a simplified way to seed for test, directly using setDoc or a specific seed function might be cleaner
+      // For now, let's assume a simplified seeding or that createUserProfileDocument handles partial data well.
+      // This seedUserProfile is a bit of a misnomer if we don't pass a FirebaseUser.
+      // Let's adjust this to be more direct for testing profile data presence.
+      // A better approach would be to have a dedicated seeding function in userService or use setDoc.
+      // For now, this simulates the profile data structure userService.getUserProfile would return.
+      // Use the main 'db' instance that the userService will use.
+      const { db: mainDb, firebaseConfig: mainConfig } = await import('@/lib/firebaseConfig'); // Use main db
+      const { doc: fbDoc, setDoc: fbSetDoc, serverTimestamp: fbServerTimestamp } = await import('firebase/firestore');
+
+      // Ensure mainDb is connected to emulator if not already by global setup
+      // This is a bit of a hack here; ideally, global setup handles this.
+      // The connectToEmulators in firebaseConfig should handle it if NODE_ENV=test.
+      // For robustness, one might explicitly call connectFirestoreEmulator(mainDb, 'localhost', 8080)
+      // in a global jest setup or ensure NODE_ENV=test is correctly set.
+
+      const userDocRef = fbDoc(mainDb, 'users', 'user-1');
+      await fbSetDoc(userDocRef, {
+        ...userProfileData,
+        createdAt: fbServerTimestamp(),
+        updatedAt: fbServerTimestamp()
+      });
     });
 
     test('should return successful matches in advanced mode with preferences', async () => {

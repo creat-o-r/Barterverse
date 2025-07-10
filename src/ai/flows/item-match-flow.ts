@@ -14,8 +14,9 @@ import {ai} from '../genkit';
 import {z}from 'genkit';
 import { logMatchSuggestion } from '../../services/match-report-service';
 import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '../../services/ai-config-service';
-import { dummyUsers } from '../../lib/dummy-data'; // For fetching user preferences
-import type { UserProfilePreferences } from '../../types';
+// import { dummyUsers } from '../../lib/dummy-data'; // To be removed
+import { getUserProfile as getUserProfileFromDb } from '../../services/userService'; // Import userService
+import type { UserProfilePreferences, User as AppUserType } from '../../types'; // Added AppUserType
 import { logAIDiagnostic } from '../../services/ai-diagnostic-log-service';
 
 const ItemBriefSchema = z.object({
@@ -260,7 +261,9 @@ const itemMatchFlow = ai.defineFlow(
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
-      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      // Fetch user profile from Firestore
+      const userProfile: AppUserType | null = await getUserProfileFromDb(input.triggeringUserId);
+
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
       let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";

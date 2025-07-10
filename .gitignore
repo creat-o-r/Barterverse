@@ -64,3 +64,6 @@ tsconfig.tsbuildinfo
 
 # Test coverage
 coverage/
+
+# Firebase Emulator Data
+firebase-emulator-data/

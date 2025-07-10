@@ -1,8 +1,11 @@
 
-import { use, Suspense } from 'react';
+import { use, Suspense, useState, useEffect } from 'react'; // Added useState, useEffect
 import Image from 'next/image';
 import Link from 'next/link';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
+// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Already marked for removal
+import { getItemById as getItemFromDb } from '@/services/itemService';
+import { getUserProfile as getUserProfileFromDb } from '@/services/userService';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod, ItemTiming } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -17,10 +20,19 @@ import { format } from 'date-fns';
 import SpecificationsDisplay from '@/components/items/SpecificationsDisplay'; // Import the new client component
 
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
-  const item = dummyItems.find((i) => i.id === itemId);
-  if (!item) return null;
-  const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) return null;
+  const item = await getItemFromDb(itemId);
+  if (!item || !item.ownerId) {
+    console.warn(`Item not found or ownerId missing for itemId: ${itemId}`);
+    return null;
+  }
+
+  const owner = await getUserProfileFromDb(item.ownerId);
+  if (!owner) {
+    console.warn(`Owner profile not found for ownerId: ${item.ownerId} (item: ${itemId})`);
+    // Decide if item should be returned without owner, or fail. For now, fail.
+    // Alternatively, return item with a placeholder owner or partial data if acceptable.
+    return null;
+  }
   return { item, owner };
 }
 
@@ -113,10 +125,47 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
   );
 }
 
-async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
-  const itemDetails = await getItemDetails(itemId);
+// Make ItemDetailsDisplay a client component to use hooks
+// It will fetch its own data based on itemId prop.
+function ItemDetailsDisplay({ itemId }: { itemId: string }) {
+  const [itemDetails, setItemDetails] = useState<{ item: Item; owner: User } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { currentUser: authCurrentUser, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    async function loadDetails() {
+      if (!itemId) {
+        console.warn('[ItemDetailsDisplay] No itemId provided.');
+        setLoading(false);
+        return;
+      }
+      console.log(`[ItemDetailsDisplay] Loading details for item ID: ${itemId}`);
+      setLoading(true);
+      try {
+        const details = await getItemDetails(itemId);
+        setItemDetails(details);
+        if (details) {
+          console.log(`[ItemDetailsDisplay] Successfully loaded details for item: ${details.item.name}`);
+        } else {
+          console.warn(`[ItemDetailsDisplay] No details found for item ID: ${itemId}`);
+        }
+      } catch (error: any) {
+        console.error(`[ItemDetailsDisplay] Failed to load item details for ${itemId}:`, error.message, error.stack);
+        setItemDetails(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDetails();
+  }, [itemId]);
+
+  if (loading || authLoading) {
+    console.log(`[ItemDetailsDisplay] Render: Loading state (loading: ${loading}, authLoading: ${authLoading}) for item: ${itemId}`);
+    return <ItemPageLoadingState />;
+  }
 
   if (!itemDetails) {
+    console.log(`[ItemDetailsDisplay] Render: Item not found for ID: ${itemId}`);
     return (
       <div className="space-y-8">
         <Card>
@@ -126,10 +175,10 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
       </div>
     );
   }
-
+  console.log(`[ItemDetailsDisplay] Render: Displaying item "${itemDetails.item.name}" (ID: ${itemId})`);
   const { item, owner } = itemDetails;
-  const currentUserId = dummyUsers[0]?.id || 'user1_fallback';
-  const isCurrentUserOwner = item.ownerId === currentUserId;
+  const currentUserId = authCurrentUser?.uid;
+  const isCurrentUserOwner = currentUserId ? item.ownerId === currentUserId : false;
 
   return (
     <div className="space-y-8">
