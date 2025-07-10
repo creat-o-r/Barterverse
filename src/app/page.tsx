@@ -286,6 +286,7 @@ export default function HomePage() {
     fetchUserSpecificDataAndSuggestions(); // Renamed from fetchAllUserItemMatches
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]); // This line is the end of the useEffect
+  ; // Added semicolon as a potential fix for "Expected a semicolon" error
 
   return ( // This is the main return for HomePage
     <div className="space-y-8">
