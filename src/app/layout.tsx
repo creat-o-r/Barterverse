@@ -1,8 +1,6 @@
 
 import type { Metadata } from 'next';
 import './globals.css';
-// Initialize global error logging (separate from app logic)
-import '../utils/logging-init';
 // Toaster will be handled by ClientLayoutWrapper
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
