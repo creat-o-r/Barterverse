@@ -1,4 +1,6 @@
 
+'use client'; // Moved to the top
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Repeat, CheckCircle, XCircle, Hourglass, Bot } from 'lucide-react';
 import type { TradeOffer } from '@/types'; 
@@ -6,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
-'use client'; // Add use client directive
 
 import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
 import { Separator } from '@/components/ui/separator';
