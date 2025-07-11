@@ -119,7 +119,7 @@ export default function HomePage() {
 
   // Fetch user's items and AI suggestions
   useEffect(() => {
-    async function fetchUserSpecificDataAndSuggestions() {
+    (async () => { // Start of IIFE
       if (authLoading || allExistingItemsLoading) { // Also wait for allExistingItems to load
         console.log(`[HomePage] Deferring user-specific data/suggestions. Auth Loading: ${authLoading}, All Items Loading: ${allExistingItemsLoading}`);
         return;
@@ -211,13 +211,13 @@ export default function HomePage() {
         try {
           console.log(`[HomePage] Calling suggestMatchingItems AI flow for user item: ${userItem.id}`);
           const result: ItemMatchOutput = await suggestMatchingItems({
-            triggeringUserId: authCurrentUser.uid, // Use authCurrentUser.uid
+            triggeringUserId: authCurrentUser.uid,
             currentItem: {
               id: userItem.id,
               name: userItem.name,
               description: userItem.description,
               category: userItem.category,
-              ownerId: userItem.ownerId, // This is authCurrentUser.uid
+              ownerId: userItem.ownerId,
               listingType: userItem.listingType,
               isGiftItForward: userItem.isGiftItForward || false,
               openToAnyOpportunity: userItem.openToAnyOpportunity || false,
@@ -245,12 +245,6 @@ export default function HomePage() {
           if (settledResult.status === 'fulfilled') {
             const { index, success, data, error: promiseError } = settledResult.value;
             if (success && data) {
-              // `allItemsFromDatabase` should be available in this scope from the parent useEffect
-              // If not, it needs to be passed or fetched again, but ideally fetched once.
-              // For now, assuming it's available or passed down if this effect is refactored.
-              // Let's assume `allItemsFromDatabase` is accessible here.
-              // If `fetchAllUserItemMatches` is kept separate, `allItemsFromDatabase` must be passed to it.
-              // For this refactor, I included its fetching inside `fetchUserSpecificDataAndSuggestions`.
               const itemsWithScores = (data.suggestedMatches || []).map(match => {
                 const itemDetails = allItemsFromDatabase.find(dItem => dItem.id === match.itemId);
                 return itemDetails ? {
@@ -281,8 +275,13 @@ export default function HomePage() {
         return newSuggestions;
       });
       setOverallLoading(false); 
-    }; // Added semicolon after function definition
-    fetchUserSpecificDataAndSuggestions();
+    } catch (error: any) { // Catch errors from getItemsByUserId or getAllItemsFromDb if they occur before try-block for suggestions
+        console.error('[HomePage] Error in outer try-catch of fetchUserSpecificDataAndSuggestions:', error.message, error.stack);
+        setUserItemSuggestions([]); // Clear suggestions
+        setOverallLoading(false); // Ensure loading is stopped
+        toast({ title: "Error Loading Suggestions", description: "Could not load data needed for AI suggestions.", variant: "destructive" });
+    }
+  })(); // Immediately invoke the async function
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]);
 
