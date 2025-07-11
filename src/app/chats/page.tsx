@@ -1,4 +1,6 @@
 
+'use client'; // Moved to the top
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Repeat, CheckCircle, XCircle, Hourglass, Bot } from 'lucide-react';
 import type { TradeOffer } from '@/types'; 
@@ -6,8 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
+
 import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
 import { Separator } from '@/components/ui/separator';
+import PrivateRoute from '@/components/auth/PrivateRoute'; // Import PrivateRoute
+import { useAuth } from '@/contexts/AuthContext'; // To get current user
 
 // Reusing dummyTrades for now, ideally this comes from a service
 const dummyTrades: TradeOffer[] = [
@@ -70,9 +75,22 @@ const StatusIcon = ({ status }: { status: TradeOffer['status'] }) => {
   }
 };
 
-export default function ChatsPage() {
-  // Simulate current user, in a real app this comes from auth
-  const currentUserId = 'user1'; 
+function ChatsPageContent() {
+  const { currentUser } = useAuth(); // Get the authenticated user
+
+  // If currentUser is null or loading, PrivateRoute would ideally handle it.
+  // But if we reach here and it's null, it's an issue or still loading.
+  // For now, we'll assume PrivateRoute has done its job and currentUser is available.
+  // If not, the page might show errors or incorrect data.
+  // A robust implementation might show a loading spinner here too if currentUser is null and auth is still loading.
+  const currentUserId = currentUser ? currentUser.uid : null;
+
+
+  if (!currentUserId) {
+    // This should ideally not be reached if PrivateRoute is working correctly.
+    // It serves as a fallback or indicates that PrivateRoute might not be used at the top level of this page yet.
+    return <div className="text-center py-10">Please sign in to view your chats.</div>;
+  }
 
   const activeChats = dummyTrades.filter(trade => 
     (trade.offeringUserId === currentUserId || trade.receivingUserId === currentUserId) &&
@@ -171,5 +189,14 @@ export default function ChatsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// New default export using PrivateRoute
+export default function ChatsPageProtected() {
+  return (
+    <PrivateRoute>
+      <ChatsPageContent />
+    </PrivateRoute>
   );
 }

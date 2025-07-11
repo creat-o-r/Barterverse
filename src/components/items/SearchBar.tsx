@@ -6,22 +6,20 @@ import { Search, Filter } from 'lucide-react';
 import { useState } from 'react';
 
 interface SearchBarProps {
-  onSearch?: (query: string) => void;
+  executeSearch: (query: string) => void; // Changed prop name and made it required for now
   onFilterToggle?: () => void;
 }
 
-export default function SearchBar({ onSearch, onFilterToggle }: SearchBarProps) {
+export default function SearchBar({ executeSearch, onFilterToggle }: SearchBarProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSearch) {
-      onSearch(searchTerm);
-    }
+    executeSearch(searchTerm); // Call the new prop
   };
 
   return (
-    <form onSubmit={handleSearch} className="flex gap-2 mb-8">
+    <form onSubmit={handleSubmit} className="flex gap-2 mb-8">
       <div className="relative flex-grow">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <Input

@@ -25,8 +25,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data';
-import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming } from '@/types';
+// import { addNewItemToDummyData, dummyUsers } from '@/lib/dummy-data'; // To be removed
+import { createItem } from '@/services/itemService'; // Import createItem
+import type { User, UserStoredLocation, ItemLogisticsLocationType, ItemDeliveryMethod, ItemLogistics, ItemTimingType, ItemTiming, Item as AppItemType } from '@/types';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link'; // Added Link
 import { Separator } from '@/components/ui/separator';
@@ -100,20 +101,15 @@ const deliveryMethodMapConcrete: Record<ItemDeliveryMethod, string> = {
   flexible_meetup: "Flexible Meetup",
 };
 
-
-export default function NewItemPage() {
+// Renamed original component
+function NewItemPageContent() {
   const { toast } = useToast();
   const router = useRouter();
   const { selectedCategory: globalSelectedCategory } = useGlobalFilter();
   const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
   const [isInferringListingType, setIsInferringListingType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const user = dummyUsers.find(u => u.id === 'user1');
-    setCurrentUser(user || null);
-  }, []);
+  const { currentUser: authCurrentUser, userProfile, loading: authLoading } = useAuth();
 
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
@@ -178,32 +174,46 @@ export default function NewItemPage() {
     const name = form.getValues('name');
     const description = form.getValues('description');
 
-    if (name.length < 3 || description.length < 10) return;
+    if (name.length < 3 || description.length < 10) {
+      console.log('[NewItemPage] AI suggestions skipped: name or description too short.');
+      return;
+    }
+    console.log('[NewItemPage] Initiating AI suggestions for category and listing type.');
 
     if (!form.formState.dirtyFields.category && !globalSelectedCategory) {
         setIsSuggestingCategory(true);
+        console.log('[NewItemPage] Requesting AI category suggestion...');
         try {
             const categoryResult: SuggestCategoryOutput = await suggestCategory({ name, description });
-            if (categoryResult.errorMessage) toast({ title: "AI Category Suggestion Failed", description: categoryResult.errorMessage, variant: "default" });
-            else if (categoryResult.suggestedCategory) {
+            if (categoryResult.errorMessage) {
+              console.warn('[NewItemPage] AI Category Suggestion Failed:', categoryResult.errorMessage);
+              toast({ title: "AI Category Suggestion Failed", description: categoryResult.errorMessage, variant: "default" });
+            } else if (categoryResult.suggestedCategory) {
                 form.setValue('category', categoryResult.suggestedCategory, { shouldValidate: true });
+                console.log('[NewItemPage] AI Category Suggested:', categoryResult.suggestedCategory);
                 toast({ title: "AI Category Suggested!", description: `We've suggested "${categoryResult.suggestedCategory}".` });
             }
         } catch (error: any) {
+            console.error('[NewItemPage] AI System Error (Category):', error.message, error.stack);
             toast({ title: "AI System Error (Category)", description: `Could not connect. ${error.message || ''}`, variant: "destructive" });
         } finally { setIsSuggestingCategory(false); }
     }
 
     if (!form.formState.dirtyFields.listingType) {
         setIsInferringListingType(true);
+        console.log('[NewItemPage] Requesting AI listing type inference...');
         try {
             const listingTypeResult: InferListingTypeOutput = await inferListingType({ name, description });
-            if (listingTypeResult.errorMessage) toast({ title: "AI Listing Type Inference Failed", description: listingTypeResult.errorMessage, variant: "default" });
-            else if (listingTypeResult.inferredListingType) {
+            if (listingTypeResult.errorMessage) {
+              console.warn('[NewItemPage] AI Listing Type Inference Failed:', listingTypeResult.errorMessage);
+              toast({ title: "AI Listing Type Inference Failed", description: listingTypeResult.errorMessage, variant: "default" });
+            } else if (listingTypeResult.inferredListingType) {
                 form.setValue('listingType', listingTypeResult.inferredListingType, { shouldValidate: true });
+                console.log('[NewItemPage] AI Listing Type Inferred:', listingTypeResult.inferredListingType);
                 toast({ title: "AI Listing Type Inferred!", description: `Inferred as an "${listingTypeResult.inferredListingType}".` });
             }
         } catch (error: any) {
+            console.error('[NewItemPage] AI System Error (Listing Type):', error.message, error.stack);
             toast({ title: "AI System Error (Listing Type)", description: `Could not connect. ${error.message || ''}`, variant: "destructive" });
         } finally { setIsInferringListingType(false); }
     }
@@ -302,12 +312,174 @@ export default function NewItemPage() {
     }
   }
 
-  const isLoadingAi = isSuggestingCategory || isInferringListingType;
-  const isLoadingOverall = isLoadingAi || isSubmitting || !currentUser;
+  // const { currentUser: authCurrentUser, loading: authLoading } = useAuth(); // REMOVED: Duplicate declaration
 
-  if (!currentUser) {
-      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Loading user data...</div>;
+  const isLoadingAi = isSuggestingCategory || isInferringListingType;
+  // Ensure authCurrentUser (from top of component scope) is loaded before enabling the form or removing loading state
+  const isLoadingOverall = isLoadingAi || isSubmitting || authLoading || !authCurrentUser;
+
+  // Update onSubmit to use the real authCurrentUser.uid for ownerId
+  // This was already done in the previous step by removing the local currentUser state.
+  // The form's currentUser related logic for default values also needs to be adjusted.
+
+  // Initial loading state for user data (now auth state)
+  if (authLoading) {
+      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Verifying your session...</div>;
   }
+  // If after loading, there's still no user, PrivateRoute should handle redirection,
+  // but as a safeguard or if PrivateRoute isn't used directly here:
+  if (!authCurrentUser) {
+      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-destructive" /> No active session. Redirecting...</div>;
+  }
+
+  // useEffect for resetting form with currentUser's preferences
+  // needs to use userProfile from useAuth() now.
+   useEffect(() => {
+    // Use userProfile for populating default logistics and locations
+    // userProfile is already available in the component scope from useAuth()
+
+    if (userProfile && form.reset) {
+        const currentFormValues = form.getValues();
+        const logisticsPreferences = userProfile.logisticsPreferences || {};
+        const locations = userProfile.locations || [];
+
+        let defaultSelectedLocationId: string | undefined = undefined;
+        const preferredStoredLocId = logisticsPreferences?.preferredStoredLocationId;
+
+        if (preferredStoredLocId && locations?.find((l: UserStoredLocation) => l.id === preferredStoredLocId)) {
+            defaultSelectedLocationId = preferredStoredLocId;
+        }
+
+        const defaultDeliveryMethods = logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
+
+        form.reset({
+            ...currentFormValues,
+            category: globalSelectedCategory || currentFormValues.category || '',
+            openToAnyOpportunity: currentFormValues.openToAnyOpportunity || false,
+            selectedLocationIdentifier: currentFormValues.selectedLocationIdentifier || defaultSelectedLocationId,
+            itemSpecificAddress: (currentFormValues.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) ? (currentFormValues.itemSpecificAddress || '') : '',
+            deliveryMethods: currentFormValues.deliveryMethods?.length ? currentFormValues.deliveryMethods : defaultDeliveryMethods,
+            timingType: currentFormValues.timingType || 'flexible',
+            timingFixedDate: currentFormValues.timingFixedDate || undefined,
+            dynamicSpecifications: currentFormValues.dynamicSpecifications || [],
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile, form.reset, globalSelectedCategory]); // Depend on userProfile now
+
+
+  // Update the onSubmit to use authCurrentUser.uid
+  async function onSubmit(data: ItemFormValues) {
+    console.log('[NewItemPage] Form submission initiated with data:', data);
+    if (!authCurrentUser) {
+      console.error('[NewItemPage] Form submission failed: User not authenticated.');
+      toast({ title: "Error", description: "You must be logged in to post an item.", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      let locationTypeForLogistics: ItemLogisticsLocationType;
+      let storedLocationIdForLogistics: string | undefined = undefined;
+      let specificAddressForLogistics: string | undefined = undefined;
+
+      if (!data.selectedLocationIdentifier || data.selectedLocationIdentifier === NO_LOCATION_SPECIFIED_VALUE) {
+        locationTypeForLogistics = 'not_specified';
+      } else if (data.selectedLocationIdentifier === ITEM_SPECIFIC_LOCATION_VALUE) {
+        locationTypeForLogistics = 'item_specific_location';
+        specificAddressForLogistics = data.itemSpecificAddress;
+      } else {
+        locationTypeForLogistics = 'profile_stored_location';
+        storedLocationIdForLogistics = data.selectedLocationIdentifier;
+      }
+
+      let itemTiming: ItemTiming | undefined = undefined;
+      if (data.timingType) {
+        itemTiming = { type: data.timingType as ItemTimingType };
+        if (data.timingType === 'fixed_date' && data.timingFixedDate) {
+          itemTiming.date = data.timingFixedDate;
+        }
+      }
+
+      const itemLogistics: ItemLogistics = {
+          locationType: locationTypeForLogistics,
+          selectedUserStoredLocationId: storedLocationIdForLogistics,
+          itemSpecificAddress: specificAddressForLogistics,
+          deliveryMethods: data.deliveryMethods,
+          timing: itemTiming,
+          notes: data.logisticsNotes,
+      };
+
+      const newItemData = {
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        listingType: data.listingType,
+        imageUrl: data.imageUrl || '',
+        ownerId: authCurrentUser.uid, // Use real user ID
+        isGiftItForward: data.listingType === 'offer' ? data.isGiftItForward : false,
+        openToAnyOpportunity: data.openToAnyOpportunity,
+        logistics: itemLogistics,
+        specifications: data.dynamicSpecifications, // Add dynamic specifications
+        // Fields like `ownerName` and `status` will be handled by backend/service or derived
+      } as Omit<AppItemType, 'id' | 'createdAt' | 'updatedAt' | 'ownerName' | 'status'>;
+      // The type assertion helps ensure we're passing the correct fields for creation.
+      // `ownerName` would typically be added when fetching/displaying, not stored on item if it can be derived.
+      // `status` is set by `createItem` service.
+
+      const newItemId = await createItem(newItemData);
+      console.log(`[NewItemPage] Item successfully created with ID: ${newItemId} by user: ${authCurrentUser.uid}`);
+
+      toast({
+        title: `Item ${data.listingType === 'offer' ? 'Listed' : 'Wanted'}!`,
+        description: `${data.name} has been successfully posted.`,
+      });
+
+      // Reset form using potentially updated userProfile data
+      if (userProfile && form.reset) {
+        console.log('[NewItemPage] Resetting form after successful submission.');
+        const logisticsPreferences = userProfile.logisticsPreferences || {};
+        const locations = userProfile.locations || [];
+        let defaultSelectedLocationId: string | undefined = undefined;
+        const preferredStoredLocId = logisticsPreferences?.preferredStoredLocationId;
+        if (preferredStoredLocId && locations?.find((l: UserStoredLocation) => l.id === preferredStoredLocId)) {
+            defaultSelectedLocationId = preferredStoredLocId;
+        }
+        const defaultDeliveryMethods = logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'];
+
+        form.reset({
+            name: '',
+            description: '',
+            category: globalSelectedCategory || '',
+            imageUrl: '',
+            listingType: 'offer',
+            isGiftItForward: false,
+            openToAnyOpportunity: false,
+            selectedLocationIdentifier: defaultSelectedLocationId,
+            itemSpecificAddress: '',
+            deliveryMethods: defaultDeliveryMethods,
+            logisticsNotes: '',
+            timingType: 'flexible',
+            timingFixedDate: undefined,
+            dynamicSpecifications: [],
+        });
+      } else {
+        form.reset();
+      }
+      router.push(`/items/${newItemId}`);
+    } catch (error: any) {
+        console.error(`[NewItemPage] Error during form submission for user ${authCurrentUser?.uid}:`, error.message, error.stack);
+        toast({ title: "Submission Error", description: error.message || "Could not post item.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+        console.log('[NewItemPage] Form submission process ended.');
+    }
+  }
+
+  // Update the Select for Item Location to use authCurrentUser (though locations aren't there yet)
+  // This part of the form <FormField control={form.control} name="selectedLocationIdentifier" ...>
+  // references `currentUser.locations`. This will need to be `authCurrentUser.locations`
+  // once user profile data is implemented. For now, it will likely show no stored locations.
+  // The `(authCurrentUser as any).locations` cast is a temporary measure.
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -365,13 +537,13 @@ export default function NewItemPage() {
                     >
                       <FormControl><SelectTrigger><SelectValue placeholder="Select location (optional)" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {currentUser.locations && currentUser.locations.length > 0 && currentUser.locations.map((loc: UserStoredLocation) => (
+                        {userProfile?.locations && userProfile.locations.length > 0 && userProfile.locations.map((loc: UserStoredLocation) => (
                           <SelectItem key={loc.id} value={loc.id}>{loc.name} ({loc.address || 'Address not set'})</SelectItem>
                         ))}
                         <SelectItem value={ITEM_SPECIFIC_LOCATION_VALUE}>Enter a specific address for this item</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormDescription className="font-body">Choose a stored location, enter a new one, or leave empty if no location needed.</FormDescription>
+                    <FormDescription className="font-body">Choose a stored location, enter a new one, or leave empty if no location needed. Profile locations load after initial auth.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -582,5 +754,17 @@ export default function NewItemPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+import PrivateRoute from '@/components/auth/PrivateRoute'; // Import PrivateRoute
+import { useAuth } from '@/contexts/AuthContext'; // For NewItemPageContent
+
+// New default export using PrivateRoute
+export default function NewItemPageProtected() {
+  return (
+    <PrivateRoute>
+      <NewItemPageContent />
+    </PrivateRoute>
   );
 }

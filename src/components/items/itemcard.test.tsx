@@ -3,6 +3,16 @@ import { render, screen, within } from '@testing-library/react';
 import ItemCard from './ItemCard'; // Default export
 import type { Item } from '@/types';
 import type { AIMatchingMode } from '@/services/ai-config-service';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getFirestore, connectFirestoreEmulator, clearFirestoreData, terminate } from 'firebase/firestore';
+import { firebaseConfig } from '@/lib/firebaseConfig'; // Use the same config
+import { createItem as createItemInDb, getItemById as getItemFromDb } from '@/services/itemService'; // Import itemService
+import { Timestamp } from 'firebase/firestore'; // For date comparisons if needed
+
+// --- Test Firebase App Setup ---
+let testApp: any;
+let testDb: any;
+const PROJECT_ID = firebaseConfig.projectId;
 
 // Mock next/image
 jest.mock('next/image', () => ({
@@ -28,61 +38,105 @@ jest.mock('next/link', () => ({
 
 // lucide-react is globally mocked in jest.setup.js
 
-// Helper to create Item objects for tests
-const createTestItem = (overrides: Partial<Item & { matchScore?: string; reciprocalItemId?: string }>): Item & { matchScore?: string; reciprocalItemId?: string } => {
-  return {
-    id: '1',
-    userId: 'user1',
+beforeAll(async () => {
+  testApp = initializeApp(firebaseConfig, `itemcard-test-app-${Date.now()}`);
+  testDb = getFirestore(testApp);
+  try {
+    connectFirestoreEmulator(testDb, 'localhost', 8080);
+    console.log('ItemCardTest: Connected to Firestore emulator.');
+  } catch (e) {
+    // console.warn('ItemCardTest: Firestore emulator already connected or error.', e);
+  }
+});
+
+afterAll(async () => {
+  if (testDb) await terminate(testDb);
+  if (testApp) await deleteApp(testApp);
+  console.log('ItemCardTest: Firebase resources cleaned up.');
+});
+
+beforeEach(async () => {
+  try {
+    await clearFirestoreData({ projectId: PROJECT_ID });
+  } catch (error) {
+    console.error('ItemCardTest: Error clearing Firestore data:', error);
+  }
+});
+
+
+// Helper to create Item objects for tests - THIS WILL BE REPLACED / AUGMENTED
+// We'll now seed data into Firestore and then fetch it for tests.
+const createTestItemInDb = async (
+  overrides: Partial<Omit<Item, 'id' | 'createdAt' | 'updatedAt' | 'ownerName' | 'status' | 'name_lowercase'>> & { name: string }
+): Promise<Item> => {
+  const uniqueOwnerId = `owner-${Date.now()}`;
+  const itemDataToSeed: Omit<Item, 'id' | 'createdAt' | 'updatedAt' | 'ownerName' | 'status' | 'name_lowercase'> = {
+    userId: uniqueOwnerId, // Use a consistent or unique owner ID for tests
     name: 'Test Item Name',
     description: 'This is a test item description.',
     category: 'Electronics',
     listingType: 'offer',
-    status: 'available',
     imageUrl: 'https://example.com/test-image.png',
     isGiftItForward: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    openToAnyOpportunity: false,
+    logistics: { locationType: 'not_specified', deliveryMethods: ['pickup_only'] },
+    specifications: { generic: 'spec' },
     ...overrides,
   };
+
+  const itemId = await createItemInDb(itemDataToSeed); // Uses itemService.createItem
+  const itemFromDb = await getItemFromDb(itemId);
+  if (!itemFromDb) throw new Error(`Failed to create or retrieve test item: ${itemId}`);
+  return itemFromDb;
 };
 
+// createMockTestItem removed as its functionality is replaced by createTestItemInDb for these tests.
+
 describe('ItemCard Component', () => {
-  test('Basic Rendering: displays name, description, category, and image', () => {
-    const item = createTestItem({});
-    render(<ItemCard item={item} />);
+  test('Basic Rendering: displays name, description, category, and image', async () => {
+    // Create item in DB
+    const itemFromDb = await createTestItemInDb({
+      name: 'Real DB Item',
+      description: 'Description from DB.',
+      category: 'DB Category'
+    });
 
-    expect(screen.getByText(item.name)).toBeInTheDocument();
-    expect(screen.getByText(item.description as string)).toBeInTheDocument();
-    expect(screen.getByText(item.category)).toBeInTheDocument();
+    // ItemCard expects certain fields; ensure itemFromDb has them or adapt ItemCard/type
+    // The `Item` type used by ItemCard should match what getItemFromDb returns.
+    // Dates like createdAt/updatedAt will be ISO strings due to processItemFirestoreTimestamps.
 
-    const image = screen.getByAltText(item.name) as HTMLImageElement;
+    render(<ItemCard item={itemFromDb} />);
+
+    expect(screen.getByText(itemFromDb.name)).toBeInTheDocument();
+    expect(screen.getByText(itemFromDb.description as string)).toBeInTheDocument();
+    expect(screen.getByText(itemFromDb.category)).toBeInTheDocument();
+
+    const image = screen.getByAltText(itemFromDb.name) as HTMLImageElement;
     expect(image).toBeInTheDocument();
-    expect(image.src).toBe(item.imageUrl);
+    expect(image.src).toBe(itemFromDb.imageUrl);
   });
 
   describe('Status Badge', () => {
-    test('does not show badge for "available" status', () => {
-      const item = createTestItem({ status: 'available' });
-      render(<ItemCard item={item} />);
-      // Assuming no badge means no element with text "available" as a badge
-      // The component explicitly checks for item.status !== 'available'
-      expect(screen.queryByText(item.status, { selector: 'span.absolute' })).not.toBeInTheDocument();
+    test('does not show badge for "available" status', async () => {
+      const itemFromDb = await createTestItemInDb({ name: 'Available Item', status: 'available' });
+      render(<ItemCard item={itemFromDb} />);
+      expect(screen.queryByText(itemFromDb.status!, { selector: 'span.absolute' })).not.toBeInTheDocument();
     });
 
-    test('renders "traded" badge for "traded" status', () => {
-      const item = createTestItem({ status: 'traded' });
-      render(<ItemCard item={item} />);
-      const badge = screen.getByText(item.status); // Badge component renders a div
+    test('renders "traded" badge for "traded" status', async () => {
+      const itemFromDb = await createTestItemInDb({ name: 'Traded Item', status: 'traded' });
+      render(<ItemCard item={itemFromDb} />);
+      const badge = screen.getByText(itemFromDb.status!);
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveClass('bg-destructive'); // From variant='destructive'
+      expect(badge).toHaveClass('bg-destructive');
     });
 
-    test('renders "pending" badge for "pending" status', () => {
-      const item = createTestItem({ status: 'pending' });
-      render(<ItemCard item={item} />);
-      const badge = screen.getByText(item.status); // Badge component renders a div
+    test('renders "pending" badge for "pending" status', async () => {
+      const itemFromDb = await createTestItemInDb({ name: 'Pending Item', status: 'pending' });
+      render(<ItemCard item={itemFromDb} />);
+      const badge = screen.getByText(itemFromDb.status!);
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveClass('bg-secondary'); // From variant='secondary'
+      expect(badge).toHaveClass('bg-secondary');
     });
   });
 
@@ -96,16 +150,27 @@ describe('ItemCard Component', () => {
     ];
 
     testCases.forEach(({ score, expectedClasses }) => {
-      test(`renders correct style for matchScore: ${score}`, () => {
-        const item = createTestItem({ matchScore: score });
+      test(`renders correct style for matchScore: ${score}`, async () => { // Made async
+        // Create item with specific matchScore in DB
+        const itemFromDb = await createTestItemInDb({
+          name: `Item with score ${score || 'undefined'}`,
+          // The Item type from createTestItemInDb doesn't include matchScore directly from DB.
+          // ItemCard's `item` prop is `Item & { matchScore?: string; ... }`
+          // So, we need to cast or add matchScore to the item *after* fetching from DB for the test.
+          // This highlights a slight mismatch: matchScore is often a runtime calculation or joined data,
+          // not a direct field on the core Item DB model.
+          // For this test, we'll simulate it being added to the object passed to ItemCard.
+        });
+
+        const testableItem = { ...itemFromDb, matchScore: score };
+
         // If score is undefined, the badge shouldn't render.
-        // The component has: {matchScore && (<Badge ...>)}
         if (!score) {
-            render(<ItemCard item={item} />);
+            render(<ItemCard item={testableItem} />); // Use testableItem
             expect(screen.queryByText(/Match:/i)).not.toBeInTheDocument(); // Use regex for flexibility
             return;
         }
-        render(<ItemCard item={item} />);
+        render(<ItemCard item={testableItem} />); // Use testableItem
         // Use regex for text matching to be flexible with whitespace
         const badge = screen.getByText((content, element) => {
             const hasText = (node: Element) => node.textContent === `Match: ${score}`;
@@ -120,44 +185,70 @@ describe('ItemCard Component', () => {
   });
 
   describe('Listing Type / Gift Badge', () => {
-    test('shows "Gift" badge for offer and isGiftItForward: true', () => {
-      const item = createTestItem({ listingType: 'offer', isGiftItForward: true });
-      render(<ItemCard item={item} />);
+    test('shows "Gift" badge for offer and isGiftItForward: true', async () => { // Made async
+      const itemFromDb = await createTestItemInDb({
+        name: 'Gift Item Offer',
+        listingType: 'offer',
+        isGiftItForward: true
+      });
+      render(<ItemCard item={itemFromDb} />);
       const badge = screen.getByText('Gift');
       expect(badge).toBeInTheDocument();
       expect(badge.className).toMatch(/bg-pink-500/);
     });
 
-    test('shows "offer" badge for offer and isGiftItForward: false (and no match score)', () => {
-      const item = createTestItem({ listingType: 'offer', isGiftItForward: false, matchScore: undefined });
-      render(<ItemCard item={item} />);
+    test('shows "offer" badge for offer and isGiftItForward: false (and no match score)', async () => { // Made async
+      // This test depends on matchScore being undefined.
+      // Our createTestItemInDb doesn't add matchScore.
+      // The ItemCard prop type allows matchScore, so we pass itemFromDb directly.
+      const itemFromDb = await createTestItemInDb({
+        name: 'Regular Offer Item',
+        listingType: 'offer',
+        isGiftItForward: false
+      });
+      // We need to ensure the item *as passed to ItemCard* has no matchScore.
+      // If itemFromDb might have it from somewhere else (it shouldn't from our service), we'd strip it.
+      // const testableItem = { ...itemFromDb, matchScore: undefined };
+      // render(<ItemCard item={testableItem} />);
+      // For now, assuming itemFromDb is clean.
+      render(<ItemCard item={itemFromDb} />);
       const badge = screen.getByText('offer');
       expect(badge).toBeInTheDocument();
       expect(badge.className).toMatch(/bg-green-600/);
     });
 
-    test('shows "want" badge for listingType: "want" (and no match score)', () => {
-      const item = createTestItem({ listingType: 'want', matchScore: undefined });
-      render(<ItemCard item={item} />);
+    test('shows "want" badge for listingType: "want" (and no match score)', async () => { // Made async
+      const itemFromDb = await createTestItemInDb({
+        name: 'Want Item',
+        listingType: 'want'
+        // isGiftItForward is irrelevant for 'want' type in current ItemCard logic for this badge
+      });
+      render(<ItemCard item={itemFromDb} />);
       const badge = screen.getByText('want');
       expect(badge).toBeInTheDocument();
       expect(badge.className).toMatch(/bg-blue-600/);
     });
 
-     test('Match score badge takes precedence over offer/want type badge if matchScore exists', () => {
-      const item = createTestItem({ listingType: 'offer', isGiftItForward: false, matchScore: 'high' });
-      render(<ItemCard item={item} />);
+     test('Match score badge takes precedence over offer/want type badge if matchScore exists', async () => { // Made async
+      const itemFromDb = await createTestItemInDb({
+        name: 'Offer with MatchScore',
+        listingType: 'offer',
+        isGiftItForward: false,
+        // As before, matchScore is added to the object passed to ItemCard
+      });
+      const testableItem = { ...itemFromDb, matchScore: 'high' as const };
+      render(<ItemCard item={testableItem} />);
       expect(screen.getByText('Match: high')).toBeInTheDocument();
       expect(screen.queryByText('offer')).not.toBeInTheDocument(); // offer badge should not be shown
     });
   });
 
-  test('"View Item" Button is always present and links correctly', () => {
-    const item = createTestItem({});
-    render(<ItemCard item={item} />);
+  test('"View Item" Button is always present and links correctly', async () => { // Made async
+    const itemFromDb = await createTestItemInDb({ name: 'Viewable Item' });
+    render(<ItemCard item={itemFromDb} />);
     const viewItemButtonLink = screen.getByRole('link', { name: /view item/i });
     expect(viewItemButtonLink).toBeInTheDocument();
-    expect(viewItemButtonLink).toHaveAttribute('href', `/items/${item.id}`);
+    expect(viewItemButtonLink).toHaveAttribute('href', `/items/${itemFromDb.id}`);
   });
 
   describe('Opportunity Link Logic', () => {
@@ -165,11 +256,19 @@ describe('ItemCard Component', () => {
     const usedMatchingMode: AIMatchingMode = 'advanced';
     const preferencesConsidered = true;
 
-    test('With opportunityContextItemId: main image and "View Opportunity" button link correctly', () => {
-      const item = createTestItem({ id: 'suggested-item-456', matchScore: 'high', reciprocalItemId: 'recip-789' });
+    test('With opportunityContextItemId: main image and "View Opportunity" button link correctly', async () => { // Made async
+      const itemFromDb = await createTestItemInDb({
+        name: 'Suggested Item',
+      });
+      const testableItem = {
+        ...itemFromDb,
+        // id: 'suggested-item-456', // Use dynamic ID from DB for more realistic test
+        matchScore: 'high' as const,
+        reciprocalItemId: 'recip-789'
+      };
       render(
         <ItemCard
-          item={item}
+          item={testableItem}
           opportunityContextItemId={opportunityContextItemId}
           usedMatchingMode={usedMatchingMode}
           preferencesConsidered={preferencesConsidered}
@@ -178,58 +277,39 @@ describe('ItemCard Component', () => {
 
       const expectedParams = new URLSearchParams();
       expectedParams.set('mainItemId', opportunityContextItemId);
-      expectedParams.set('suggestedItemId', item.id);
+      expectedParams.set('suggestedItemId', testableItem.id); // Uses dynamic ID
       expectedParams.set('score', item.matchScore!);
       expectedParams.set('reciprocalItemId', item.reciprocalItemId!);
       expectedParams.set('usedMatchingMode', usedMatchingMode);
       expectedParams.set('preferencesConsidered', String(preferencesConsidered));
       const expectedHref = `/opportunities?${expectedParams.toString()}`;
 
-      // Main image area link
-      // The header content is wrapped in a Link. The image is inside.
-      // We can find the link by checking its href.
       const imageLink = screen.getByAltText(item.name).closest('a');
       expect(imageLink).toHaveAttribute('href', expectedHref);
 
-      // "View Opportunity" button
       const viewOppButtonLink = screen.getByRole('link', { name: /view opportunity/i });
       expect(viewOppButtonLink).toBeInTheDocument();
       expect(viewOppButtonLink).toHaveAttribute('href', expectedHref);
     });
 
-    test('isGiftItForward item does not show opportunity link even with context item ID', () => {
-        const item = createTestItem({ id: 'gift-item-789', isGiftItForward: true });
+    test('isGiftItForward item does not show opportunity link even with context item ID', async () => { // Made async
+        const itemFromDb = await createTestItemInDb({
+          name: 'Gift Item No Opp Link',
+          isGiftItForward: true
+        });
         render(
             <ItemCard
-            item={item}
+            item={itemFromDb} // Pass itemFromDb directly
             opportunityContextItemId={opportunityContextItemId}
             />
         );
-        // Image should link to item detail, not opportunity
-        const imageLink = screen.getByAltText(item.name).closest('a');
-        // In this case, the header content is NOT wrapped in a Link for opportunity
-        // So, the closest 'a' would be the CardTitle's link to item details, not the image itself.
-        // Let's check that the "View Opportunity" button is NOT present
         expect(screen.queryByRole('link', { name: /view opportunity/i })).not.toBeInTheDocument();
-        // And the header image is not wrapped in the opportunity link.
-        // The direct parent of HeaderContent should not be a link with opportunity href.
-        // This is harder to assert directly without more specific selectors on HeaderContent wrapper.
-        // The absence of "View Opportunity" button is a good indicator.
     });
 
-    test('Without opportunityContextItemId: "View Opportunity" button is NOT present and image links to item detail', () => {
-      const item = createTestItem({});
-      render(<ItemCard item={item} />);
-
+    test('Without opportunityContextItemId: "View Opportunity" button is NOT present', async () => { // Made async
+      const itemFromDb = await createTestItemInDb({ name: 'No Context Item' });
+      render(<ItemCard item={itemFromDb} />);
       expect(screen.queryByRole('link', { name: /view opportunity/i })).not.toBeInTheDocument();
-
-      // The header content (containing the image) should not be wrapped by an opportunity link.
-      // The CardTitle contains a link to the item detail page.
-      // The image itself is not directly linked in this case.
-      // The structure is: Card -> HeaderContent (not a link) -> CardContent -> CardTitle (link to itemDetailLink)
-      // So there's no single link wrapping the image that would go to itemDetailLink directly for the header.
-      // The primary link for navigation is the "View Item" button or the title.
-      // This test mainly ensures the opportunity specific elements are absent.
     });
   });
 });
