@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { dummyItems, dummyUsers } from '@/lib/dummy-data'; 
+'use client'; // Add use client directive
+
 import GeneralChatWindow from '@/components/chat/GeneralChatWindow';
 import { Separator } from '@/components/ui/separator';
 import PrivateRoute from '@/components/auth/PrivateRoute'; // Import PrivateRoute
