@@ -281,7 +281,7 @@ export default function HomePage() {
         return newSuggestions;
       });
       setOverallLoading(false); 
-    }
+    }; // Added semicolon after function definition
     fetchUserSpecificDataAndSuggestions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authCurrentUser, authLoading, allExistingItemsFromDb, allExistingItemsLoading]);
