@@ -1,0 +1,75 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "group:monorepos",
+    ":semanticCommits",
+    ":dependencyDashboard"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "timezone": "America/New_York",
+  "automerge": true,
+  "platformAutomerge": true,
+  "packageRules": [
+    {
+      "description": "Auto-merge patch updates",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    {
+      "description": "Auto-merge dev dependencies minor updates", 
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor"],
+      "automerge": true
+    },
+    {
+      "description": "Group React ecosystem updates",
+      "groupName": "React ecosystem",
+      "matchPackagePatterns": ["^react", "@types/react"],
+      "automerge": false
+    },
+    {
+      "description": "Group Next.js ecosystem updates",
+      "groupName": "Next.js ecosystem", 
+      "matchPackagePatterns": ["^next", "@next/"],
+      "automerge": false
+    },
+    {
+      "description": "Group testing libraries",
+      "groupName": "Testing libraries",
+      "matchPackagePatterns": ["jest", "testing-library", "@testing-library/"],
+      "automerge": true
+    },
+    {
+      "description": "Group UI component libraries",
+      "groupName": "UI components",
+      "matchPackagePatterns": ["@radix-ui/", "@hookform/"],
+      "automerge": false
+    },
+    {
+      "description": "Hold back major framework updates",
+      "matchPackageNames": ["react", "next", "typescript"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "Security updates get priority",
+      "matchPackagePatterns": ["*"],
+      "vulnerabilityAlerts": {
+        "enabled": true
+      },
+      "automerge": true,
+      "schedule": ["at any time"]
+    }
+  ],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to v{{newVersion}}",
+  "commitMessageSuffix": "",
+  "branchPrefix": "renovate/",
+  "labels": ["dependencies"],
+  "assignees": ["@creat-o-r"]
+}
