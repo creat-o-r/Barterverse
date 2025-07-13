@@ -108,7 +108,7 @@ export const dummyUsers: User[] = [
   },
 ];
 
-export let dummyItems: Item[] = [
+export const dummyItems: Item[] = [
   {
     id: 'item1',
     name: 'Vintage Leather Journal',
@@ -540,7 +540,7 @@ export function addNewItemToDummyData(
     finalLogistics = {
         locationType: defaultLocType,
         selectedUserStoredLocationId: defaultStoredId,
-        itemSpecificAddress: defaultLocType === 'item_specific_location' ? 'Default Address Needed' : undefined,
+        itemSpecificAddress: undefined,
         deliveryMethods: owner.logisticsPreferences?.defaultDeliveryMethods || ['pickup_only'],
         timing: { type: 'flexible' },
         notes: '',

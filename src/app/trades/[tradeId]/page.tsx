@@ -95,9 +95,10 @@ async function getTradeContext(tradeId: string, currentUserId: string): Promise<
 }
 
 
-export default async function TradeDetailPage({ params }: { params: { tradeId: string } }) {
-  const currentUserId = dummyUsers[0].id; 
-  const tradeContext = await getTradeContext(params.tradeId, currentUserId);
+export default async function TradeDetailPage({ params }: { params: Promise<{ tradeId: string }> }) {
+  const currentUserId = dummyUsers[0].id;
+  const { tradeId } = await params;
+  const tradeContext = await getTradeContext(tradeId, currentUserId);
 
   if (!tradeContext) {
     return (
@@ -115,7 +116,7 @@ export default async function TradeDetailPage({ params }: { params: { tradeId: s
     );
   }
 
-  const { tradeId, currentUser, otherUser, itemOfferedByOther, itemCurrentUserMightOffer } = tradeContext;
+  const { currentUser, otherUser, itemOfferedByOther, itemCurrentUserMightOffer } = tradeContext;
   
   return (
     <div className="max-w-4xl mx-auto space-y-6">
