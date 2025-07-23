@@ -2,12 +2,13 @@
 import { use, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { dummyItems, dummyUsers } from '@/lib/dummy-data';
+// import { dummyItems, dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getItem, getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
 import type { Item, User, ItemLogistics, UserStoredLocation, ItemDeliveryMethod, ItemTiming } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock } from 'lucide-react';
+import { MessageSquare, Star, UserCircle, Tag, Info, Repeat, Gift, Search, Link2 as LinkIcon, Loader2, HeartHandshake, MapPin, Truck, Edit2, Clock, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
 import { Badge } from '@/components/ui/badge';
 import ItemTradeInitiationContent from '@/components/items/ItemTradeInitiationContent';
 import SuggestedMatches from '@/components/items/SuggestedMatches';
@@ -16,11 +17,24 @@ import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import SpecificationsDisplay from '@/components/items/SpecificationsDisplay'; // Import the new client component
 
+// Simulated current user ID - replace with actual auth logic when available
+const SIMULATED_CURRENT_USER_ID = 'user1';
+
 async function getItemDetails(itemId: string): Promise<{ item: Item; owner: User } | null> {
-  const item = dummyItems.find((i) => i.id === itemId);
-  if (!item) return null;
-  const owner = dummyUsers.find((u) => u.id === item.ownerId);
-  if (!owner) return null;
+  // const item = dummyItems.find((i) => i.id === itemId); // Old way
+  const item = await getItem(itemId);
+  if (!item) {
+    console.warn(`Item with ID ${itemId} not found in Firestore.`);
+    return null;
+  }
+  // const owner = dummyUsers.find((u) => u.id === item.ownerId); // Old way
+  const owner = await getUser(item.ownerId);
+  if (!owner) {
+    console.warn(`Owner with ID ${item.ownerId} for item ${itemId} not found in Firestore.`);
+    // Decide if item should be returned without owner, or fail entirely.
+    // For now, let's say an item must have a valid owner to be displayed.
+    return null;
+  }
   return { item, owner };
 }
 
@@ -59,9 +73,19 @@ function LogisticsDisplay({ logistics, owner }: { logistics?: ItemLogistics, own
       timingDisplay = "Flexible";
     } else if (logistics.timing.type === 'fixed_date' && logistics.timing.date) {
       try {
-        timingDisplay = `Fixed: ${format(new Date(logistics.timing.date), "PPP")}`;
+        // Ensure date is a string or number that can be parsed by new Date()
+        // Firestore Timestamps would be .toDate() before this point, or handle string dates
+        const dateInput = (typeof logistics.timing.date === 'string' || typeof logistics.timing.date === 'number')
+                            ? logistics.timing.date
+                            : (logistics.timing.date as any)?.seconds ? (logistics.timing.date as any).toDate() : undefined;
+
+        if (dateInput) {
+            timingDisplay = `Fixed: ${format(new Date(dateInput), "PPP")}`;
+        } else {
+            timingDisplay = `Fixed: Invalid Date (received: ${JSON.stringify(logistics.timing.date)})`;
+        }
       } catch (e) {
-        timingDisplay = `Fixed: Invalid Date (${logistics.timing.date})`;
+        timingDisplay = `Fixed: Error formatting date (${logistics.timing.date})`;
       }
     }
   }
@@ -119,17 +143,19 @@ async function ItemDetailsDisplay({ itemId }: { itemId: string }) {
   if (!itemDetails) {
     return (
       <div className="space-y-8">
-        <Card>
-          <CardHeader><CardTitle className="text-center font-headline">Item Not Found</CardTitle></CardHeader>
-          <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}</p></CardContent>
+        <Card className="border-destructive">
+          <CardHeader><CardTitle className="text-center font-headline text-destructive flex items-center justify-center gap-2">
+            <AlertTriangle className="h-6 w-6" /> Item Not Found
+            </CardTitle></CardHeader>
+          <CardContent><p className="text-center font-body">Could not find an item with ID: {itemId}. It may have been removed or the ID is incorrect.</p></CardContent>
         </Card>
       </div>
     );
   }
 
   const { item, owner } = itemDetails;
-  const currentUserId = dummyUsers[0]?.id || 'user1_fallback';
-  const isCurrentUserOwner = item.ownerId === currentUserId;
+  // const currentUserId = dummyUsers[0]?.id || 'user1_fallback'; // Old way
+  const isCurrentUserOwner = item.ownerId === SIMULATED_CURRENT_USER_ID;
 
   return (
     <div className="space-y-8">

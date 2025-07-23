@@ -1,16 +1,18 @@
 
 "use client";
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
-import { dummyUsers, dummyItems, updateUserPreferencesInDummyData } from '@/lib/dummy-data';
+import { getUser, getItemsByOwner, updateUser } from '@/lib/firebase/firestoreUtils';
 import type { User, Item, UserMotivation, TradeTimingPreference, UserProfilePreferences as UserProfilePreferencesType, InferredUserPreferences, ItemDeliveryMethod } from '@/types';
 import { inferUserPreferences, type InferUserPreferencesInput, type InferUserPreferencesOutput } from '@/ai/flows/infer-user-preferences-flow';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { getEnableAutomaticPreferenceInference } from '@/services/ai-config-service';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ItemList from '@/components/items/ItemList';
-import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase } from 'lucide-react';
+import { Star, Package, MessageSquare, Edit3, Repeat, Gift, Search, Network, MapPin, Sparkles, Clock, Users, Lightbulb, Wand2, Loader2, FileText, ChevronDown, ChevronUp, Filter, Truck, Home, Briefcase, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
@@ -18,22 +20,28 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
+// Simulated current user ID - replace with actual auth logic when available
+const SIMULATED_CURRENT_USER_ID = 'user1';
 
-async function getUserProfile(userId: string): Promise<User | null> {
-  const actualUserId = userId === 'me' ? dummyUsers[0].id : userId;
-  const user = dummyUsers.find((u) => u.id === actualUserId);
-  if (!user) return null;
+async function fetchUserProfileData(userIdToFetch: string): Promise<User | null> {
+  const user = await getUser(userIdToFetch);
+  if (!user) {
+    console.warn(`User with ID ${userIdToFetch} not found.`);
+    return null;
+  }
   
+  // Ensure some defaults if they are critical for display and might be missing
+  // This kind of logic might better live in a data transformation layer or type validation
   if (user.minimumMatchRating === undefined) {
-    user.minimumMatchRating = 'Low';
+    user.minimumMatchRating = 'Low'; // Default if not set
   }
   if (user.logisticsPreferences && !user.logisticsPreferences.defaultDeliveryMethods) {
-    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only'];
+    user.logisticsPreferences.defaultDeliveryMethods = ['pickup_only']; // Default if not set
   }
 
-
-  const userItemsFromGlobal = dummyItems.filter(item => item.ownerId === user.id);
-  return JSON.parse(JSON.stringify({...user, items: userItemsFromGlobal}));
+  const userItems = await getItemsByOwner(userIdToFetch);
+  // No need for JSON.parse(JSON.stringify(...)) if types are handled correctly
+  return { ...user, items: userItems };
 }
 
 const motivationTextMap: Record<UserMotivation, string> = { 'help-others': 'Helping Others', 'maximize-trades': 'Maximizing Trades', 'convenience-focused': 'Convenience', 'community-building': 'Community Building', 'unique-finds': 'Finding Unique Items', };
@@ -61,10 +69,13 @@ const getChainDeliveryBadgeText = (openToChain?: boolean): string | null => {
 
 
 const preparePreferenceInferenceInput = (user: User | null): InferUserPreferencesInput | null => {
-  if (!user) return null;
+  if (!user || !user.items) { // Ensure user and user.items exist
+    // console.warn("[preparePreferenceInferenceInput] User or user.items is null/undefined.", user);
+    return null;
+  }
 
-  const userListedItems = dummyItems
-    .filter(i => i.ownerId === user.id && (i.status === 'available' || i.status === 'pending'))
+  const userListedItems = user.items // Use items already attached to the user object
+    .filter(i => (i.status === 'available' || i.status === 'pending'))
     .slice(0, 5) 
     .map(item => ({
       name: item.name,
@@ -129,13 +140,13 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
   const [activityInputForAI, setActivityInputForAI] = useState<InferUserPreferencesInput | null>(null);
   const { toast } = useToast();
 
-  const currentViewingUserId = dummyUsers[0].id; 
+  const currentViewingUserId = SIMULATED_CURRENT_USER_ID; 
   const isOwnProfile = resolvedParams.userId === 'me' || resolvedParams.userId === currentViewingUserId;
 
   useEffect(() => {
     async function loadUserProfileAndSettings() {
       setLoading(true);
-      const profile = await getUserProfile(resolvedParams.userId);
+      const profile = await fetchUserProfileData(resolvedParams.userId);
       setUser(profile);
       if (isOwnProfile) {
         const allowInference = await getEnableAutomaticPreferenceInference();
@@ -171,9 +182,9 @@ export default function UserProfilePage({ params: paramsProp }: { params: Promis
         toast({ title: "AI Preference Learning Error", description: result.errorMessage || "Could not infer preferences.", variant: "destructive" });
       } else {
         
-        const updateSuccess = updateUserPreferencesInDummyData(user.id, result.suggestedPreferences as InferredUserPreferences);
+        const updateSuccess = await updateUser(user.id, { ...result.suggestedPreferences });
         if (updateSuccess) {
-          const updatedProfile = await getUserProfile(user.id); 
+          const updatedProfile = await fetchUserProfileData(user.id); 
           setUser(updatedProfile); 
           if(updatedProfile) setActivityInputForAI(preparePreferenceInferenceInput(updatedProfile));
 

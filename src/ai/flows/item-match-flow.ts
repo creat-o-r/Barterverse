@@ -12,11 +12,12 @@
 
 import {ai} from '../genkit';
 import {z}from 'genkit';
-import { logMatchSuggestion } from '../../services/match-report-service';
-import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '../../services/ai-config-service';
-import { dummyUsers } from '../../lib/dummy-data'; // For fetching user preferences
-import type { UserProfilePreferences } from '../../types';
-import { logAIDiagnostic } from '../../services/ai-diagnostic-log-service';
+import { logMatchSuggestion } from '@/services/match-report-service';
+import { getAIMatchingMode, getUseUserProfilePreferencesInMatching } from '@/services/ai-config-service';
+// import { dummyUsers } from '@/lib/dummy-data'; // Replaced with Firestore
+import { getUser } from '@/lib/firebase/firestoreUtils'; // Firestore access
+import type { UserProfilePreferences, User } from '@/types'; // Added User
+import { logAIDiagnostic } from '@/services/ai-diagnostic-log-service';
 
 const ItemBriefSchema = z.object({
   id: z.string(),
@@ -260,7 +261,7 @@ const itemMatchFlow = ai.defineFlow(
 
     if (currentMatchingMode === 'advanced') {
       promptToUse = advancedItemMatchPrompt;
-      const userProfile = dummyUsers.find(u => u.id === input.triggeringUserId);
+      const userProfile = await getUser(input.triggeringUserId);
       const effectiveUserMinRating: 'Low' | 'Medium' | 'High' = userProfile?.minimumMatchRating || 'Low';
 
       let fulfillmentDisplayText = "<!-- No explicit 3rd party fulfillment preference set -->";
