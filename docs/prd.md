@@ -388,9 +388,71 @@ so that **we have automated quality gates on every PR**.
 
 ## Epic 3: Database Implementation
 
-**Status**: 🚧 PENDING - To be completed
+**Epic Goal**: Add persistent database storage using free-tier solution.
 
-*This epic will cover database selection, schema design, service layer implementation, and migration from dummy data.*
+**Dependencies**:
+- ✅ Epic 1 complete (Firebase removed)
+- ✅ Epic 2 complete (Tests ready to validate migration)
+
+**Implementation Learnings**: See Appendix A for patterns extracted from Firestore branches.
+
+### Story 3.1: Database Setup and Schema
+
+As a **developer**,
+I want **a working database with schema matching our types**,
+so that **we can start persisting data**.
+
+**Acceptance Criteria**:
+1. Choose free-tier database (Supabase/Neon/PlanetScale - recommend Supabase for RLS)
+2. Set up database instance and connection
+3. Create schema from `src/types/index.ts` (User, Item, TradeOffer tables)
+4. Add basic indexes (ownerId, category, listingType)
+5. Document connection setup in .env.example
+6. Create seed script using dummy-data.ts
+
+**Integration Verification**:
+- IV1: Database connects locally
+- IV2: Schema created successfully
+- IV3: Seed script populates test data
+
+### Story 3.2: Implement Database Service Layer
+
+As a **developer**,
+I want **a service layer abstracting database operations**,
+so that **AI flows work with either dummy data or database**.
+
+**Acceptance Criteria**:
+1. Create `src/lib/database/utils.ts` with functions matching dummy-data.ts API
+2. Implement: getUser, getUsers, addUser, getItem, getItems, addItem, etc.
+3. Add feature flag `USE_DATABASE` to toggle dummy vs real database
+4. Update service functions to check flag and route accordingly
+5. Add environment-aware table prefixes (test_, dev_, prod_)
+
+**Integration Verification**:
+- IV1: Service layer works with USE_DATABASE=false (dummy data baseline)
+- IV2: Service layer works with USE_DATABASE=true (database)
+- IV3: Epic 2 tests pass with both modes
+
+### Story 3.3: Migrate to Database and Remove Dummy Data
+
+As a **developer**,
+I want **all data operations using real database**,
+so that **data persists and we have single source of truth**.
+
+**Acceptance Criteria**:
+1. Update all API routes/server actions to use service layer
+2. Update AI flows to use service layer instead of direct dummy-data imports
+3. Set USE_DATABASE=true by default
+4. Run full test suite (Epic 2 tests should all pass)
+5. Deploy to preview and validate end-to-end
+6. Remove feature flag and dummy data fallback logic
+7. Update CLAUDE.md with database architecture
+
+**Integration Verification**:
+- IV1: All Epic 2 tests pass with database
+- IV2: AI matching works with database
+- IV3: Preview deployment works
+- IV4: Performance meets NFR2 (<100ms queries)
 
 ---
 
@@ -410,9 +472,123 @@ so that **we have automated quality gates on every PR**.
 
 ---
 
+## Appendix A: Database Implementation Learnings from Firestore Branches
+
+**Source**: Reviewed `feat/firestore-dummy-data-admin` and `clean-firestore-merge` branches before discarding them.
+
+### ✅ Good Patterns to Reuse (Database-Agnostic)
+
+**1. Service Layer Pattern**
+- Created `src/lib/firebase/firestoreUtils.ts` with generic CRUD functions (addUser, getUser, addItem, etc.)
+- Isolated database operations from AI flows and components
+- **Apply**: Create `src/lib/database/utils.ts` with same pattern for any database
+
+**2. Environment-Specific Collections**
+```typescript
+function getCollectionName(baseName: string): string {
+  const prefix = getCollectionPrefix(); // 'test_', 'dev_', 'prod_'
+  return `${prefix}${baseName}`;
+}
+```
+- **Apply**: Use table prefixes or schemas to separate test/dev/prod data
+
+**3. Data Type Conversion Layer**
+- Created helpers to convert database types (Firestore Timestamps) to application types (JS Dates)
+- **Apply**: Keep conversion logic centralized, especially for timestamps and JSON fields
+
+**4. Gradual Migration Strategy**
+- Kept `dummy-data.ts` and created seeding function to migrate it
+- **Apply**: Keep dummy data initially, use as seed source, swap implementations incrementally with feature flag
+
+**5. Seeding/Migration Scripts**
+- Separate scripts: `scripts/seed-firestore.js`, `src/lib/firebase/seedUtils.ts`
+- **Apply**: Create `scripts/seed-database.ts` using dummy data as source
+
+**6. Security/Permissions from Day 1**
+- Implemented row-level security (users can only edit their own data)
+- **Apply**: Use Supabase RLS or implement ownership checks in service layer
+
+**7. Test Data Isolation**
+- Separate test collections (`test_users`, `test_items`)
+- **Apply**: Environment-based table prefixes for easy test data cleanup
+
+### ❌ Anti-Patterns Avoided
+
+1. **No tight coupling to database specifics** - Abstract behind service layer
+2. **Document migration clearly** - PRD includes clear implementation steps
+3. **Feature flag for cutover** - Toggle between dummy/database, not both simultaneously
+
+### Key Architecture Pattern
+
+```
+AI Flows → Service Layer → Database Utils → Database
+         ↓ (same interface, swappable implementation)
+```
+
+**Implementation**: Stories 3.1-3.3 use these patterns for clean, testable database layer.
+
+---
+
+## Appendix B: Feature Branch Audit Results
+
+**Purpose**: Identify which feature branches to keep, merge, or discard before Epic 1 (Firebase removal).
+
+### Firebase-Heavy Branches - ❌ DISCARD
+
+| Branch | Purpose | Firebase Level | Decision |
+|--------|---------|----------------|----------|
+| `feat/firestore-dummy-data-admin` | Firestore integration | **VERY HIGH** - Admin SDK, emulators, seed scripts | **DISCARD** - Conflicts with Epic 3 (free DB choice) |
+| `clean-firestore-merge` | Firestore + Auth fixes | **VERY HIGH** - Auth integration, permission fixes | **DISCARD** - Wrong database direction |
+| `clean-target-1`, `clean-target-2` | Firebase cleanup attempts | Unknown | **AUDIT FURTHER** - Might be incomplete cleanup |
+
+**Rationale**: These branches deeply integrate Firestore/Firebase, conflicting with our decision to use alternative free-tier database (Supabase/Neon/PlanetScale). Extract learnings (Appendix A), then discard.
+
+### Testing Branch - ⚠️ CHERRY-PICK
+
+| Branch | Conflicts | Valuable Content | Decision |
+|--------|-----------|------------------|----------|
+| `feature/comprehensive-testing-integration` | **Jest** (want Vitest)<br>**Firebase configs**<br>Husky/lint-staged | ✅ Comprehensive AI flow tests<br>✅ Playwright for E2E<br>✅ Test patterns | **CHERRY-PICK** - Extract AI tests, rewrite for Vitest, keep Playwright |
+
+**Key Findings**:
+- ✅ Has valuable AI flow tests (`src/ai/flows/*.test.ts`)
+- ❌ Uses Jest instead of Vitest - needs rewrite
+- ❌ Still has Firebase configs
+- ✅ Has Playwright E2E setup - valuable!
+- ⚠️ Has husky/lint-staged - evaluate if wanted
+
+**Action**: Extract test files, rewrite for Vitest in Epic 2, discard original branch.
+
+### Valuable Feature Branches - ✅ STRIP FIREBASE & MERGE
+
+| Branch | Purpose | Firebase? | Decision |
+|--------|---------|-----------|----------|
+| `feature/projects-collaborative-sharing` | Collaborative shared projects | **YES** | **STRIP & MERGE** - Remove Firebase, keep feature |
+| `feature/dynamic-social-buttons` | Social media sharing | **YES** | **STRIP & MERGE** - Remove Firebase, keep feature |
+| `feature/github-issues-integration` | GitHub automation | **YES** | **STRIP & MERGE** - Jules cleanup automation valuable |
+
+**Problem**: These branches have valuable features BUT also have Firebase packages that would conflict with Epic 1.
+
+**Solution**: Strip Firebase from these branches BEFORE merging (part of Epic 4).
+
+### Critical Dependency Discovery
+
+**🚨 Epic 1 (Firebase Removal) is BLOCKED by Epic 4!**
+
+We can't fully remove Firebase from `main` if we're going to merge branches that ADD Firebase back!
+
+**Revised Epic Order**:
+1. **Epic 4a**: Feature Branch Triage (discard Firestore branches, strip Firebase from valuable branches)
+2. **Epic 1**: Firebase Removal (now safe - no branches will re-add Firebase)
+3. **Epic 2**: Testing Consolidation (using extracted tests from testing branch)
+4. **Epic 4b**: Feature Branch Merging (clean branches, no Firebase conflicts)
+5. **Epic 3**: Database Implementation (with tests validating)
+6. **Epic 5**: Environment Variable Cleanup
+
+---
+
 ## Next Steps
 
-1. ✅ Complete Epic 3, 4, 5 story definitions
+1. ✅ Complete Epic 4, 5 story definitions
 2. ✅ Validate PRD with PO checklist
 3. ✅ Shard PRD into individual story files for development
 4. ✅ Begin Epic 1 implementation (Firebase removal)
