@@ -12,6 +12,7 @@ import { tradeNegotiationChat } from '@/ai/flows/trade-negotiation-chat';
 import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
 import { dummyUsers } from '@/lib/dummy-data'; // For currentUserId simulation
+import { logComponentError } from '@/utils/client-error-logger';
 
 interface ChatWindowProps {
   currentItem: Item; // Item that forms the primary context from *other user's* side (e.g., what they offer, or what they want of yours)
@@ -129,7 +130,13 @@ export default function ChatWindow({
       };
       setMessages((prevMessages) => [...prevMessages, aiMessage]);
     } catch (error) {
-      console.error('Error calling AI chat:', error);
+      logComponentError(error instanceof Error ? error : new Error(String(error)), 'ChatWindow', {
+        tradeId,
+        currentItemId: currentItem.id,
+        requestedItemId: requestedItemInitial?.id,
+        operation: 'tradeNegotiationChat',
+        userMessage: userMessage.text,
+      });
       toast({
         title: "Chat Error",
         description: "Could not get a response from the negotiation assistant. Please try again.",

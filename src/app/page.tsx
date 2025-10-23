@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button'; // Added Button for Quick List link
+import { logComponentError } from '@/utils/client-error-logger';
 
 interface UserItemSuggestion {
   userItem: Item;
@@ -110,7 +111,11 @@ export default function HomePage() {
           });
           return { index, success: true, data: result };
         } catch (error) {
-          console.error(`Error fetching matches for ${userItem.name}:`, error);
+          logComponentError(error instanceof Error ? error : new Error(String(error)), 'HomePage', {
+            itemName: userItem.name,
+            itemId: userItem.id,
+            operation: 'suggestMatchingItems',
+          });
           return {
             index,
             success: false,
