@@ -61,3 +61,7 @@ tsconfig.tsbuildinfo
 
 # IDE specific files
 .idx/
+
+# BMAD-Method generated files (auto-installed via postinstall hook)
+.bmad-core/
+.claude/commands/BMad/
