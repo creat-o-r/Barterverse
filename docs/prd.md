@@ -487,6 +487,30 @@ so that **we don't waste effort merging code that conflicts with our database de
 
 **Note**: Authentication implementation from `clean-firestore-merge` noted in Story 4.5 for future reimplementation.
 
+**Implementation Status** ✅ **TAGS CREATED - AWAITING MANUAL PUSH**:
+
+Archive tags created locally (need manual push to remote):
+- ✅ `archive/firestore-dummy-data-admin` - Firestore integration with admin SDK
+- ✅ `archive/clean-firestore-merge` - Firestore + Auth implementation
+- ✅ `archive/merge-firestore-testing` - Combined Firestore fixes with auth and testing
+- ✅ `archive/firestore-database-testing` - Firestore database + CI testing integration (WIP)
+
+Branches already deleted (confirmed Firebase-heavy):
+- ✅ `clean-target-1` - Firebase deployment workflows (deleted previously)
+- ✅ `clean-target-2` - Firebase deployment workflows (deleted previously)
+
+**Manual steps required**:
+```bash
+# Push archive tags to remote
+git push origin archive/firestore-dummy-data-admin archive/clean-firestore-merge archive/merge-firestore-testing archive/firestore-database-testing
+
+# Delete remote branches
+git push origin --delete feat/firestore-dummy-data-admin
+git push origin --delete clean-firestore-merge
+git push origin --delete merge-firestore-with-comprehensive-testing-integration
+git push origin --delete integration/firestore-database-testing
+```
+
 ---
 
 ### Story 4.2: Extract and Rewrite AI Tests from Testing Branch
