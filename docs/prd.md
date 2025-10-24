@@ -458,17 +458,179 @@ so that **data persists and we have single source of truth**.
 
 ## Epic 4: Feature Branch Consolidation
 
-**Status**: 🚧 PENDING - To be completed
+**Epic Goal**: Triage feature branches - discard Firestore branches, extract valuable capabilities, strip Firebase from keeper branches.
 
-*This epic will cover auditing and merging feature branches: collaborative projects, social sharing, GitHub integration, and other capabilities.*
+**Dependencies**: NONE - This epic must run BEFORE Epic 1 (Firebase Removal)
+
+**Critical**: Epic 1 is BLOCKED until Epic 4a completes. See Appendix B for rationale.
+
+### Story 4.1: Discard Firebase-Heavy Branches
+
+As a **developer**,
+I want **to discard branches that deeply integrate Firestore/Firebase**,
+so that **we don't waste effort merging code that conflicts with our database decision**.
+
+**Acceptance Criteria**:
+1. Archive/delete the following branches (learnings already extracted to Appendix A):
+   - `feat/firestore-dummy-data-admin`
+   - `clean-firestore-merge`
+   - `clean-target-1` (if confirmed Firebase-heavy)
+   - `clean-target-2` (if confirmed Firebase-heavy)
+2. Document in GitHub why branches were discarded (comment on branch or create issue)
+3. Verify no valuable features lost (cross-reference with audit in Appendix B)
+4. Update this PRD noting branches discarded
+
+**Integration Verification**:
+- IV1: Branches deleted or archived
+- IV2: No merge conflicts with remaining branches
+- IV3: Learnings documented in Appendix A
+
+**Note**: Authentication implementation from `clean-firestore-merge` noted in Story 4.5 for future reimplementation.
+
+---
+
+### Story 4.2: Extract and Rewrite AI Tests from Testing Branch
+
+As a **developer**,
+I want **AI flow tests from testing branch rewritten for Vitest**,
+so that **we have test coverage without Jest/Firebase dependencies**.
+
+**Acceptance Criteria**:
+1. Checkout `feature/comprehensive-testing-integration` branch
+2. Extract AI flow test files:
+   - `src/ai/flows/*.test.ts` (all test files)
+   - Playwright E2E setup (if valuable)
+   - Test patterns and mocking strategies
+3. Rewrite tests for Vitest (remove Jest-specific syntax)
+4. Remove Firebase-specific test setup
+5. Add extracted tests to Epic 2 Story 2.4 implementation
+6. Document what was kept vs. discarded
+7. Archive/delete original testing branch after extraction
+
+**Integration Verification**:
+- IV1: Extracted test files compile with Vitest
+- IV2: Tests provide same coverage as original
+- IV3: No Firebase dependencies in tests
+
+---
+
+### Story 4.3: Strip Firebase from Valuable Feature Branches
+
+As a **developer**,
+I want **Firebase removed from feature branches before merging**,
+so that **we don't reintroduce Firebase dependencies after Epic 1**.
+
+**Branches to clean**:
+- `feature/projects-collaborative-sharing`
+- `feature/dynamic-social-buttons`
+- `feature/github-issues-integration`
+
+**Acceptance Criteria**:
+1. For each branch:
+   - Create new branch: `{original-name}-clean`
+   - Remove Firebase packages from package.json
+   - Remove Firebase imports/usage from code
+   - Replace Firebase features with TODOs or stubs (e.g., "Auth: TODO - implement with Supabase Auth")
+   - Test that feature code compiles (may have broken features, that's OK)
+   - Document what was removed/stubbed
+2. Push clean branches
+3. Archive original branches (keep for reference)
+
+**Integration Verification**:
+- IV1: Clean branches have zero Firebase dependencies
+- IV2: Feature code compiles (functionality can be broken)
+- IV3: Original branches archived for reference
+
+---
+
+### Story 4.4: Merge Cleaned Feature Branches
+
+As a **developer**,
+I want **cleaned feature branches merged into main**,
+so that **we have all valuable features consolidated**.
+
+**Dependencies**: Epic 1 (Firebase Removal) must be complete first!
+
+**Acceptance Criteria**:
+1. Merge cleaned branches in this order:
+   - `feature/dynamic-social-buttons-clean` (likely least conflicts)
+   - `feature/github-issues-integration-clean`
+   - `feature/projects-collaborative-sharing-clean` (likely most conflicts)
+2. For each merge:
+   - Resolve conflicts carefully
+   - Run tests (Epic 2 tests should still pass)
+   - Verify feature UI loads (may not work fully without database)
+   - Deploy to preview and smoke test
+3. Update CLAUDE.md with new features
+4. Archive merged branches
+
+**Integration Verification**:
+- IV1: All merges complete without breaking main
+- IV2: Epic 2 tests still pass
+- IV3: Application builds and deploys successfully
+
+---
+
+### Story 4.5: Document Authentication Migration Path
+
+As a **developer**,
+I want **authentication migration path documented**,
+so that **we can reimplement auth with Supabase/alternative after database is ready**.
+
+**Background**: `clean-firestore-merge` branch had comprehensive Firebase Auth implementation with:
+- Email/password signup/signin
+- Social auth (Facebook, Twitter/X)
+- AuthContext provider
+- User profile syncing
+- Current main has auth UI pages but no working backend
+
+**Acceptance Criteria**:
+1. Create `docs/authentication-migration.md` documenting:
+   - Current state: Auth UI exists, no working backend
+   - Previous Firebase Auth implementation (what was built)
+   - Recommended path: Supabase Auth or NextAuth
+   - Migration steps (TBD - will be future epic)
+2. Add authentication as future epic to PRD backlog
+3. Note that auth should be implemented AFTER Epic 3 (Database) completes
+4. Link to clean-firestore-merge branch for reference
+
+**Integration Verification**:
+- IV1: Documentation created and committed
+- IV2: Future epic placeholder added to PRD
+- IV3: Stakeholders aware auth is deferred
 
 ---
 
 ## Epic 5: Environment Variable Cleanup
 
-**Status**: 🚧 PENDING - To be completed
+**Epic Goal**: Simplify and document environment variables after Firebase removal.
 
-*This epic will cover environment variable documentation, .env.example updates, and deployment platform configuration.*
+**Dependencies**: Epic 1 (Firebase Removal) complete
+
+### Story 5.1: Update .env.example and Documentation
+
+As a **developer**,
+I want **clean environment variable documentation**,
+so that **setup is straightforward and Firebase references are gone**.
+
+**Acceptance Criteria**:
+1. Remove Firebase-related variables from `.env.example`:
+   - NEXT_PUBLIC_FIREBASE_*
+   - FIREBASE_SERVICE_ACCOUNT_*
+   - Any other Firebase configs
+2. Add database-related variables (from Epic 3):
+   - DATABASE_URL or SUPABASE_URL/SUPABASE_ANON_KEY
+   - DATABASE_ENV (dev/test/prod)
+3. Add clear comments explaining each variable
+4. Group variables by purpose (Database, AI/Genkit, Deployment, etc.)
+5. Update README.md with setup instructions
+6. Update CLAUDE.md with environment variable documentation
+7. Verify all required variables documented
+
+**Integration Verification**:
+- IV1: `.env.example` has no Firebase references
+- IV2: All required variables for local development documented
+- IV3: Setup guide in README accurate and complete
 
 ---
 
@@ -569,6 +731,23 @@ AI Flows → Service Layer → Database Utils → Database
 **Problem**: These branches have valuable features BUT also have Firebase packages that would conflict with Epic 1.
 
 **Solution**: Strip Firebase from these branches BEFORE merging (part of Epic 4).
+
+### Authentication - 📋 DOCUMENT FOR FUTURE EPIC
+
+| Branch | Capability | Decision |
+|--------|------------|----------|
+| `clean-firestore-merge` | **Comprehensive Firebase Auth** - Email/password, social (Facebook, Twitter/X), AuthContext, profile syncing | **DOCUMENT & DEFER** - Document implementation, defer to future epic after database ready |
+
+**Current State**:
+- Main branch has auth UI pages (`/auth/signin`, `/auth/signup`)
+- No working auth backend in main
+- Firebase Auth implementation exists in discarded branch
+
+**Future Work**:
+- Reimplement with Supabase Auth (if using Supabase for database)
+- Or use NextAuth.js / Clerk
+- Defer until AFTER Epic 3 (Database) completes
+- Story 4.5 documents migration path
 
 ### Critical Dependency Discovery
 
