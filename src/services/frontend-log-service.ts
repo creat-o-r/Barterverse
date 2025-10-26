@@ -15,6 +15,7 @@ class FrontendLogger {
   private flushInterval = 5000; // 5 seconds
   private flushTimer: NodeJS.Timeout | null = null;
   private isEnabled = false;
+  private isProduction = false;
   private originalConsole = {
     log: console.log,
     warn: console.warn,
@@ -23,7 +24,9 @@ class FrontendLogger {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.isEnabled = process.env.NODE_ENV === 'development';
+      // Always enable, but capture different levels based on environment
+      this.isEnabled = true;
+      this.isProduction = process.env.NODE_ENV === 'production';
     }
   }
 
@@ -31,10 +34,13 @@ class FrontendLogger {
     if (!this.isEnabled || typeof window === 'undefined') return;
 
     // Intercept console methods
-    console.log = (...args) => {
-      this.captureLog('log', args);
-      this.originalConsole.log(...args);
-    };
+    // In production, only intercept errors/warnings (not regular logs)
+    if (!this.isProduction) {
+      console.log = (...args) => {
+        this.captureLog('log', args);
+        this.originalConsole.log(...args);
+      };
+    }
 
     console.warn = (...args) => {
       this.captureLog('warn', args);
