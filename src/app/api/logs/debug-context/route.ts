@@ -4,7 +4,7 @@ import path from 'path';
 
 const FRONTEND_LOG_FILE = path.join(process.cwd(), '.frontend-logs.jsonl');
 const AI_DIAGNOSTIC_LOG_FILE = path.join(process.cwd(), '.ai-diagnostics.log.jsonl');
-const MATCH_LOG_FILE = path.join(process.cwd(), '.match-suggestions.log.jsonl');
+const MATCH_LOG_FILE = path.join(process.cwd(), '.match-suggestions.log.json'); // NOTE: JSON array format, not JSONL
 const DEBUG_CONTEXT_FILE = path.join(process.cwd(), '.debug-context.md');
 
 interface FrontendLogEntry {
@@ -40,11 +40,27 @@ interface MatchLogEntry {
 async function readJSONL<T>(filePath: string): Promise<T[]> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
-    return content
-      .trim()
-      .split('\n')
-      .filter(line => line.trim())
-      .map(line => JSON.parse(line));
+    if (!content.trim()) {
+      return [];
+    }
+
+    // Try parsing as JSONL first (newline-delimited JSON objects)
+    try {
+      return content
+        .trim()
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => JSON.parse(line));
+    } catch (jsonlError) {
+      // If JSONL parsing fails, try parsing as JSON array
+      try {
+        const parsed = JSON.parse(content);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (jsonArrayError) {
+        console.error(`Failed to parse log file ${filePath} as either JSONL or JSON array`);
+        return [];
+      }
+    }
   } catch (error: any) {
     if (error.code === 'ENOENT') {
       return [];
