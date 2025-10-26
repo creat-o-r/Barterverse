@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { logStore } from '@/lib/logging/log-store';
 
 const FRONTEND_LOG_FILE = path.join(process.cwd(), '.frontend-logs.jsonl');
 const AI_DIAGNOSTIC_LOG_FILE = path.join(process.cwd(), '.ai-diagnostics.log.jsonl');
@@ -55,11 +56,12 @@ interface ServerErrorEntry {
   };
 }
 
-async function readJSONL<T>(filePath: string): Promise<T[]> {
+async function readJSONL<T>(filePath: string, logType?: string): Promise<T[]> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     if (!content.trim()) {
-      return [];
+      // File exists but empty - check in-memory fallback
+      return getInMemoryLogs<T>(logType);
     }
 
     // Try parsing as JSONL first (newline-delimited JSON objects)
@@ -76,14 +78,32 @@ async function readJSONL<T>(filePath: string): Promise<T[]> {
         return Array.isArray(parsed) ? parsed : [];
       } catch (jsonArrayError) {
         console.error(`Failed to parse log file ${filePath} as either JSONL or JSON array`);
-        return [];
+        return getInMemoryLogs<T>(logType);
       }
     }
   } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      return [];
+    if (error.code === 'ENOENT' || error.code === 'EROFS') {
+      // File doesn't exist or read-only filesystem - use in-memory logs
+      return getInMemoryLogs<T>(logType);
     }
     throw error;
+  }
+}
+
+function getInMemoryLogs<T>(logType?: string): T[] {
+  if (!logType) return [];
+
+  switch (logType) {
+    case 'frontend':
+      return logStore.getFrontendLogs() as T[];
+    case 'server-errors':
+      return logStore.getServerErrors() as T[];
+    case 'ai':
+    case 'match':
+      // These still use file-based logging only
+      return [];
+    default:
+      return [];
   }
 }
 
@@ -110,11 +130,11 @@ function getLevelEmoji(level: string): string {
 }
 
 async function generateDebugContext(): Promise<string> {
-  // Read all logs
-  const frontendLogs = await readJSONL<FrontendLogEntry>(FRONTEND_LOG_FILE);
-  const aiLogs = await readJSONL<AILogEntry>(AI_DIAGNOSTIC_LOG_FILE);
-  const matchLogs = await readJSONL<MatchLogEntry>(MATCH_LOG_FILE);
-  const serverErrors = await readJSONL<ServerErrorEntry>(SERVER_ERROR_LOG_FILE);
+  // Read all logs (try files first, fallback to in-memory)
+  const frontendLogs = await readJSONL<FrontendLogEntry>(FRONTEND_LOG_FILE, 'frontend');
+  const aiLogs = await readJSONL<AILogEntry>(AI_DIAGNOSTIC_LOG_FILE, 'ai');
+  const matchLogs = await readJSONL<MatchLogEntry>(MATCH_LOG_FILE, 'match');
+  const serverErrors = await readJSONL<ServerErrorEntry>(SERVER_ERROR_LOG_FILE, 'server-errors');
 
   // Take last N entries
   const recentFrontend = frontendLogs.slice(-100);

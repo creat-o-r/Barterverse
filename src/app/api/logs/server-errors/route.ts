@@ -1,25 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { logStore, type ServerErrorEntry } from '@/lib/logging/log-store';
 
 const SERVER_ERROR_LOG_FILE = path.join(process.cwd(), '.server-errors.jsonl');
 
-export interface ServerErrorEntry {
-  timestamp: string;
-  type: 'api-route' | 'server-action' | 'nextjs-framework' | 'uncaught';
-  route?: string;
-  method?: string;
-  error: {
-    name?: string;
-    message?: string;
-    stack?: string;
-    code?: string;
-  };
-  requestInfo?: {
-    url?: string;
-    headers?: Record<string, string>;
-  };
-}
+export type { ServerErrorEntry };
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +16,9 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
+    // Always store in memory first (works in all environments)
+    logStore.addServerError(entry);
+
     // In production, log to console for Vercel logs visibility
     console.error('[Server Error Logged]', {
       type: entry.type,
@@ -37,7 +26,7 @@ export async function POST(request: NextRequest) {
       error: entry.error.message,
     });
 
-    // In development, also write to file
+    // In development, also persist to file for debugging
     if (process.env.NODE_ENV === 'development') {
       try {
         const logLine = JSON.stringify(entry) + '\n';
@@ -61,12 +50,21 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const content = await fs.readFile(SERVER_ERROR_LOG_FILE, 'utf-8');
-    return NextResponse.json({ success: true, content });
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      return NextResponse.json({ success: true, content: '' });
+    // Try to read from file first (development)
+    try {
+      const content = await fs.readFile(SERVER_ERROR_LOG_FILE, 'utf-8');
+      return NextResponse.json({ success: true, content });
+    } catch (fileError: any) {
+      // File doesn't exist or can't be read - return in-memory logs
+      if (fileError.code === 'ENOENT' || fileError.code === 'EROFS') {
+        const memoryErrors = logStore.getServerErrors();
+        const content = memoryErrors.map(log => JSON.stringify(log)).join('\n');
+        return NextResponse.json({ success: true, content });
+      }
+      throw fileError;
     }
+  } catch (error: any) {
+    console.error('Error reading server error logs:', error);
     return NextResponse.json(
       { error: 'Failed to read server error logs' },
       { status: 500 }

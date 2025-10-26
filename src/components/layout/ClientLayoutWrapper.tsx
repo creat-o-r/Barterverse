@@ -12,16 +12,12 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
   useEffect(() => {
     setMounted(true);
 
-    // Initialize frontend logger in development
-    if (process.env.NODE_ENV === 'development') {
-      frontendLogger.init();
-      console.log('🔍 Frontend logger initialized');
-    }
+    // Initialize frontend logger (works in both dev and production)
+    frontendLogger.init();
+    console.log('🔍 Frontend logger initialized');
 
     return () => {
-      if (process.env.NODE_ENV === 'development') {
-        frontendLogger.destroy();
-      }
+      frontendLogger.destroy();
     };
   }, []);
 
