@@ -185,8 +185,15 @@ export async function GET() {
   try {
     const markdown = await generateDebugContext();
 
-    // Write to file (for MCP access)
-    await fs.writeFile(DEBUG_CONTEXT_FILE, markdown, 'utf-8');
+    // Write to file (for MCP access) - only in development, ignore errors in production
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        await fs.writeFile(DEBUG_CONTEXT_FILE, markdown, 'utf-8');
+      } catch (writeError) {
+        console.warn('Could not write debug context to file (read-only filesystem):', writeError);
+        // Continue anyway - clipboard copy still works
+      }
+    }
 
     return NextResponse.json({ success: true, content: markdown });
   } catch (error) {

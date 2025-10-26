@@ -15,9 +15,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Append logs to JSONL file
-    const logLines = logs.map(log => JSON.stringify(log)).join('\n') + '\n';
-    await fs.appendFile(FRONTEND_LOG_FILE, logLines, 'utf-8');
+    // In production serverless environments (read-only filesystem), just acknowledge receipt
+    // Frontend logger is dev-only anyway, but handle gracefully if called
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const logLines = logs.map(log => JSON.stringify(log)).join('\n') + '\n';
+        await fs.appendFile(FRONTEND_LOG_FILE, logLines, 'utf-8');
+      } catch (writeError: any) {
+        if (writeError.code === 'EROFS') {
+          console.warn('Read-only filesystem - frontend logs not persisted to file');
+        } else {
+          throw writeError;
+        }
+      }
+    }
 
     return NextResponse.json({ success: true, count: logs.length });
   } catch (error) {

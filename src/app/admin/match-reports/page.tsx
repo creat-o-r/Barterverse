@@ -222,7 +222,9 @@ export default function MatchReportsPage() {
       if (result.success && result.content) {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(result.content);
-          toast({ title: "Success", description: "Full debug context copied to clipboard! Also saved to .debug-context.md" });
+          const isDev = process.env.NODE_ENV === 'development';
+          const fileMsg = isDev ? " Also saved to .debug-context.md" : "";
+          toast({ title: "Success", description: `Full debug context copied to clipboard!${fileMsg}` });
         } else {
           toast({ title: "Clipboard Error", description: "Clipboard API not available.", variant: "destructive" });
         }
