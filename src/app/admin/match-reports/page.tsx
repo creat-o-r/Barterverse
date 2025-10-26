@@ -81,6 +81,7 @@ export default function MatchReportsPage() {
   const [isCopyingFeedbackLog, setIsCopyingFeedbackLog] = useState(false);
   const [isCopyingMatchLog, setIsCopyingMatchLog] = useState(false);
   const [isCopyingDiagnosticLog, setIsCopyingDiagnosticLog] = useState(false);
+  const [isCopyingDebugContext, setIsCopyingDebugContext] = useState(false);
   const [isClearingFeedbackLog, setIsClearingFeedbackLog] = useState(false);
   const [showClearFeedbackDialog, setShowClearFeedbackDialog] = useState(false);
 
@@ -211,6 +212,29 @@ export default function MatchReportsPage() {
   const handleCopyFeedbackLog = () => copyToClipboard(getFeedbackLogContent, setIsCopyingFeedbackLog, "Feedback User Report Log");
   const handleCopyMatchLog = () => copyToClipboard(getMatchSuggestionLogRawContent, setIsCopyingMatchLog, "Raw Match Suggestion Log");
   const handleCopyDiagnosticLog = () => copyToClipboard(getAIDiagnosticLogContent, setIsCopyingDiagnosticLog, "AI Diagnostic Log");
+
+  const handleCopyDebugContext = async () => {
+    setIsCopyingDebugContext(true);
+    try {
+      const response = await fetch('/api/logs/debug-context');
+      const result = await response.json();
+
+      if (result.success && result.content) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(result.content);
+          toast({ title: "Success", description: "Full debug context copied to clipboard! Also saved to .debug-context.md" });
+        } else {
+          toast({ title: "Clipboard Error", description: "Clipboard API not available.", variant: "destructive" });
+        }
+      } else {
+        throw new Error('Failed to fetch debug context');
+      }
+    } catch (error: any) {
+      toast({ title: "Copy Failed", description: error.message || "Could not copy debug context.", variant: "destructive" });
+    } finally {
+      setIsCopyingDebugContext(false);
+    }
+  };
 
   const performClearFeedbackLog = async () => {
     setIsClearingFeedbackLog(true);
@@ -392,6 +416,16 @@ export default function MatchReportsPage() {
           )}
         </CardContent>
          <CardFooter className="border-t p-4 flex flex-wrap gap-2">
+             <Button
+               onClick={handleCopyDebugContext}
+               disabled={isCopyingDebugContext}
+               variant="default"
+               size="default"
+               className="font-semibold"
+             >
+                <ClipboardCopy className={`mr-2 h-5 w-5 ${isCopyingDebugContext ? 'animate-spin' : ''}`} />
+                {isCopyingDebugContext ? "Generating..." : "🔍 Copy Full Debug Context (LLM-Friendly)"}
+            </Button>
              <Button onClick={handleCopyFeedbackLog} disabled={isCopyingFeedbackLog} variant="outline" size="sm">
                 <ClipboardCopy className={`mr-2 h-4 w-4 ${isCopyingFeedbackLog ? 'animate-spin' : ''}`} />
                 {isCopyingFeedbackLog ? "Copying..." : "Copy Feedback Log"}

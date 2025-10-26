@@ -384,6 +384,46 @@ so that **we have automated quality gates on every PR**.
 - IV2: Failed tests block deployment
 - IV3: Coverage trends visible over time
 
+### Story 2.6: Integrated Web-Based LLM Debugging Solution ✅ **COMPLETE**
+
+As a **developer**,
+I want **unified frontend and backend logs accessible via web interface in LLM-friendly format**,
+so that **I can efficiently debug issues in Google IDX or any web-based development environment**.
+
+**Acceptance Criteria**:
+1. Frontend log interceptor captures console, errors, React errors, and network failures
+2. API endpoint aggregates frontend logs + AI diagnostics + match reports into unified markdown
+3. Admin panel includes "Copy Full Debug Context (LLM-Friendly)" button
+4. Unified log written to `.debug-context.md` for MCP/file access
+5. Logs formatted in markdown with timestamps, emojis, and clear sections
+6. Works in development environment without external dependencies
+7. No framework lock-in (custom JavaScript solution)
+
+**Integration Verification**:
+- IV1: Frontend logger initializes in ClientLayoutWrapper on mount
+- IV2: Logs successfully sent to `/api/logs/frontend` endpoint
+- IV3: Debug context API generates unified markdown from all log sources
+- IV4: Admin button copies complete context to clipboard
+- IV5: `.debug-context.md` file created and accessible for MCP
+
+**Implementation Status**: ✅ **COMPLETE**
+
+**Files Created**:
+- `src/services/frontend-log-service.ts` - Client-side log interceptor (console, errors, network)
+- `src/app/api/logs/frontend/route.ts` - API to receive frontend logs
+- `src/app/api/logs/debug-context/route.ts` - Unified markdown aggregator
+- Updated `src/components/layout/ClientLayoutWrapper.tsx` - Logger initialization
+- Updated `src/app/admin/match-reports/page.tsx` - Added "Copy Full Debug Context" button
+- Updated `.gitignore` - Exclude log files (*.jsonl, .debug-context.md)
+
+**Technical Details**:
+- Framework-agnostic custom JavaScript logger
+- Captures console.log/warn/error, window.onerror, unhandledrejection, fetch failures
+- Batches logs every 5 seconds, immediate flush on errors
+- Markdown format optimized for LLM consumption (Claude, ChatGPT, etc.)
+- Both clipboard copy (admin UI) and file access (MCP) supported
+- Development-only (process.env.NODE_ENV === 'development')
+
 ---
 
 ## Epic 3: Database Implementation

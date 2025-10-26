@@ -42,6 +42,11 @@ dist
 # Log files
 *.log
 *.log.*
+*.jsonl
+.debug-context.md
+.frontend-logs.jsonl
+.ai-diagnostics.log.jsonl
+.match-suggestions.log.jsonl
 
 # User-specific VSCode settings
 .vscode/*.user.*
