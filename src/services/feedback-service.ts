@@ -27,14 +27,17 @@ async function readFeedbackLogs(): Promise<FeedbackReport[]> {
     return JSON.parse(fileContent) as FeedbackReport[];
   } catch (error: any) {
     if (error.code === 'ENOENT') { // File does not exist
-      // Attempt to create the file with an empty array
-      try {
-        await fs.writeFile(FEEDBACK_LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
-        return [];
-      } catch (writeError) {
-        console.error('[Feedback Service] Error creating feedback log file:', writeError);
-        return []; // Return empty if creation fails
+      // Attempt to create the file (skip if read-only filesystem)
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          await fs.writeFile(FEEDBACK_LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+        } catch (writeError: any) {
+          if (writeError.code !== 'EROFS') {
+            console.error('[Feedback Service] Error creating feedback log file:', writeError);
+          }
+        }
       }
+      return [];
     }
     console.error('[Feedback Service] Error reading feedback log file:', error);
     return [];
@@ -42,10 +45,20 @@ async function readFeedbackLogs(): Promise<FeedbackReport[]> {
 }
 
 async function writeFeedbackLogs(logs: FeedbackReport[]): Promise<boolean> {
+  // Skip file writes in production/serverless (read-only filesystem)
+  if (process.env.NODE_ENV !== 'development') {
+    // Silently succeed - feedback acknowledged even if not persisted
+    return true;
+  }
+
   try {
     await fs.writeFile(FEEDBACK_LOG_FILE_PATH, JSON.stringify(logs, null, 2), 'utf-8');
     return true;
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'EROFS') {
+      // Silently succeed for read-only filesystem
+      return true;
+    }
     console.error('[Feedback Service] Error writing feedback log file:', error);
     return false;
   }

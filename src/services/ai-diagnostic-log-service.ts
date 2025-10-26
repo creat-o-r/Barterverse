@@ -28,12 +28,25 @@ export async function logAIDiagnostic(entryData: Omit<AIDiagnosticEntry, 'timest
     timestamp: new Date().toISOString(),
   };
 
+  // Skip file writes in production/serverless (read-only filesystem)
+  if (process.env.NODE_ENV !== 'development') {
+    // Still log to console for production debugging via Vercel logs
+    console.error('[AI Diagnostic] Flow error:', {
+      flowName: entry.flowName,
+      error: entry.error.message || entry.error.name,
+      userId: entry.triggeringUserId
+    });
+    return;
+  }
+
   try {
     const logLine = JSON.stringify(entry) + '\n';
     await fs.appendFile(DIAGNOSTIC_LOG_FILE_PATH, logLine, 'utf-8');
     // console.log(`[AI Diagnostic Log Service] Logged diagnostic entry for ${entry.flowName}`);
-  } catch (error) {
-    console.error('[AI Diagnostic Log Service] Error writing to diagnostic log file:', error);
+  } catch (error: any) {
+    if (error.code !== 'EROFS') {
+      console.error('[AI Diagnostic Log Service] Error writing to diagnostic log file:', error);
+    }
   }
 }
 
