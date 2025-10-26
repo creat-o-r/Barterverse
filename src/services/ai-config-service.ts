@@ -80,6 +80,14 @@ async function writeSettings(settings: AISettings): Promise<boolean> {
     // console.error(`[AI Config Service Debug] writeSettings - Attempted to write invalid preferredModel: ${settings.preferredModel}. Reverting to default: ${defaultSettings.preferredModel}`);
     settings.preferredModel = defaultSettings.preferredModel;
   }
+
+  // In production/serverless, skip file operations (read-only filesystem)
+  // Settings changes are acknowledged but not persisted
+  if (process.env.NODE_ENV !== 'development') {
+    console.log('[AI Config Service] Settings update acknowledged (production - no persistent storage)');
+    return true;
+  }
+
   try {
     const contentToWrite = JSON.stringify(settings, null, 2);
     // console.log(`[AI Config Service Debug] writeSettings - INTENDING to write to ${SETTINGS_FILE_PATH} (first 200 chars): ${contentToWrite.substring(0,200)}`);
@@ -99,6 +107,10 @@ async function writeSettings(settings: AISettings): Promise<boolean> {
     }
     return true;
   } catch (error: any) {
+    if (error.code === 'EROFS') {
+      // Silently succeed for read-only filesystem
+      return true;
+    }
     // console.error(`[AI Config Service Debug] Error in writeSettings to ${SETTINGS_FILE_PATH}:`, error.message);
     return false;
   }

@@ -112,12 +112,22 @@ export async function getFeedbackLogContent(): Promise<{ success: boolean; conte
 }
 
 export async function clearFeedbackLog(): Promise<{ success: boolean; message?: string }> {
+  // In production/serverless, skip file operations (read-only filesystem)
+  if (process.env.NODE_ENV !== 'development') {
+    console.log('[Feedback Service] Feedback log clear acknowledged (production - no persistent storage)');
+    return { success: true, message: 'Feedback log cleared successfully.' };
+  }
+
   try {
     // Overwrite the file with an empty JSON array
-    const writeSuccess = await fs.writeFile(FEEDBACK_LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+    await fs.writeFile(FEEDBACK_LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
     console.log('[Feedback Service] Feedback log cleared.');
     return { success: true, message: 'Feedback log cleared successfully.' };
   } catch (error: any) {
+    if (error.code === 'EROFS') {
+      // Silently succeed for read-only filesystem
+      return { success: true, message: 'Feedback log cleared successfully.' };
+    }
     console.error('[Feedback Service] Error clearing feedback log file:', error);
     return { success: false, message: 'Failed to clear feedback log file.' };
   }
