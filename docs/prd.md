@@ -421,8 +421,10 @@ so that **I can efficiently debug issues in Google IDX or any web-based developm
 - Captures console.log/warn/error, window.onerror, unhandledrejection, fetch failures
 - Batches logs every 5 seconds, immediate flush on errors
 - Markdown format optimized for LLM consumption (Claude, ChatGPT, etc.)
-- Both clipboard copy (admin UI) and file access (MCP) supported
-- Development-only (process.env.NODE_ENV === 'development')
+- Clipboard copy works in all environments (primary feature)
+- File write (.debug-context.md) dev-only (serverless has read-only filesystem)
+- Frontend logger dev-only (process.env.NODE_ENV === 'development')
+- Gracefully handles EROFS errors in production/serverless environments
 
 ---
 
