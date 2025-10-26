@@ -5,6 +5,7 @@ import path from 'path';
 const FRONTEND_LOG_FILE = path.join(process.cwd(), '.frontend-logs.jsonl');
 const AI_DIAGNOSTIC_LOG_FILE = path.join(process.cwd(), '.ai-diagnostics.log.jsonl');
 const MATCH_LOG_FILE = path.join(process.cwd(), '.match-suggestions.log.json'); // NOTE: JSON array format, not JSONL
+const SERVER_ERROR_LOG_FILE = path.join(process.cwd(), '.server-errors.jsonl');
 const DEBUG_CONTEXT_FILE = path.join(process.cwd(), '.debug-context.md');
 
 interface FrontendLogEntry {
@@ -35,6 +36,23 @@ interface MatchLogEntry {
   modelUsed?: string;
   suggestedMatches?: any[];
   reasoning?: string;
+}
+
+interface ServerErrorEntry {
+  timestamp: string;
+  type: 'api-route' | 'server-action' | 'nextjs-framework' | 'uncaught';
+  route?: string;
+  method?: string;
+  error: {
+    name?: string;
+    message?: string;
+    stack?: string;
+    code?: string;
+  };
+  requestInfo?: {
+    url?: string;
+    headers?: Record<string, string>;
+  };
 }
 
 async function readJSONL<T>(filePath: string): Promise<T[]> {
@@ -96,11 +114,13 @@ async function generateDebugContext(): Promise<string> {
   const frontendLogs = await readJSONL<FrontendLogEntry>(FRONTEND_LOG_FILE);
   const aiLogs = await readJSONL<AILogEntry>(AI_DIAGNOSTIC_LOG_FILE);
   const matchLogs = await readJSONL<MatchLogEntry>(MATCH_LOG_FILE);
+  const serverErrors = await readJSONL<ServerErrorEntry>(SERVER_ERROR_LOG_FILE);
 
   // Take last N entries
   const recentFrontend = frontendLogs.slice(-100);
   const recentAI = aiLogs.slice(-50);
   const recentMatches = matchLogs.slice(-20);
+  const recentServerErrors = serverErrors.slice(-50);
 
   // Build markdown
   let markdown = `# 🔍 BarterVerse Debug Context\n\n`;
@@ -121,6 +141,33 @@ async function generateDebugContext(): Promise<string> {
       markdown += `\`\`\`\n${log.message}\n\`\`\`\n`;
       if (log.stack && log.level.includes('error')) {
         markdown += `<details><summary>Stack Trace</summary>\n\n\`\`\`\n${log.stack}\n\`\`\`\n</details>\n`;
+      }
+      markdown += `\n`;
+    }
+  }
+
+  markdown += `---\n\n`;
+
+  // Server Errors Section (CRITICAL - show first!)
+  markdown += `## 🚨 Server & API Errors (Last ${recentServerErrors.length} entries)\n\n`;
+  if (recentServerErrors.length === 0) {
+    markdown += `_No server errors logged_\n\n`;
+  } else {
+    for (const error of recentServerErrors) {
+      const time = formatTimestamp(error.timestamp);
+      const typeEmoji = error.type === 'api-route' ? '🔌' : error.type === 'uncaught' ? '💥' : '⚙️';
+      markdown += `**[${time}]** ${typeEmoji} **${error.type.toUpperCase()}**\n`;
+      markdown += `- **Route:** ${error.route || 'Unknown'}\n`;
+      markdown += `- **Method:** ${error.method || 'N/A'}\n`;
+      markdown += `- **Error:** ${error.error.message || error.error.name || 'Unknown error'}\n`;
+      if (error.error.code) {
+        markdown += `- **Code:** \`${error.error.code}\`\n`;
+      }
+      if (error.requestInfo?.url) {
+        markdown += `- **URL:** ${error.requestInfo.url}\n`;
+      }
+      if (error.error.stack) {
+        markdown += `<details><summary>Stack Trace</summary>\n\n\`\`\`\n${error.error.stack}\n\`\`\`\n</details>\n`;
       }
       markdown += `\n`;
     }

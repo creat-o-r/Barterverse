@@ -47,6 +47,7 @@ dist
 .ai-diagnostics.log.jsonl
 .match-suggestions.log.json
 .feedback-reports.log.json
+.server-errors.jsonl
 
 # User-specific VSCode settings
 .vscode/*.user.*
