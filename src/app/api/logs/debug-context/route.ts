@@ -99,8 +99,9 @@ function getInMemoryLogs<T>(logType?: string): T[] {
     case 'server-errors':
       return logStore.getServerErrors() as T[];
     case 'ai':
+      return logStore.getAIDiagnostics() as T[];
     case 'match':
-      // These still use file-based logging only
+      // Match logs still use file-based logging only
       return [];
     default:
       return [];

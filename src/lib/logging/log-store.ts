@@ -29,9 +29,26 @@ export interface ServerErrorEntry {
   };
 }
 
+export interface AIDiagnosticEntry {
+  timestamp: string;
+  flowName: string;
+  triggeringUserId?: string;
+  input: any;
+  error: {
+    name?: string;
+    message?: string;
+    stack?: string;
+    details?: any;
+    status?: number;
+    code?: string | number;
+  };
+  userFacingMessage: string;
+}
+
 class LogStore {
   private frontendLogs: FrontendLogEntry[] = [];
   private serverErrors: ServerErrorEntry[] = [];
+  private aiDiagnostics: AIDiagnosticEntry[] = [];
   private maxLogs = 200; // Keep last 200 entries per type
 
   // Frontend logs
@@ -58,6 +75,18 @@ class LogStore {
     return [...this.serverErrors];
   }
 
+  // AI diagnostics
+  addAIDiagnostic(entry: AIDiagnosticEntry) {
+    this.aiDiagnostics.push(entry);
+    if (this.aiDiagnostics.length > this.maxLogs) {
+      this.aiDiagnostics = this.aiDiagnostics.slice(-this.maxLogs);
+    }
+  }
+
+  getAIDiagnostics(): AIDiagnosticEntry[] {
+    return [...this.aiDiagnostics];
+  }
+
   // Clear methods (for testing/admin)
   clearFrontendLogs() {
     this.frontendLogs = [];
@@ -67,9 +96,14 @@ class LogStore {
     this.serverErrors = [];
   }
 
+  clearAIDiagnostics() {
+    this.aiDiagnostics = [];
+  }
+
   clearAll() {
     this.frontendLogs = [];
     this.serverErrors = [];
+    this.aiDiagnostics = [];
   }
 }
 
