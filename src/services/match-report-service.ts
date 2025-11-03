@@ -39,13 +39,17 @@ async function readLogs(): Promise<LoggedMatchSuggestion[]> {
     }));
   } catch (error: any) {
     if (error.code === 'ENOENT') {
-      try {
-        await fs.writeFile(LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
-        return [];
-      } catch (writeError) {
-         console.error('[Match Report Service] Error creating log file:', writeError);
-         return [];
+      // File doesn't exist - try to create it (skip if read-only filesystem)
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          await fs.writeFile(LOG_FILE_PATH, JSON.stringify([], null, 2), 'utf-8');
+        } catch (writeError: any) {
+          if (writeError.code !== 'EROFS') {
+            console.error('[Match Report Service] Error creating log file:', writeError);
+          }
+        }
       }
+      return [];
     }
     console.error('[Match Report Service] Error reading log file:', error);
     return [];
@@ -53,9 +57,19 @@ async function readLogs(): Promise<LoggedMatchSuggestion[]> {
 }
 
 async function writeLogs(logs: LoggedMatchSuggestion[]): Promise<void> {
+  // Skip file writes in production/serverless (read-only filesystem)
+  // Logs are still captured in memory for the current request
+  if (process.env.NODE_ENV !== 'development') {
+    return;
+  }
+
   try {
     await fs.writeFile(LOG_FILE_PATH, JSON.stringify(logs, null, 2), 'utf-8');
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'EROFS') {
+      // Silently ignore read-only filesystem errors
+      return;
+    }
     console.error('[Match Report Service] Error writing log file:', error);
   }
 }

@@ -42,6 +42,12 @@ dist
 # Log files
 *.log
 *.log.*
+.debug-context.md
+.frontend-logs.jsonl
+.ai-diagnostics.log.jsonl
+.match-suggestions.log.json
+.feedback-reports.log.json
+.server-errors.jsonl
 
 # User-specific VSCode settings
 .vscode/*.user.*
@@ -61,3 +67,7 @@ tsconfig.tsbuildinfo
 
 # IDE specific files
 .idx/
+
+# BMAD Method framework (auto-generated)
+.bmad-core/
+.claude/commands/BMad/

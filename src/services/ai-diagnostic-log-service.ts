@@ -1,54 +1,54 @@
-
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
+import type { AIDiagnosticEntry } from '@/lib/logging/log-store';
 
-const DIAGNOSTIC_LOG_FILE_PATH = path.join(process.cwd(), '.ai-diagnostics.log.jsonl');
-
-export interface AIDiagnosticEntry {
-  timestamp: string;
-  flowName: string;
-  triggeringUserId?: string; // Optional, if available from input
-  input: any;
-  error: {
-    name?: string;
-    message?: string;
-    stack?: string;
-    details?: any; // For Genkit error details
-    status?: number; // For HTTP status codes
-    code?: string | number; // For gRPC codes or other error codes
-  };
-  userFacingMessage: string; // The message that was or would be returned to the user
-}
+export type { AIDiagnosticEntry };
 
 export async function logAIDiagnostic(entryData: Omit<AIDiagnosticEntry, 'timestamp'>): Promise<void> {
-  const entry: AIDiagnosticEntry = {
-    ...entryData,
-    timestamp: new Date().toISOString(),
-  };
+  // Log to console for immediate visibility
+  console.error('[AI Diagnostic] Flow error:', {
+    flowName: entryData.flowName,
+    error: entryData.error.message || entryData.error.name,
+    userId: entryData.triggeringUserId
+  });
 
+  // Send to logging endpoint (works across serverless instances)
   try {
-    const logLine = JSON.stringify(entry) + '\n';
-    await fs.appendFile(DIAGNOSTIC_LOG_FILE_PATH, logLine, 'utf-8');
-    // console.log(`[AI Diagnostic Log Service] Logged diagnostic entry for ${entry.flowName}`);
+    // Construct absolute URL for server-side fetch
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : 'http://localhost:9002';
+
+    await fetch(`${baseUrl}/api/logs/ai-diagnostics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entryData),
+    });
   } catch (error) {
-    console.error('[AI Diagnostic Log Service] Error writing to diagnostic log file:', error);
+    console.error('[AI Diagnostic] Failed to send log to endpoint:', error);
   }
 }
 
 export async function getAIDiagnosticLogContent(): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    await fs.access(DIAGNOSTIC_LOG_FILE_PATH);
-    const fileContent = await fs.readFile(DIAGNOSTIC_LOG_FILE_PATH, 'utf-8');
-    if (fileContent.trim() === '') {
-      return { success: true, content: "" }; // Return empty string if file is empty
+    // Construct absolute URL for server-side fetch
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : 'http://localhost:9002';
+
+    const response = await fetch(`${baseUrl}/api/logs/ai-diagnostics`);
+    const data = await response.json();
+
+    if (data.success) {
+      return { success: true, content: data.content || '' };
+    } else {
+      return { success: false, error: data.error || 'Failed to fetch AI diagnostic logs' };
     }
-    return { success: true, content: fileContent };
   } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      return { success: true, content: "" }; // File doesn't exist, treat as empty log
-    }
     console.error('[AI Diagnostic Log Service] Error reading diagnostic log content:', error);
     return { success: false, error: 'Could not read AI diagnostic log file.' };
   }
