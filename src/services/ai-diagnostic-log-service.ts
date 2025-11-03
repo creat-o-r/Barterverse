@@ -1,65 +1,53 @@
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
-import { logStore, type AIDiagnosticEntry } from '@/lib/logging/log-store';
-
-const DIAGNOSTIC_LOG_FILE_PATH = path.join(process.cwd(), '.ai-diagnostics.log.jsonl');
+import type { AIDiagnosticEntry } from '@/lib/logging/log-store';
 
 export type { AIDiagnosticEntry };
 
 export async function logAIDiagnostic(entryData: Omit<AIDiagnosticEntry, 'timestamp'>): Promise<void> {
-  const entry: AIDiagnosticEntry = {
-    ...entryData,
-    timestamp: new Date().toISOString(),
-  };
-
-  // Always store in memory first (works in all environments)
-  logStore.addAIDiagnostic(entry);
-
-  // Log to console for visibility in Vercel logs
+  // Log to console for immediate visibility
   console.error('[AI Diagnostic] Flow error:', {
-    flowName: entry.flowName,
-    error: entry.error.message || entry.error.name,
-    userId: entry.triggeringUserId
+    flowName: entryData.flowName,
+    error: entryData.error.message || entryData.error.name,
+    userId: entryData.triggeringUserId
   });
 
-  // In development, also persist to file for debugging
-  if (process.env.NODE_ENV === 'development') {
-    try {
-      const logLine = JSON.stringify(entry) + '\n';
-      await fs.appendFile(DIAGNOSTIC_LOG_FILE_PATH, logLine, 'utf-8');
-    } catch (error: any) {
-      if (error.code !== 'EROFS') {
-        console.error('[AI Diagnostic Log Service] Error writing to diagnostic log file:', error);
-      }
-    }
+  // Send to logging endpoint (works across serverless instances)
+  try {
+    // Construct absolute URL for server-side fetch
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : 'http://localhost:9002';
+
+    await fetch(`${baseUrl}/api/logs/ai-diagnostics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entryData),
+    });
+  } catch (error) {
+    console.error('[AI Diagnostic] Failed to send log to endpoint:', error);
   }
 }
 
 export async function getAIDiagnosticLogContent(): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
-    // Try to read from file first (development)
-    try {
-      await fs.access(DIAGNOSTIC_LOG_FILE_PATH);
-      const fileContent = await fs.readFile(DIAGNOSTIC_LOG_FILE_PATH, 'utf-8');
-      if (fileContent.trim()) {
-        return { success: true, content: fileContent };
-      }
-    } catch (fileError: any) {
-      // File doesn't exist or can't be read - use in-memory logs
-      if (fileError.code === 'ENOENT' || fileError.code === 'EROFS') {
-        const memoryLogs = logStore.getAIDiagnostics();
-        const content = memoryLogs.map(log => JSON.stringify(log)).join('\n');
-        return { success: true, content };
-      }
-      throw fileError;
-    }
+    // Construct absolute URL for server-side fetch
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : 'http://localhost:9002';
 
-    // If file exists but is empty, check in-memory
-    const memoryLogs = logStore.getAIDiagnostics();
-    const content = memoryLogs.map(log => JSON.stringify(log)).join('\n');
-    return { success: true, content };
+    const response = await fetch(`${baseUrl}/api/logs/ai-diagnostics`);
+    const data = await response.json();
+
+    if (data.success) {
+      return { success: true, content: data.content || '' };
+    } else {
+      return { success: false, error: data.error || 'Failed to fetch AI diagnostic logs' };
+    }
   } catch (error: any) {
     console.error('[AI Diagnostic Log Service] Error reading diagnostic log content:', error);
     return { success: false, error: 'Could not read AI diagnostic log file.' };
