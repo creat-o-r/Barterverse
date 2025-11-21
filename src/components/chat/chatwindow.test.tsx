@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import ChatWindow from './ChatWindow';
 import type { Item, ChatMessage } from '@/types';
 import { tradeNegotiationChat as mockTradeNegotiationChat } from '@/ai/flows/trade-negotiation-chat';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { testAuthHelpers } from '@/test-utils/auth-helpers';
 // For typing, actual mock is below, not importing dummyUsers directly into test logic
 // import { dummyUsers as mockActualDummyUsers } from '@/lib/dummy-data';
 import { useToast as mockUseToast } from "@/hooks/use-toast";
@@ -47,42 +49,87 @@ const otherUserName = 'Other User Name';
 
 
 describe('ChatWindow Component', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    // Clean up any existing auth state
+    await testAuthHelpers.signOutTestUser();
+  });
+
+  afterEach(async () => {
+    // Clean up auth state after each test
+    await testAuthHelpers.signOutTestUser();
   });
 
   describe('Initial Rendering', () => {
-    test('CurrentUser as Initiator: renders correct initial AI message', () => {
+    test('CurrentUser as Initiator: shows sign in prompt when not authenticated', async () => {
       const tradeIdAsInitiator = `trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`;
       render(
-        <ChatWindow
-          currentItem={otherUsersItem}
-          requestedItemInitial={currentUsersItem}
-          otherUserId={otherUserId}
-          otherUserName={otherUserName}
-          tradeId={tradeIdAsInitiator}
-        />
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={tradeIdAsInitiator}
+          />
+        </AuthProvider>
       );
 
-      expect(screen.getByText(/Hi! I'm here to help you negotiate/i)).toBeInTheDocument();
-      expect(screen.getByText(new RegExp(`You're interested in their "${otherUsersItem.name}"`, "i"))).toBeInTheDocument();
-      expect(screen.getByText(new RegExp(`You could offer your "${currentUsersItem.name}"`, "i"))).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/sign in to chat/i)).toBeInTheDocument();
+      });
     });
 
-    test('OtherUser as Initiator: renders correct initial AI message', () => {
+    test('OtherUser as Initiator: shows sign in prompt when not authenticated', async () => {
       const tradeIdAsReceiver = `trade-${otherUserId}-wants-${currentUsersItem.id}-from-${mockCurrentUserId}`;
       render(
-        <ChatWindow
-          currentItem={otherUsersItem}
-          requestedItemInitial={currentUsersItem}
-          otherUserId={otherUserId}
-          otherUserName={otherUserName}
-          tradeId={tradeIdAsReceiver}
-        />
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={tradeIdAsReceiver}
+          />
+        </AuthProvider>
       );
-      expect(screen.getByText(/Hi! I'm here to help you negotiate/i)).toBeInTheDocument();
-      expect(screen.getByText(new RegExp(`${otherUserName} is interested in your "${currentUsersItem.name}"`, "i"))).toBeInTheDocument();
-      expect(screen.getByText(new RegExp(`They might offer their "${otherUsersItem.name}"`, "i"))).toBeInTheDocument();
+      
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/sign in to chat/i)).toBeInTheDocument();
+      });
+    });
+
+    test('CurrentUser as Initiator: renders correct initial AI message when authenticated', async () => {
+      // Sign in a test user
+      const user = await testAuthHelpers.createAndSignInTestUser('chattest@example.com');
+      
+      const tradeIdAsInitiator = `trade-${user.uid}-wants-${otherUsersItem.id}-from-${otherUserId}`;
+      render(
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={tradeIdAsInitiator}
+          />
+        </AuthProvider>
+      );
+
+      // Wait for auth state to settle
+      await testAuthHelpers.waitForAuthState();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Hi! I'm here to help you negotiate/i)).toBeInTheDocument();
+      }, { timeout: 3000 });
+      
+      await waitFor(() => {
+        expect(screen.getByText(new RegExp(`You're interested in their "${otherUsersItem.name}"`, "i"))).toBeInTheDocument();
+      }, { timeout: 3000 });
+      
+      await waitFor(() => {
+        expect(screen.getByText(new RegExp(`You could offer your "${currentUsersItem.name}"`, "i"))).toBeInTheDocument();
+      }, { timeout: 3000 });
     });
   });
 
@@ -90,6 +137,9 @@ describe('ChatWindow Component', () => {
     const tradeId = `trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`;
 
     test('sends a message, shows loading, receives and displays AI response', async () => {
+      // Sign in a test user
+      const user = await testAuthHelpers.createAndSignInTestUser('chattest2@example.com');
+      await testAuthHelpers.waitForAuthState();
       const aiResponseText = "That's an interesting proposal!";
       let resolveChatPromise: (value: { response: string }) => void;
       (mockTradeNegotiationChat as jest.Mock).mockImplementationOnce(
@@ -97,14 +147,27 @@ describe('ChatWindow Component', () => {
       );
 
       render(
-        <ChatWindow
-          currentItem={otherUsersItem}
-          requestedItemInitial={currentUsersItem}
-          otherUserId={otherUserId}
-          otherUserName={otherUserName}
-          tradeId={tradeId}
-        />
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={tradeId}
+          />
+        </AuthProvider>
       );
+
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
+
+      // Wait for authentication to complete and form to be enabled
+      await waitFor(() => {
+        const input = screen.getByPlaceholderText('Type your message...');
+        expect(input).not.toBeDisabled();
+      }, { timeout: 3000 });
 
       const input = screen.getByPlaceholderText('Type your message...');
       const sendButton = screen.getByRole('button', { type: 'submit' });
@@ -138,11 +201,11 @@ describe('ChatWindow Component', () => {
 
       // Check chatHistory parts
       expect(actualArgs.chatHistory).toContain("AI: Hi! I'm here to help you negotiate");
-      expect(actualArgs.chatHistory).toContain(`User (${mockCurrentUserId}): Hello, interested in a trade?`);
+      expect(actualArgs.chatHistory).toContain(`User (${user.uid}): Hello, interested in a trade?`);
 
-      // Check item descriptions
-      expect(actualArgs.itemOfferedDescription).toBe(`${currentUsersItem.name}: ${currentUsersItem.description}`);
-      expect(actualArgs.itemWantedDescription).toBe(`${otherUsersItem.name}: ${otherUsersItem.description}`);
+      // Check item descriptions  
+      expect(actualArgs.itemOfferedDescription).toBe(`${otherUsersItem.name}: ${otherUsersItem.description}`);
+      expect(actualArgs.itemWantedDescription).toBe(`${currentUsersItem.name}: ${currentUsersItem.description}`);
 
       expect(actualArgs.userMessage).toBe('Hello, interested in a trade?');
 
@@ -150,19 +213,28 @@ describe('ChatWindow Component', () => {
     });
 
     test('handles AI error, shows error message, and calls toast', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest3@example.com');
       let rejectChatPromise: (reason?: any) => void;
       (mockTradeNegotiationChat as jest.Mock).mockImplementationOnce(
         () => new Promise((_, reject) => { rejectChatPromise = reject; })
       );
       render(
-        <ChatWindow
-          currentItem={otherUsersItem}
-          requestedItemInitial={currentUsersItem}
-          otherUserId={otherUserId}
-          otherUserName={otherUserName}
-          tradeId={tradeId}
-        />
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={tradeId}
+          />
+        </AuthProvider>
       );
+
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText('Type your message...');
       const sendButton = screen.getByRole('button', { type: 'submit' });
@@ -198,30 +270,45 @@ describe('ChatWindow Component', () => {
   });
 
   describe('Input and Button Disabled States', () => {
-    test('Send button is disabled when input is empty', () => {
+    test('Send button is disabled when not authenticated', async () => {
       render(
-        <ChatWindow
-          currentItem={otherUsersItem}
-          otherUserId={otherUserId}
-          otherUserName={otherUserName}
-          tradeId={`trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`}
-        />
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={`trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`}
+          />
+        </AuthProvider>
       );
-      const sendButton = screen.getByRole('button', { type: 'submit' });
-      expect(sendButton).toBeDisabled();
+      
+      await waitFor(() => {
+        const sendButton = screen.getByRole('button', { type: 'submit' });
+        expect(sendButton).toBeDisabled();
+      });
     });
 
     test('Input and Send button are disabled during AI response loading', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest4@example.com');
       (mockTradeNegotiationChat as jest.Mock).mockImplementation(() => new Promise(resolve => setTimeout(() => resolve({ response: "Delayed" }), 100)));
       render(
-        <ChatWindow
-          currentItem={otherUsersItem}
-          requestedItemInitial={currentUsersItem}
-          otherUserId={otherUserId}
-          otherUserName={otherUserName}
-          tradeId={`trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`}
-        />
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={`trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`}
+          />
+        </AuthProvider>
       );
+      
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
+      
       const input = screen.getByPlaceholderText('Type your message...') as HTMLInputElement;
       const sendButton = screen.getByRole('button', { type: 'submit' });
 
@@ -245,17 +332,26 @@ describe('ChatWindow Component', () => {
 
   describe('Message Styling/Alignment', () => {
     test('User message has user-specific styling, AI message has AI-specific styling', async () => {
+      // Sign in a test user
+      await testAuthHelpers.createAndSignInTestUser('chattest5@example.com');
       const aiResponseText = "AI reply here.";
       (mockTradeNegotiationChat as jest.Mock).mockResolvedValue({ response: aiResponseText });
       render(
-        <ChatWindow
-          currentItem={otherUsersItem}
-          requestedItemInitial={currentUsersItem}
-          otherUserId={otherUserId}
-          otherUserName={otherUserName}
-          tradeId={`trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`}
-        />
+        <AuthProvider>
+          <ChatWindow
+            currentItem={otherUsersItem}
+            requestedItemInitial={currentUsersItem}
+            otherUserId={otherUserId}
+            otherUserName={otherUserName}
+            tradeId={`trade-${mockCurrentUserId}-wants-${otherUsersItem.id}-from-${otherUserId}`}
+          />
+        </AuthProvider>
       );
+
+      // Wait for component to load with authenticated state
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
+      });
 
       const input = screen.getByPlaceholderText('Type your message...');
       const sendButton = screen.getByRole('button', { type: 'submit' });

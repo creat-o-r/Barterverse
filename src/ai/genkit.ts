@@ -37,5 +37,14 @@ export const ai = genkit({
 // Export the async initializer for future use
 export { createAI };
 
+// Import test flows and evaluators when in test environment
+if (process.env.GENKIT_ENV === 'dev' || process.env.NODE_ENV === 'test') {
+  console.log('[Genkit Init] Loading test flows and evaluators...');
+  // Import test components to register them with Genkit
+  import('./test/genkit-flow-evaluator').catch(error => {
+    console.warn('[Genkit Init] Failed to load test evaluators:', error.message);
+  });
+}
+
 console.log('[Genkit Init] genkit.ts: Module execution END. Genkit "ai" object configured with googleAI plugin and hardcoded model.');
 

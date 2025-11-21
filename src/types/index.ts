@@ -57,6 +57,7 @@ export type UserLogisticsPreferences = {
 export type User = {
   id: string;
   name: string;
+  email?: string;
   avatarUrl: string;
   dataAiHint?: string;
   rating: number;
@@ -131,4 +132,12 @@ export type InferUserPreferencesOutput = {
   reasoning?: string;
   errorMessage?: string;
 };
+
+// Firebase Firestore types
+export type FirestoreTimestamp = {
+  seconds: number;
+  nanoseconds: number;
+};
+
+export type ItemSpecification = Record<string, string>;
 

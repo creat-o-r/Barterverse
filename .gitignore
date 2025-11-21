@@ -64,3 +64,4 @@ tsconfig.tsbuildinfo
 
 # Test coverage
 coverage/
+dev.pid

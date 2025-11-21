@@ -42,6 +42,19 @@ jest.mock('@/lib/dummy-data', () => ({
   ],
 }));
 
+// Mock Firestore utils to prevent actual Firebase calls
+jest.mock('@/lib/firebase/firestoreUtils', () => ({
+  getUser: jest.fn().mockResolvedValue({
+    id: 'user-1',
+    name: 'Test User',
+    minimumMatchRating: 'Medium',
+    motivations: ['help-others'],
+    locationPreference: { isSensitive: false },
+    tradeTimingPreference: 'flexible',
+    interestedInThirdPartyFulfillment: true,
+  }),
+}));
+
 // Import after mocking
 import { suggestMatchingItems } from './item-match-flow';
 import * as genkitModule from '@/ai/genkit';
